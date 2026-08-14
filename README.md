@@ -16,7 +16,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Active_Development-success?style=for-the-badge&logo=github&logoColor=white" />
   <img src="https://img.shields.io/badge/Version-2.0.0-blue?style=for-the-badge&logo=git&logoColor=white" />
-  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" />
+  <a href="./COPYRIGHT.md"><img src="https://img.shields.io/badge/License-Proprietary_&_Confidential-red?style=for-the-badge&logo=lock" /></a>
 </p>
 
 </div>
