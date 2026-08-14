@@ -1,0 +1,14 @@
+                 {{businessName}}
+                  CLOSING REPORT
+                  {{date}}
+------------------------------------------
+{{cashierReports}}
+------------------------------------------
+                  GRAND TOTALS
+------------------------------------------
+Total Cash:                 Ksh {{totalCash}}
+Total Mpesa:                Ksh {{totalMpesa}}
+Total Credit:               Ksh {{totalCredit}}
+Grand Total:                Ksh {{grandTotal}}
+------------------------------------------
+               End of Day Report

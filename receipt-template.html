@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt</title>
+    <style>
+        @page {
+            margin: 0;
+            size: 80mm auto; /* Physical paper size */
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10.5px; /* Corrected font size */
+            font-weight: bold;
+            color: #000;
+            margin: 0;
+            padding: 0;
+
+            /*
+               Content width restricted to 70mm to prevent stretching
+               and "unused spaces".
+               margin-left: 5mm centers it on 80mm paper (5mm + 70mm + 5mm = 80mm).
+            */
+            width: 70mm;
+            margin-left: 5mm;
+        }
+        .container {
+            padding: 5px 0; /* Vertical padding only; side spacing handled by body margin */
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        .header h1 {
+            font-size: 18px;
+            margin: 0 0 2px 0;
+            text-transform: uppercase;
+        }
+        .header p {
+            margin: 2px 0;
+        }
+        .separator {
+            border-top: 1px dashed #000;
+            margin: 5px 0;
+        }
+        .info {
+            margin-bottom: 5px;
+        }
+        .info p {
+            margin: 2px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed; /* Enforce strict column widths */
+        }
+        th {
+            text-align: left;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 2px;
+        }
+        td {
+            padding: 2px 0;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        /* 4-Column Layout Styles - Adjusted for 70mm content area */
+        th:nth-child(1), td:nth-child(1) { width: 40%; } /* Item */
+        th:nth-child(2), td:nth-child(2) { width: 15%; text-align: center; } /* Qty */
+        th:nth-child(3), td:nth-child(3) { width: 20%; text-align: right; } /* Price */
+        th:nth-child(4), td:nth-child(4) { width: 25%; text-align: right; } /* Total */
+
+        .totals {
+            margin-top: 5px;
+        }
+        .totals .row {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+        .totals .total-row {
+            font-weight: 900;
+            font-size: 14px;
+            margin-top: 4px;
+            border-top: 1px dashed #000;
+            padding-top: 4px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        .footer p {
+            margin: 2px 0;
+        }
+        .footer-dev {
+            text-align: center;
+            margin-top: 5px;
+            font-size: 10px;
+        }
+        .payment-line {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{businessName}}</h1>
+            <p>{{location}}</p>
+            <p>{{address}}</p>
+            <p>{{phone}}</p>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="info">
+            <p>Receipt #: {{receiptId}}</p>
+            <p>Date: {{date}}</p>
+            <p>Customer: {{customer}}</p>
+        </div>
+
+        <div class="separator"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th class="qty">Qty</th>
+                    <th class="price">@</th>
+                    <th class="total">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{itemsHtml}}
+            </tbody>
+        </table>
+
+        <div class="separator"></div>
+
+        <div class="totals">
+            <div class="row">
+                <span>Subtotal:</span>
+                <span>{{subtotal}}</span>
+            </div>
+            <div class="row total-row">
+                <span>TOTAL:</span>
+                <span>{{total}}</span>
+            </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="info">
+            <div class="payment-line">
+                <span>Served By: {{servedBy}}</span>
+                <span>Payment : {{paymentMethod}}</span>
+            </div>
+            {{paymentDetailsHtml}}
+        </div>
+
+        <div style="text-align: center;">
+            {{mpesaDetails}}
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="footer">
+            <p>{{receiptHeader}}</p>
+            {{receiptFooter}}
+        </div>
+
+        <div class="separator"></div>
+
+        {{developerFooter}}
+    </div>
+</body>
+</html>

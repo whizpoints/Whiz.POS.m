@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1",
+    "name": "Admin",
+    "pin": "1234",
+    "role": "admin",
+    "isActive": true,
+    "createdAt": "2023-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "2",
+    "name": "User",
+    "pin": "1234",
+    "role": "cashier",
+    "isActive": true,
+    "createdAt": "2023-01-01T00:00:00.000Z"
+  }
+]

@@ -1,0 +1,8 @@
+{
+	"appId": "com.whizpos.mobile",
+	"appName": "WHIZ POS",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
+}

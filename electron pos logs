@@ -1,0 +1,3258 @@
+VM9:4 Preload script executed
+chunk-LAV6FB6A.js?v=c06d8d44:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+VM8 sandbox_bundle:2 Electron Security Warning (Insecure Content-Security-Policy) This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+warnAboutInsecureCSP @ VM8 sandbox_bundle:2
+logSecurityWarnings @ VM8 sandbox_bundle:2
+(anonymous) @ VM8 sandbox_bundle:2
+load (async)
+securityWarnings @ VM8 sandbox_bundle:2
+./lib/renderer/common-init.ts @ VM8 sandbox_bundle:2
+__webpack_require__ @ VM8 sandbox_bundle:2
+(anonymous) @ VM8 sandbox_bundle:2
+(anonymous) @ VM8 sandbox_bundle:2
+___electron_webpack_init__ @ VM8 sandbox_bundle:2
+(anonymous) @ VM8 sandbox_bundle:2
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+App.tsx:58 Auto-logoff configured: 2 minutes (120000ms)
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+App.tsx:58 Auto-logoff configured: 2 minutes (120000ms)
+react-router-dom.js?v=c06d8d44:4429 ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+warnOnce @ react-router-dom.js?v=c06d8d44:4429
+logDeprecation @ react-router-dom.js?v=c06d8d44:4432
+logV6DeprecationWarnings @ react-router-dom.js?v=c06d8d44:4435
+(anonymous) @ react-router-dom.js?v=c06d8d44:5346
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 16 more frames
+Show less
+react-router-dom.js?v=c06d8d44:4429 ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+warnOnce @ react-router-dom.js?v=c06d8d44:4429
+logDeprecation @ react-router-dom.js?v=c06d8d44:4432
+logV6DeprecationWarnings @ react-router-dom.js?v=c06d8d44:4438
+(anonymous) @ react-router-dom.js?v=c06d8d44:5346
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 16 more frames
+Show less
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+App.tsx:58 Auto-logoff configured: 2 minutes (120000ms)
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+posStore.ts:1352 Full sync successful
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+useAutoLogout.ts:47 User idle detected. Elapsed: 159395ms > Timeout: 120000ms
+(anonymous) @ useAutoLogout.ts:47
+setInterval (async)
+(anonymous) @ useAutoLogout.ts:43
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 12 more frames
+Show less
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+useAutoLogout.ts:47 User idle detected. Elapsed: 129484ms > Timeout: 120000ms
+(anonymous) @ useAutoLogout.ts:47
+setInterval (async)
+(anonymous) @ useAutoLogout.ts:43
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 11 more frames
+Show less
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+App.tsx:58 Auto-logoff configured: 2 minutes (120000ms)
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+processSyncQueue @ posStore.ts:597
+await in processSyncQueue (async)
+(anonymous) @ posStore.ts:570
+setTimeout (async)
+addToSyncQueue @ posStore.ts:570
+completeTransaction @ posStore.ts:238
+handleComplete @ CheckoutModal.tsx:90
+callCallback2 @ chunk-LAV6FB6A.js?v=c06d8d44:3674
+invokeGuardedCallbackDev @ chunk-LAV6FB6A.js?v=c06d8d44:3699
+invokeGuardedCallback @ chunk-LAV6FB6A.js?v=c06d8d44:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-LAV6FB6A.js?v=c06d8d44:3736
+executeDispatch @ chunk-LAV6FB6A.js?v=c06d8d44:7016
+processDispatchQueueItemsInOrder @ chunk-LAV6FB6A.js?v=c06d8d44:7036
+processDispatchQueue @ chunk-LAV6FB6A.js?v=c06d8d44:7045
+dispatchEventsForPlugins @ chunk-LAV6FB6A.js?v=c06d8d44:7053
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:7177
+batchedUpdates$1 @ chunk-LAV6FB6A.js?v=c06d8d44:18941
+batchedUpdates @ chunk-LAV6FB6A.js?v=c06d8d44:3579
+dispatchEventForPluginEventSystem @ chunk-LAV6FB6A.js?v=c06d8d44:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-LAV6FB6A.js?v=c06d8d44:5478
+dispatchEvent @ chunk-LAV6FB6A.js?v=c06d8d44:5472
+dispatchDiscreteEvent @ chunk-LAV6FB6A.js?v=c06d8d44:5449
+Show 15 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+processSyncQueue @ posStore.ts:597
+await in processSyncQueue (async)
+(anonymous) @ posStore.ts:570
+setTimeout (async)
+addToSyncQueue @ posStore.ts:570
+completeTransaction @ posStore.ts:238
+handleComplete @ CheckoutModal.tsx:90
+callCallback2 @ chunk-LAV6FB6A.js?v=c06d8d44:3674
+invokeGuardedCallbackDev @ chunk-LAV6FB6A.js?v=c06d8d44:3699
+invokeGuardedCallback @ chunk-LAV6FB6A.js?v=c06d8d44:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-LAV6FB6A.js?v=c06d8d44:3736
+executeDispatch @ chunk-LAV6FB6A.js?v=c06d8d44:7016
+processDispatchQueueItemsInOrder @ chunk-LAV6FB6A.js?v=c06d8d44:7036
+processDispatchQueue @ chunk-LAV6FB6A.js?v=c06d8d44:7045
+dispatchEventsForPlugins @ chunk-LAV6FB6A.js?v=c06d8d44:7053
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:7177
+batchedUpdates$1 @ chunk-LAV6FB6A.js?v=c06d8d44:18941
+batchedUpdates @ chunk-LAV6FB6A.js?v=c06d8d44:3579
+dispatchEventForPluginEventSystem @ chunk-LAV6FB6A.js?v=c06d8d44:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-LAV6FB6A.js?v=c06d8d44:5478
+dispatchEvent @ chunk-LAV6FB6A.js?v=c06d8d44:5472
+dispatchDiscreteEvent @ chunk-LAV6FB6A.js?v=c06d8d44:5449
+Show 15 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+useAutoLogout.ts:47 User idle detected. Elapsed: 120159ms > Timeout: 120000ms
+(anonymous) @ useAutoLogout.ts:47
+setInterval (async)
+(anonymous) @ useAutoLogout.ts:43
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 12 more frames
+Show less
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:1352 Full sync successful
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:1352 Full sync successful
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx:85 Auto-sync: Pushing data to server...
+App.tsx:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+App.tsx?t=1779045721329:58 Auto-logoff configured: 2 minutes (120000ms)
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+(anonymous) @ App.tsx:88
+setInterval (async)
+(anonymous) @ App.tsx:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+invokePassiveEffectMountInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:18352
+invokeEffectsInDev @ chunk-LAV6FB6A.js?v=c06d8d44:19729
+commitDoubleInvokeEffectsInDEV @ chunk-LAV6FB6A.js?v=c06d8d44:19714
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19531
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:19356
+workLoop @ chunk-LAV6FB6A.js?v=c06d8d44:197
+flushWork @ chunk-LAV6FB6A.js?v=c06d8d44:176
+performWorkUntilDeadline @ chunk-LAV6FB6A.js?v=c06d8d44:384
+Show 10 more frames
+Show less
+posStore.ts:1352 Full sync successful
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:627 
+        
+        
+       GET http://localhost:3000/api/sync 500 (Internal Server Error)
+syncFromServer @ posStore.ts:627
+processSyncQueue @ posStore.ts:597
+await in processSyncQueue (async)
+(anonymous) @ posStore.ts:570
+setTimeout (async)
+addToSyncQueue @ posStore.ts:570
+completeTransaction @ posStore.ts:238
+handleComplete @ CheckoutModal.tsx:90
+callCallback2 @ chunk-LAV6FB6A.js?v=c06d8d44:3674
+invokeGuardedCallbackDev @ chunk-LAV6FB6A.js?v=c06d8d44:3699
+invokeGuardedCallback @ chunk-LAV6FB6A.js?v=c06d8d44:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-LAV6FB6A.js?v=c06d8d44:3736
+executeDispatch @ chunk-LAV6FB6A.js?v=c06d8d44:7016
+processDispatchQueueItemsInOrder @ chunk-LAV6FB6A.js?v=c06d8d44:7036
+processDispatchQueue @ chunk-LAV6FB6A.js?v=c06d8d44:7045
+dispatchEventsForPlugins @ chunk-LAV6FB6A.js?v=c06d8d44:7053
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:7177
+batchedUpdates$1 @ chunk-LAV6FB6A.js?v=c06d8d44:18941
+batchedUpdates @ chunk-LAV6FB6A.js?v=c06d8d44:3579
+dispatchEventForPluginEventSystem @ chunk-LAV6FB6A.js?v=c06d8d44:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-LAV6FB6A.js?v=c06d8d44:5478
+dispatchEvent @ chunk-LAV6FB6A.js?v=c06d8d44:5472
+dispatchDiscreteEvent @ chunk-LAV6FB6A.js?v=c06d8d44:5449
+Show 15 more frames
+Show less
+posStore.ts:633 Sync fetch failed: 500 Internal Server Error
+syncFromServer @ posStore.ts:633
+await in syncFromServer (async)
+processSyncQueue @ posStore.ts:597
+await in processSyncQueue (async)
+(anonymous) @ posStore.ts:570
+setTimeout (async)
+addToSyncQueue @ posStore.ts:570
+completeTransaction @ posStore.ts:238
+handleComplete @ CheckoutModal.tsx:90
+callCallback2 @ chunk-LAV6FB6A.js?v=c06d8d44:3674
+invokeGuardedCallbackDev @ chunk-LAV6FB6A.js?v=c06d8d44:3699
+invokeGuardedCallback @ chunk-LAV6FB6A.js?v=c06d8d44:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-LAV6FB6A.js?v=c06d8d44:3736
+executeDispatch @ chunk-LAV6FB6A.js?v=c06d8d44:7016
+processDispatchQueueItemsInOrder @ chunk-LAV6FB6A.js?v=c06d8d44:7036
+processDispatchQueue @ chunk-LAV6FB6A.js?v=c06d8d44:7045
+dispatchEventsForPlugins @ chunk-LAV6FB6A.js?v=c06d8d44:7053
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:7177
+batchedUpdates$1 @ chunk-LAV6FB6A.js?v=c06d8d44:18941
+batchedUpdates @ chunk-LAV6FB6A.js?v=c06d8d44:3579
+dispatchEventForPluginEventSystem @ chunk-LAV6FB6A.js?v=c06d8d44:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-LAV6FB6A.js?v=c06d8d44:5478
+dispatchEvent @ chunk-LAV6FB6A.js?v=c06d8d44:5472
+dispatchDiscreteEvent @ chunk-LAV6FB6A.js?v=c06d8d44:5449
+Show 15 more frames
+Show less
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+App.tsx?t=1779045721329:58 Auto-logoff configured: 2 minutes (120000ms)
+posStore.ts:1352 Full sync successful
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts:1352 Full sync successful
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts?t=1779045721329:1362 Full sync successful
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts?t=1779045721329:1362 Full sync successful
+useAutoLogout.ts:47 User idle detected. Elapsed: 279235ms > Timeout: 120000ms
+(anonymous) @ useAutoLogout.ts:47
+setInterval (async)
+(anonymous) @ useAutoLogout.ts:43
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 12 more frames
+Show less
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+useAutoLogout.ts:47 User idle detected. Elapsed: 296984ms > Timeout: 120000ms
+(anonymous) @ useAutoLogout.ts:47
+setInterval (async)
+(anonymous) @ useAutoLogout.ts:43
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 12 more frames
+Show less
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+App.tsx?t=1779045721329:85 Auto-sync: Pushing data to server...
+App.tsx?t=1779045721329:87 Auto-sync: Fetching updates from server (PULL)...
+useAutoLogout.ts:27 Auto-logout enabled. Timeout: 120000ms
+App.tsx:54 Auto-logoff configured: 2 minutes (120000ms)
+posStore.ts:1890 Deduplicated/Cleaned products: Reduced from 55 to 54
+posStore.ts:1931 Repaired/Deduplicated data in products.json
+posStore.ts:1923 Deduplicated credit customers: Reduced from 38 to 24
+posStore.ts:1931 Repaired/Deduplicated data in credit-customers.json
+App.tsx:167 Uncaught ReferenceError: Modal is not defined
+    at App (App.tsx:167:12)
+    at renderWithHooks (chunk-LAV6FB6A.js?v=c06d8d44:11568:26)
+    at updateFunctionComponent (chunk-LAV6FB6A.js?v=c06d8d44:14602:28)
+    at beginWork (chunk-LAV6FB6A.js?v=c06d8d44:15944:22)
+    at HTMLUnknownElement.callCallback2 (chunk-LAV6FB6A.js?v=c06d8d44:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-LAV6FB6A.js?v=c06d8d44:3699:24)
+    at invokeGuardedCallback (chunk-LAV6FB6A.js?v=c06d8d44:3733:39)
+    at beginWork$1 (chunk-LAV6FB6A.js?v=c06d8d44:19793:15)
+    at performUnitOfWork (chunk-LAV6FB6A.js?v=c06d8d44:19226:20)
+    at workLoopSync (chunk-LAV6FB6A.js?v=c06d8d44:19165:13)
+App @ App.tsx:167
+renderWithHooks @ chunk-LAV6FB6A.js?v=c06d8d44:11568
+updateFunctionComponent @ chunk-LAV6FB6A.js?v=c06d8d44:14602
+beginWork @ chunk-LAV6FB6A.js?v=c06d8d44:15944
+callCallback2 @ chunk-LAV6FB6A.js?v=c06d8d44:3674
+invokeGuardedCallbackDev @ chunk-LAV6FB6A.js?v=c06d8d44:3699
+invokeGuardedCallback @ chunk-LAV6FB6A.js?v=c06d8d44:3733
+beginWork$1 @ chunk-LAV6FB6A.js?v=c06d8d44:19793
+performUnitOfWork @ chunk-LAV6FB6A.js?v=c06d8d44:19226
+workLoopSync @ chunk-LAV6FB6A.js?v=c06d8d44:19165
+renderRootSync @ chunk-LAV6FB6A.js?v=c06d8d44:19144
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18902
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 13 more frames
+Show less
+App.tsx:167 Uncaught ReferenceError: Modal is not defined
+    at App (App.tsx:167:12)
+    at renderWithHooks (chunk-LAV6FB6A.js?v=c06d8d44:11568:26)
+    at updateFunctionComponent (chunk-LAV6FB6A.js?v=c06d8d44:14602:28)
+    at beginWork (chunk-LAV6FB6A.js?v=c06d8d44:15944:22)
+    at HTMLUnknownElement.callCallback2 (chunk-LAV6FB6A.js?v=c06d8d44:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-LAV6FB6A.js?v=c06d8d44:3699:24)
+    at invokeGuardedCallback (chunk-LAV6FB6A.js?v=c06d8d44:3733:39)
+    at beginWork$1 (chunk-LAV6FB6A.js?v=c06d8d44:19793:15)
+    at performUnitOfWork (chunk-LAV6FB6A.js?v=c06d8d44:19226:20)
+    at workLoopSync (chunk-LAV6FB6A.js?v=c06d8d44:19165:13)
+App @ App.tsx:167
+renderWithHooks @ chunk-LAV6FB6A.js?v=c06d8d44:11568
+updateFunctionComponent @ chunk-LAV6FB6A.js?v=c06d8d44:14602
+beginWork @ chunk-LAV6FB6A.js?v=c06d8d44:15944
+callCallback2 @ chunk-LAV6FB6A.js?v=c06d8d44:3674
+invokeGuardedCallbackDev @ chunk-LAV6FB6A.js?v=c06d8d44:3699
+invokeGuardedCallback @ chunk-LAV6FB6A.js?v=c06d8d44:3733
+beginWork$1 @ chunk-LAV6FB6A.js?v=c06d8d44:19793
+performUnitOfWork @ chunk-LAV6FB6A.js?v=c06d8d44:19226
+workLoopSync @ chunk-LAV6FB6A.js?v=c06d8d44:19165
+renderRootSync @ chunk-LAV6FB6A.js?v=c06d8d44:19144
+recoverFromConcurrentError @ chunk-LAV6FB6A.js?v=c06d8d44:18764
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18907
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 14 more frames
+Show less
+chunk-LAV6FB6A.js?v=c06d8d44:14052 The above error occurred in the <App> component:
+
+    at App (http://localhost:5174/src/App.tsx?t=1779045957559:33:84)
+    at ToastProvider (http://localhost:5174/src/components/ui/use-toast.tsx:22:33)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-LAV6FB6A.js?v=c06d8d44:14052
+update.callback @ chunk-LAV6FB6A.js?v=c06d8d44:14072
+callCallback @ chunk-LAV6FB6A.js?v=c06d8d44:11268
+commitUpdateQueue @ chunk-LAV6FB6A.js?v=c06d8d44:11285
+commitLayoutEffectOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:17115
+commitLayoutMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18008
+commitLayoutEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:17997
+commitLayoutEffects @ chunk-LAV6FB6A.js?v=c06d8d44:17948
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19381
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 13 more frames
+Show less
+chunk-LAV6FB6A.js?v=c06d8d44:9145 Uncaught ReferenceError: Modal is not defined
+    at App (App.tsx:167:12)
+    at renderWithHooks (chunk-LAV6FB6A.js?v=c06d8d44:11568:26)
+    at updateFunctionComponent (chunk-LAV6FB6A.js?v=c06d8d44:14602:28)
+    at beginWork (chunk-LAV6FB6A.js?v=c06d8d44:15944:22)
+    at beginWork$1 (chunk-LAV6FB6A.js?v=c06d8d44:19781:22)
+    at performUnitOfWork (chunk-LAV6FB6A.js?v=c06d8d44:19226:20)
+    at workLoopSync (chunk-LAV6FB6A.js?v=c06d8d44:19165:13)
+    at renderRootSync (chunk-LAV6FB6A.js?v=c06d8d44:19144:15)
+    at recoverFromConcurrentError (chunk-LAV6FB6A.js?v=c06d8d44:18764:28)
+    at performSyncWorkOnRoot (chunk-LAV6FB6A.js?v=c06d8d44:18907:28)
+App @ App.tsx:167
+renderWithHooks @ chunk-LAV6FB6A.js?v=c06d8d44:11568
+updateFunctionComponent @ chunk-LAV6FB6A.js?v=c06d8d44:14602
+beginWork @ chunk-LAV6FB6A.js?v=c06d8d44:15944
+beginWork$1 @ chunk-LAV6FB6A.js?v=c06d8d44:19781
+performUnitOfWork @ chunk-LAV6FB6A.js?v=c06d8d44:19226
+workLoopSync @ chunk-LAV6FB6A.js?v=c06d8d44:19165
+renderRootSync @ chunk-LAV6FB6A.js?v=c06d8d44:19144
+recoverFromConcurrentError @ chunk-LAV6FB6A.js?v=c06d8d44:18764
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18907
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+(anonymous) @ chunk-LAV6FB6A.js?v=c06d8d44:18655
+Show 11 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:8 Failed to save users.json: Use userManagement IPC instead.
+saveDataToFile @ posStore.ts?t=1779045721329:8
+await in saveDataToFile (async)
+syncFromServer @ posStore.ts?t=1779045721329:769
+await in syncFromServer (async)
+(anonymous) @ App.tsx?t=1779045721329:88
+setInterval (async)
+(anonymous) @ App.tsx?t=1779045721329:80
+commitHookEffectListMount @ chunk-LAV6FB6A.js?v=c06d8d44:16936
+commitPassiveMountOnFiber @ chunk-LAV6FB6A.js?v=c06d8d44:18184
+commitPassiveMountEffects_complete @ chunk-LAV6FB6A.js?v=c06d8d44:18157
+commitPassiveMountEffects_begin @ chunk-LAV6FB6A.js?v=c06d8d44:18147
+commitPassiveMountEffects @ chunk-LAV6FB6A.js?v=c06d8d44:18137
+flushPassiveEffectsImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19518
+flushPassiveEffects @ chunk-LAV6FB6A.js?v=c06d8d44:19475
+commitRootImpl @ chunk-LAV6FB6A.js?v=c06d8d44:19444
+commitRoot @ chunk-LAV6FB6A.js?v=c06d8d44:19305
+performSyncWorkOnRoot @ chunk-LAV6FB6A.js?v=c06d8d44:18923
+flushSyncCallbacks @ chunk-LAV6FB6A.js?v=c06d8d44:9135
+flushSync @ chunk-LAV6FB6A.js?v=c06d8d44:18987
+scheduleRefresh @ chunk-LAV6FB6A.js?v=c06d8d44:20032
+(anonymous) @ @react-refresh:228
+performReactRefresh @ @react-refresh:217
+(anonymous) @ @react-refresh:608
+setTimeout (async)
+(anonymous) @ @react-refresh:598
+validateRefreshBoundaryAndEnqueueUpdate @ @react-refresh:648
+(anonymous) @ DeleteReceiptsModal.tsx:174
+(anonymous) @ client.ts:564
+(anonymous) @ client.ts:481
+(anonymous) @ client.ts:328
+queueUpdate @ client.ts:328
+await in queueUpdate (async)
+(anonymous) @ client.ts:181
+handleMessage @ client.ts:179
+(anonymous) @ client.ts:96
+Show 20 more frames
+Show less
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful
+posStore.ts?t=1779045721329:1362 Full sync successful

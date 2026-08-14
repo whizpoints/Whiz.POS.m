@@ -1,0 +1,20 @@
+                 {{businessName}}
+                   {{address}}
+                 Tel: {{phone}}
+------------------------------------------
+{{reprintHeader}}
+Receipt #:{{receiptId}}
+Cashier:{{cashierName}}
+Date:{{date}}
+Payment:{{paymentMethod}}
+------------------------------------------
+Item                Qty       Price
+{{items}}
+------------------------------------------
+Subtotal                    Ksh {{subtotal}}
+Tax                         Ksh {{tax}}
+Total                       Ksh {{total}}
+------------------------------------------
+           Thank you for choosing us
+    System designed and Serviced by Whizpoint Solutions
+               Tell 0740 841 168

@@ -1,0 +1,16 @@
+{
+  "businessName": "Whiz Cafe",
+  "businessId": "12345",
+  "apiKey": "abcdefg",
+  "address": "123 Main St",
+  "phone": "555-555-5555",
+  "email": "test@test.com",
+  "taxRate": 0.16,
+  "currency": "KES",
+  "receiptHeader": "Welcome to WHIZ POS",
+  "receiptFooter": "Thank you for your business!",
+  "printerType": "thermal",
+  "isSetup": true,
+  "isLoggedIn": false,
+  "createdAt": "2023-01-01T00:00:00.000Z"
+}

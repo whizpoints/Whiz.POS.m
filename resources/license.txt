@@ -1,0 +1,29 @@
+End User License Agreement (EULA)
+
+This End User License Agreement is a binding legal agreement between Whizpoint Solutions and you (the User) for the software product Whiz POS.
+
+1. License Grant
+Whizpoint Solutions grants you a non-exclusive, non-transferable license to use the Whiz POS Desktop, Back Office Dashboard, and Mobile App for your business operations. This license is for your internal use only. You may not sub-license, rent, or lease this software to third parties.
+
+2. Intellectual Property
+The software, including its source code, design, and architecture, is the sole property of Whizpoint Solutions. You agree not to reverse engineer, decompile, or attempt to derive the source code of any component within the ecosystem.
+
+3. Data & Privacy
+Whiz POS is an offline-first system. You are responsible for the security of your local hardware and MongoDB instances. Whizpoint Solutions is not liable for data loss caused by hardware failure, improper backup routines, or unauthorized local access.
+
+4. Updates & Maintenance
+We provide periodic updates (such as version 5.2.3) to improve functionality. The software is provided "as is" without any express or implied warranties regarding its fitness for a particular purpose.
+
+5. Payment & Subscription
+Your right to use the Sync API and Back Office features is subject to your specific payment plan. Failure to maintain an active subscription may result in the suspension of cloud-based services and dashboard access.
+
+6. Limitation of Liability
+In no event shall Whizpoint Solutions be liable for any financial loss, business interruptions, or data corruption arising from the use of this software. You are responsible for ensuring that receipt formatting and tax calculations comply with your local regulations.
+
+7. Termination
+This license is effective until terminated. We reserve the right to terminate your access if you violate these terms. Upon termination, you must cease all use of the software and delete all copies.
+
+Contact Support
+Phone: 0740-841-168
+Email: whiz.techke@gmail.com
+Made by Whizpoint Solutions

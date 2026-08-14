@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Startup Invoice</title>
+    <style>
+        @page {
+            margin: 0;
+            size: 80mm auto; /* Physical paper size */
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10.5px;
+            font-weight: bold;
+            color: #000;
+            margin: 0;
+            padding: 0;
+            width: 70mm;
+            margin-left: 5mm;
+        }
+        .container {
+            padding: 5px 0;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        .header h1 {
+            font-size: 18px;
+            margin: 0 0 2px 0;
+            text-transform: uppercase;
+        }
+        .header p {
+            margin: 2px 0;
+        }
+        .separator {
+            border-top: 1px dashed #000;
+            margin: 5px 0;
+        }
+        .info {
+            margin-bottom: 5px;
+        }
+        .info p {
+            margin: 2px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th {
+            text-align: left;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 2px;
+        }
+        td {
+            padding: 2px 0;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        th:nth-child(1), td:nth-child(1) { width: 70%; } /* Item */
+        th:nth-child(2), td:nth-child(2) { width: 30%; text-align: right; } /* Total */
+
+        .totals {
+            margin-top: 5px;
+        }
+        .totals .row {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+        .totals .total-row {
+            font-weight: 900;
+            font-size: 14px;
+            margin-top: 4px;
+            border-top: 1px dashed #000;
+            padding-top: 4px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        .footer p {
+            margin: 2px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>WHIZ POS</h1>
+            <p>Welcome to your new system!</p>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="info">
+            <h2 style="text-align: center; font-size: 14px; margin: 5px 0;">STARTUP INVOICE</h2>
+            <p>Business: {{businessName}}</p>
+            <p>Address: {{businessAddress}}</p>
+            <p>Phone: {{businessPhone}}</p>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="info">
+            <p>Admin User: {{adminName}}</p>
+            <p>Admin PIN: {{adminPin}} (Keep Safe!)</p>
+        </div>
+
+        <div class="separator"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>POS Software License & Installation (Inc. V.A.T)</td>
+                    <td style="text-align: right;">14,280.00</td>
+                </tr>
+                <tr>
+                    <td>Cloud Back Office Setup & Hosting (1 Year)</td>
+                    <td style="text-align: right;">5,720.00</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="separator"></div>
+
+        <div class="totals">
+            <div class="row total-row">
+                <span>TOTAL DUE:</span>
+                <span>Ksh. 20,000.00</span>
+            </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="footer">
+            <p>All future support is free.</p>
+            <p>"The secret of getting ahead is getting started."</p>
+            <p>- Mark Twain</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,22 @@
+              Welcome to WHIZ POS!
+   Your business is now set up and ready to go.
+------------------------------------------
+Business Name: {{businessName}}
+Address: {{address}}
+Phone: {{phone}}
+------------------------------------------
+Your Admin User:
+  Name: {{adminName}}
+  PIN: {{adminPin}} (Keep this safe!)
+------------------------------------------
+                  Startup Invoice
+------------------------------------------
+Software Cost:              Ksh 8,470
+Back Office & Hosting:      Ksh 5,720
+                          ------------------
+Total:                      Ksh 14,230
+
+           All future support is free.
+------------------------------------------
+ "The secret of getting ahead is getting started."
+                  - Mark Twain

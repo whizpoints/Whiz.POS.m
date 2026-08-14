@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page {
+            margin: 0;
+            size: 80mm auto; /* Hardcoded to 80mm as per user preference for "perfect" layout */
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10.5px; /* Matching receipt font size */
+            font-weight: bold;
+            color: #000;
+            margin: 0;
+            padding: 0;
+
+            /* Content width restricted to 70mm to prevent stretching */
+            width: 70mm;
+            margin-left: 5mm; /* Centers content on 80mm paper */
+            box-sizing: border-box;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .bold { font-weight: bold; }
+        .uppercase { text-transform: uppercase; }
+
+        .header {
+            margin-bottom: 5px;
+            text-align: center;
+        }
+        .business-name {
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px dashed #000;
+            margin: 5px 0;
+        }
+
+        .report-title {
+            font-size: 12px;
+            margin: 5px 0;
+        }
+
+        .grand-total-section {
+            margin-top: 5px;
+            font-size: 11px;
+        }
+
+        /* Table Styles matching Receipt */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 10.5px;
+        }
+        th, td {
+            padding: 2px 0;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="business-name bold uppercase">{{businessName}}</div>
+        <div>{{businessAddress}}</div>
+        <div>{{businessPhone}}</div>
+    </div>
+
+    <hr/>
+
+    <div class="text-center">
+        <div class="report-title bold">END DAY REPORT</div>
+        <div>{{date}}</div>
+    </div>
+
+    <hr/>
+
+    <!-- Dynamic Cashier Sections Injected Here -->
+    {{cashierSections}}
+
+    <hr/>
+
+    <div class="grand-total-section">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+             <span>Total Cash:</span>
+             <span>{{totalCash}}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+             <span>Total M-Pesa:</span>
+             <span>{{totalMpesa}}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+             <span>Total Credit:</span>
+             <span>{{totalCredit}}</span>
+        </div>
+        <hr style="border-top: 1px dashed #000; margin: 5px 0;"/>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;">
+            <span class="bold">GRAND TOTAL:</span>
+            <span class="bold">{{grandTotal}}</span>
+        </div>
+    </div>
+
+    <hr/>
+    <div class="text-center" style="margin-top: 10px;">
+        *** END OF REPORT ***
+    </div>
+</body>
+</html>

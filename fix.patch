@@ -1,0 +1,45 @@
+--- src/components/BusinessRegistration.tsx
++++ src/components/BusinessRegistration.tsx
+@@ -7,7 +7,8 @@
+   ChevronRight, ChevronLeft, Building2, User, Phone,
+   MapPin, Tag, CheckCircle2, DollarSign, Printer, Lock, Info, LogIn, PartyPopper,
+   CreditCard, Key, FileText, Database, ShieldAlert, FileSearch
+-} from 'lucide-react';
++} from 'lucide-react';
++import Swal from 'sweetalert2';
+ import setupBg from '../assets/setup-bg.jpg';
+
+ export default function BusinessRegistration() {
+@@ -107,8 +108,30 @@
+   };
+
+   const handleSearchData = async () => {
+-    alert("Search Data functionality not implemented yet.");
++    if (window.electron && window.electron.readData) {
++      const data = await window.electron.readData('business-setup.json');
++      if (data && data.isSetup) {
++        Swal.fire({
++          title: 'Data Found!',
++          text: 'Business data has been found successfully. The application will now restart to apply it.',
++          icon: 'success',
++          confirmButtonText: 'Restart Now',
++          confirmButtonColor: '#3085d6',
++        }).then(() => {
++          window.location.reload();
++        });
++      } else {
++        Swal.fire({
++          title: 'No Data Found',
++          text: 'Sorry, no valid business data was found. Please proceed to create an account.',
++          icon: 'error',
++          confirmButtonText: 'Create Account',
++          confirmButtonColor: '#d33',
++        }).then(() => {
++          // Automatically proceed to registration
++          setCurrentStepIndex(1);
++        });
++      }
++    }
+   };
+
+   const handleBeginRegistration = () => {
