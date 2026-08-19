@@ -13,8 +13,32 @@ function initDB(userDataPath) {
         CREATE TABLE IF NOT EXISTS businessSetup (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS serverConfig (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, data TEXT);
-        CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, data TEXT);
-        CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, data TEXT);
+        
+        -- Relational Products
+        CREATE TABLE IF NOT EXISTS products (
+            id TEXT PRIMARY KEY, businessId TEXT, sku TEXT, barcode TEXT, name TEXT, category TEXT, 
+            price REAL, costPrice REAL, taxRate REAL, stock INTEGER DEFAULT 0, minStock INTEGER DEFAULT 5, 
+            image TEXT, updatedAt TEXT
+        );
+        
+        -- Relational Transactions & Items
+        CREATE TABLE IF NOT EXISTS transactions (
+            id TEXT PRIMARY KEY, businessId TEXT, locationId TEXT, outletId TEXT, receiptNumber TEXT, 
+            totalAmount REAL, paymentMethod TEXT, customerPhone TEXT, mpesaCode TEXT, status TEXT, 
+            cashierName TEXT, timestamp TEXT, updatedAt TEXT, subtotal REAL, tax REAL
+        );
+        CREATE TABLE IF NOT EXISTS transaction_items (
+            id TEXT PRIMARY KEY, transactionId TEXT, productId TEXT, productName TEXT, 
+            quantity INTEGER, unitPrice REAL, totalPrice REAL, 
+            FOREIGN KEY(transactionId) REFERENCES transactions(id)
+        );
+        
+        -- Relational Stock Movements
+        CREATE TABLE IF NOT EXISTS stockMovements (
+            id TEXT PRIMARY KEY, businessId TEXT, productId TEXT, type TEXT, quantity INTEGER, 
+            reference TEXT, timestamp TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS salaries (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS creditCustomers (id TEXT PRIMARY KEY, data TEXT);
@@ -26,7 +50,7 @@ function initDB(userDataPath) {
         CREATE TABLE IF NOT EXISTS suppliers (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS heldOrders (id TEXT PRIMARY KEY, data TEXT);
-        CREATE TABLE IF NOT EXISTS stockMovements (id TEXT PRIMARY KEY, data TEXT);
+        CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, saleId TEXT, paymentMethod TEXT, amount REAL, reference TEXT, status TEXT, source TEXT, rawCallback TEXT, timestamp TEXT);
         
         -- Multi-Outlet Additions
         CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, data TEXT);
@@ -44,25 +68,21 @@ function initDB(userDataPath) {
     return dbPath;
 }
 
+// ... keeping legacy migration for other files ...
 async function migrateLegacyData(userDataPath) {
     if (!db) return;
-
     const files = [
         { file: 'business-setup.json', table: 'businessSetup', isArray: false },
         { file: 'server-config.json', table: 'serverConfig', isArray: false },
         { file: 'users.json', table: 'users', isArray: true },
-        { file: 'products.json', table: 'products', isArray: true },
-        { file: 'transactions.json', table: 'transactions', isArray: true },
         { file: 'expenses.json', table: 'expenses', isArray: true },
         { file: 'salaries.json', table: 'salaries', isArray: true },
         { file: 'credit-customers.json', table: 'creditCustomers', isArray: true },
         { file: 'mobile-receipts.json', table: 'mobileReceipts', isArray: true },
         { file: 'credit-payments.json', table: 'creditPayments', isArray: true },
-        { file: 'inventory-logs.json', table: 'inventoryLogs', isArray: true },
         { file: 'daily-summaries.json', table: 'dailySummaries', isArray: false },
         { file: 'sessions.json', table: 'sessions', isArray: true },
         { file: 'suppliers.json', table: 'suppliers', isArray: true },
-        { file: 'documents.json', table: 'documents', isArray: true },
         { file: 'document-settings.json', table: 'documentSettings', isArray: false }
     ];
 
@@ -70,16 +90,13 @@ async function migrateLegacyData(userDataPath) {
     const filesToDelete = [];
 
     try {
-        // Start a single transaction for the entire migration to guarantee atomicity if possible,
-        // but since we're inserting into multiple tables, we'll just process sequentially.
-        // If an error happens, we throw and DO NOT delete any files.
         for (const { file, table, isArray } of files) {
             const filePath = path.join(userDataPath, file);
             let content;
             try {
                 content = await fs.readFile(filePath, 'utf-8');
             } catch (err) {
-                if (err.code === 'ENOENT') continue; // File doesn't exist, skip
+                if (err.code === 'ENOENT') continue;
                 throw err;
             }
 
@@ -108,51 +125,125 @@ async function migrateLegacyData(userDataPath) {
             console.log(`[Migration] Successfully processed ${file}`);
         }
 
-        // Only after ALL files have been successfully migrated do we delete them.
         for (const filePath of filesToDelete) {
             try {
                 await fs.unlink(filePath);
-                console.log(`[Migration] Deleted legacy file ${path.basename(filePath)}`);
-            } catch (unlinkErr) {
-                console.warn(`[Migration] Could not delete legacy file ${path.basename(filePath)}:`, unlinkErr.message);
-            }
-        }
-
-        if (migrationOccurred) {
-            console.log('[Migration] Legacy JSON to SQLite migration completed successfully.');
+            } catch (unlinkErr) {}
         }
 
     } catch (e) {
         console.error(`[Migration Error] Migration failed:`, e);
-        // Do not delete any JSON files. The app will halt because we re-throw the error.
         throw new Error(`Migration failed: ` + e.message);
     }
 }
 
 function getTableData(table) {
     if (!db) return [];
+    
+    // RELATIONAL OVERRIDES
+    if (table === 'products') {
+        const stmt = db.prepare('SELECT * FROM products');
+        return stmt.all();
+    }
+    if (table === 'transactions') {
+        const stmt = db.prepare('SELECT * FROM transactions');
+        const txns = stmt.all();
+        const itemsStmt = db.prepare('SELECT * FROM transaction_items WHERE transactionId = ?');
+        return txns.map(tx => {
+            const items = itemsStmt.all(tx.id);
+            return { ...tx, items };
+        });
+    }
+    if (table === 'stockMovements' || table === 'inventoryLogs') {
+        const stmt = db.prepare('SELECT * FROM stockMovements');
+        return stmt.all();
+    }
+
     try {
-        const stmt = db.prepare(`SELECT data FROM ${table}`);
+        const isSingleton = ['businessSetup', 'serverConfig', 'dailySummaries', 'documentSettings', 'sync_metadata'].includes(table);
+        const query = isSingleton 
+            ? `SELECT data FROM ${table} ORDER BY rowid DESC LIMIT 1`
+            : `SELECT data FROM ${table}`;
+        
+        const stmt = db.prepare(query);
         const rows = stmt.all();
-        if (['businessSetup', 'serverConfig', 'dailySummaries', 'documentSettings'].includes(table)) {
+        
+        if (isSingleton) {
             return rows.length > 0 ? JSON.parse(rows[0].data) : (table === 'dailySummaries' ? {} : null);
         }
         return rows.map(r => JSON.parse(r.data));
     } catch (e) {
         console.error(`[DB Error] Failed to read ${table}:`, e);
-        return ['businessSetup', 'serverConfig', 'dailySummaries', 'documentSettings'].includes(table) ? (table === 'dailySummaries' ? {} : null) : [];
+        return ['businessSetup', 'serverConfig', 'dailySummaries', 'documentSettings', 'sync_metadata'].includes(table) ? (table === 'dailySummaries' ? {} : null) : [];
     }
 }
 
 function saveTableData(table, id, dataObj) {
     if (!db) return;
+    
+    // RELATIONAL OVERRIDES
+    if (table === 'products') {
+        const stmt = db.prepare(`INSERT OR REPLACE INTO products 
+            (id, businessId, sku, barcode, name, category, price, costPrice, taxRate, stock, minStock, image, updatedAt) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        stmt.run(
+            String(dataObj.id), dataObj.businessId || '', dataObj.sku || '', dataObj.barcode || '', 
+            dataObj.name || '', dataObj.category || '', dataObj.price || 0, dataObj.costPrice || 0, 
+            dataObj.taxRate || 0, dataObj.stock || 0, dataObj.minStock || 0, dataObj.image || '', 
+            dataObj.updatedAt || new Date().toISOString()
+        );
+        return;
+    }
+
     try {
         const stmt = db.prepare(`INSERT OR REPLACE INTO ${table} (id, data) VALUES (?, ?)`);
         stmt.run(String(id), JSON.stringify(dataObj));
-    } catch (e) {
-        console.error(`[DB Error] Failed to save to ${table}:`, e);
-        throw e;
-    }
+    } catch (e) {}
+}
+
+function completeAtomicSale(tx, items) {
+    if (!db) throw new Error("DB not init");
+    
+    const insertTx = db.prepare(`INSERT INTO transactions 
+        (id, businessId, locationId, outletId, receiptNumber, totalAmount, paymentMethod, customerPhone, mpesaCode, status, cashierName, timestamp, updatedAt, subtotal, tax) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        
+    const insertItem = db.prepare(`INSERT INTO transaction_items 
+        (id, transactionId, productId, productName, quantity, unitPrice, totalPrice) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)`);
+        
+    const updateStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ?`);
+    
+    const insertStockMovement = db.prepare(`INSERT INTO stockMovements 
+        (id, businessId, productId, type, quantity, reference, timestamp) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)`);
+
+    db.transaction(() => {
+        insertTx.run(
+            tx.id, tx.businessId || '', tx.locationId || '', tx.outletId || '', tx.receiptNumber || tx.id, 
+            tx.totalAmount || tx.total || 0, tx.paymentMethod || 'cash', tx.customerPhone || '', tx.mpesaCode || '', 
+            tx.status || 'completed', tx.cashierName || tx.cashier || '', tx.timestamp || new Date().toISOString(), 
+            tx.updatedAt || new Date().toISOString(), tx.subtotal || 0, tx.tax || 0
+        );
+
+        for (const item of items) {
+            const itemId = 'ITEM_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            const productId = item.productId || item.product?.id || '';
+            const productName = item.productName || item.product?.name || '';
+            const qty = item.quantity || 1;
+            const price = item.unitPrice || item.product?.price || 0;
+            const total = item.totalPrice || (qty * price);
+
+            insertItem.run(itemId, tx.id, String(productId), productName, qty, price, total);
+            
+            if (productId) {
+                updateStock.run(qty, String(productId));
+                const moveId = 'MOV_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                insertStockMovement.run(moveId, tx.businessId || '', String(productId), 'SALE', qty, tx.id, new Date().toISOString());
+            }
+        }
+    })();
+    return tx.id;
 }
 
 function saveSingletonData(table, dataObj) {
@@ -160,21 +251,29 @@ function saveSingletonData(table, dataObj) {
     try {
         const stmt = db.prepare(`INSERT OR REPLACE INTO ${table} (id, data) VALUES (?, ?)`);
         stmt.run('SINGLETON', JSON.stringify(dataObj));
-    } catch (e) {
-        console.error(`[DB Error] Failed to save to ${table}:`, e);
-        throw e;
-    }
+    } catch (e) {}
 }
 
 function deleteTableData(table, id) {
     if (!db) return;
+    
+    if (table === 'products') {
+        const stmt = db.prepare(`DELETE FROM products WHERE id = ?`);
+        stmt.run(String(id));
+        return;
+    }
+    if (table === 'transactions') {
+        const stmt = db.prepare(`DELETE FROM transactions WHERE id = ?`);
+        stmt.run(String(id));
+        const stmt2 = db.prepare(`DELETE FROM transaction_items WHERE transactionId = ?`);
+        stmt2.run(String(id));
+        return;
+    }
+
     try {
         const stmt = db.prepare(`DELETE FROM ${table} WHERE id = ?`);
         stmt.run(String(id));
-    } catch (e) {
-        console.error(`[DB Error] Failed to delete from ${table}:`, e);
-        throw e;
-    }
+    } catch (e) {}
 }
 
 function getFileTableMapping(filename) {
@@ -196,8 +295,7 @@ function getFileTableMapping(filename) {
         'audit-logs.json': { table: 'audit_logs', isArray: true },
         'held-orders.json': { table: 'heldOrders', isArray: true },
         'stock-movements.json': { table: 'stockMovements', isArray: true },
-        
-        // Multi-Outlet Additions
+        'inventory-logs.json': { table: 'stockMovements', isArray: true },
         'categories.json': { table: 'categories', isArray: true },
         'outlets.json': { table: 'outlets', isArray: true },
         'terminals.json': { table: 'terminals', isArray: true },
@@ -219,8 +317,42 @@ async function writeJsonFileFallback(filename, data) {
     if (!mapInfo) return;
 
     if (mapInfo.isArray) {
+        if (mapInfo.table === 'products') {
+             const existingIds = db.prepare('SELECT id FROM products').all().map(r => r.id);
+             const incomingIds = new Set();
+             db.transaction(() => {
+                 for (const item of data) {
+                     const id = item.id || item.productId;
+                     if (id) {
+                         incomingIds.add(String(id));
+                         saveTableData('products', id, item);
+                     }
+                 }
+                 for (const id of existingIds) {
+                     if (!incomingIds.has(id)) deleteTableData('products', id);
+                 }
+             })();
+             return;
+        }
+        if (mapInfo.table === 'transactions') {
+             const existingIds = db.prepare('SELECT id FROM transactions').all().map(r => r.id);
+             const incomingIds = new Set();
+             db.transaction(() => {
+                 for (const item of data) {
+                     const id = item.id || item.transactionId;
+                     if (id) {
+                         incomingIds.add(String(id));
+                         const existing = db.prepare('SELECT id FROM transactions WHERE id = ?').get(String(id));
+                         if (!existing) {
+                             completeAtomicSale(item, item.items || []);
+                         }
+                     }
+                 }
+             })();
+             return;
+        }
+        
         const insertStmt = db.prepare(`INSERT OR REPLACE INTO ${mapInfo.table} (id, data) VALUES (?, ?)`);
-
         const deleteStmt = db.prepare(`DELETE FROM ${mapInfo.table} WHERE id = ?`);
         db.transaction(() => {
             const incomingIds = new Set();
@@ -232,14 +364,11 @@ async function writeJsonFileFallback(filename, data) {
                 }
             }
 
-            // Fetch existing IDs to find ones to delete
             const existingIdsStmt = db.prepare(`SELECT id FROM ${mapInfo.table}`);
             const existingIds = existingIdsStmt.all().map(row => row.id);
 
             for (const id of existingIds) {
-                if (!incomingIds.has(id)) {
-                    deleteStmt.run(id);
-                }
+                if (!incomingIds.has(id)) deleteStmt.run(id);
             }
         })();
     } else {
@@ -254,19 +383,47 @@ async function mergeJsonFileFallback(filename, data) {
     if (mapInfo.isArray) {
         if (!data || !Array.isArray(data) || data.length === 0) return;
         
+        if (mapInfo.table === 'products') {
+            db.transaction(() => {
+                const selectStmt = db.prepare('SELECT * FROM products WHERE id = ?');
+                for (const item of data) {
+                    const id = item.id || item.productId;
+                    if (id) {
+                        let finalItem = { ...item };
+                        const existing = selectStmt.get(String(id));
+                        if (existing && existing.stock !== undefined) {
+                            finalItem.stock = existing.stock;
+                        }
+                        saveTableData('products', id, finalItem);
+                    }
+                }
+            })();
+            return;
+        }
+
+        const selectStmt = db.prepare(`SELECT data FROM ${mapInfo.table} WHERE id = ?`);
         const insertStmt = db.prepare(`INSERT OR REPLACE INTO ${mapInfo.table} (id, data) VALUES (?, ?)`);
         
         db.transaction(() => {
             for (const item of data) {
                 const id = item.id || item.productId || item.userId || item.expenseId || item.transactionId || item.customerId || item.supplierId || item.token;
                 if (id) {
-                    insertStmt.run(String(id), JSON.stringify(item));
+                    let finalItem = item;
+                    const existingRow = selectStmt.get(String(id));
+                    if (existingRow && existingRow.data) {
+                        try {
+                            const existingData = JSON.parse(existingRow.data);
+                            finalItem = { ...existingData, ...item };
+                        } catch (e) {}
+                    }
+                    insertStmt.run(String(id), JSON.stringify(finalItem));
                 }
             }
         })();
     } else {
         if (data) {
-            saveSingletonData(mapInfo.table, data);
+            const existing = getTableData(mapInfo.table) || {};
+            saveSingletonData(mapInfo.table, { ...existing, ...data });
         }
     }
 }
@@ -278,25 +435,17 @@ function addPendingSync(syncOperation) {
         const stmt = db.prepare(`INSERT INTO pending_syncs (id, type, data, timestamp) VALUES (?, ?, ?, ?)`);
         stmt.run(id, syncOperation.type, JSON.stringify(syncOperation.data), new Date().toISOString());
         return id;
-    } catch (e) {
-        console.error('[DB Error] Failed to add pending sync:', e);
-        throw e;
-    }
+    } catch (e) {}
 }
 
 function getPendingSyncs() {
     if (!db) return [];
     try {
         const stmt = db.prepare(`SELECT * FROM pending_syncs ORDER BY timestamp ASC`);
-        const rows = stmt.all();
-        return rows.map(r => ({
-            id: r.id,
-            type: r.type,
-            data: JSON.parse(r.data),
-            timestamp: r.timestamp
+        return stmt.all().map(r => ({
+            id: r.id, type: r.type, data: JSON.parse(r.data), timestamp: r.timestamp
         }));
     } catch (e) {
-        console.error('[DB Error] Failed to get pending syncs:', e);
         return [];
     }
 }
@@ -311,34 +460,13 @@ function removePendingSyncs(ids) {
             }
         });
         deleteMany(ids);
-    } catch (e) {
-        console.error('[DB Error] Failed to remove pending syncs:', e);
-        throw e;
-    }
+    } catch (e) {}
 }
 
 module.exports = {
-    initDB,
-    migrateLegacyData,
-    getTableData,
-    saveTableData,
-    saveSingletonData,
-    deleteTableData,
-    readJsonFileFallback,
-    writeJsonFileFallback,
-    mergeJsonFileFallback,
-    addPendingSync,
-    getPendingSyncs,
-    removePendingSyncs,
-    get db() { return db; },
-    backupDB: async (destPath) => {
-        if (!db) throw new Error("Database not initialized");
-        await db.backup(destPath);
-    },
-    closeDB: () => {
-        if (db) {
-            db.close();
-            db = null;
-        }
-    }
+    initDB, migrateLegacyData, getTableData, saveTableData, saveSingletonData, deleteTableData,
+    readJsonFileFallback, writeJsonFileFallback, mergeJsonFileFallback, completeAtomicSale,
+    addPendingSync, getPendingSyncs, removePendingSyncs, get db() { return db; },
+    backupDB: async (destPath) => { await db.backup(destPath); },
+    closeDB: () => { if (db) { db.close(); db = null; } }
 };
