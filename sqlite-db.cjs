@@ -150,8 +150,20 @@ function getTableData(table) {
         const txns = stmt.all();
         const itemsStmt = db.prepare('SELECT * FROM transaction_items WHERE transactionId = ?');
         return txns.map(tx => {
-            const items = itemsStmt.all(tx.id);
-            return { ...tx, items };
+            const items = itemsStmt.all(tx.id).map(item => ({
+                quantity: item.quantity,
+                product: {
+                    id: item.productId,
+                    name: item.productName,
+                    price: item.unitPrice
+                }
+            }));
+            return { 
+                ...tx, 
+                total: tx.totalAmount, 
+                cashier: tx.cashierName,
+                items 
+            };
         });
     }
     if (table === 'stockMovements' || table === 'inventoryLogs') {
