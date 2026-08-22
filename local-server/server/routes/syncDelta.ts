@@ -191,9 +191,10 @@ router.post('/', async (req: any, res: any) => {
       businessSetup
     } = req.body;
 
-    let targetLocationId = undefined;
-    let targetOutletId = undefined;
+    let targetLocationId: string | null = null;
+    let targetOutletId: string | null = null;
     
+    // Try to resolve from businessSetup in payload
     if (businessSetup?.locationId) {
       const loc = await prisma.storeLocation.findFirst({ where: { id: businessSetup.locationId, businessId } });
       if (loc) targetLocationId = loc.id;
@@ -203,6 +204,29 @@ router.post('/', async (req: any, res: any) => {
       const out = await prisma.outlet.findFirst({ where: { id: businessSetup.outletId, locationId: targetLocationId } });
       if (out) targetOutletId = out.id;
     }
+
+    // Fallback: resolve from the authenticated user's outlet
+    if (!targetOutletId && req.user.outletId) {
+      const out = await prisma.outlet.findFirst({ where: { id: req.user.outletId, location: { businessId } }, include: { location: true } });
+      if (out) {
+        targetOutletId = out.id;
+        if (!targetLocationId) targetLocationId = out.locationId;
+      }
+    }
+
+    // Fallback: resolve from the business's first location
+    if (!targetLocationId) {
+      const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+      if (loc) targetLocationId = loc.id;
+    }
+
+    // Fallback: resolve from the business's first outlet
+    if (!targetOutletId && targetLocationId) {
+      const out = await prisma.outlet.findFirst({ where: { locationId: targetLocationId } });
+      if (out) targetOutletId = out.id;
+    }
+
+    console.log(`[SYNC PUSH] businessId=${businessId}, targetLocationId=${targetLocationId}, targetOutletId=${targetOutletId}, user.outletId=${req.user.outletId}`);
 
     const results = {
       users: 0,
@@ -292,13 +316,16 @@ router.post('/', async (req: any, res: any) => {
        for (const m of stockMovements) {
           const existing = await prisma.stockMovement.findUnique({ where: { id: m.id } });
           if (!existing) {
+             const resolvedLocationId = targetLocationId || m.locationId || null;
+             const resolvedOutletId = targetOutletId || m.outletId || null;
+
              await prisma.stockMovement.create({
                 data: {
                    id: m.id,
                    businessId,
                    productId: m.productId,
-                   locationId: targetLocationId || m.locationId,
-                   outletId: targetOutletId || m.outletId,
+                   locationId: resolvedLocationId,
+                   outletId: resolvedOutletId,
                    type: m.type,
                    quantity: Number(m.quantity),
                    reference: m.reference ? String(m.reference) : null,
@@ -310,7 +337,7 @@ router.post('/', async (req: any, res: any) => {
 
              // Update inventory based on movement type
              const invExisting = await prisma.productInventory.findFirst({
-                where: { productId: m.productId, locationId: targetLocationId || m.locationId, outletId: targetOutletId || m.outletId || null }
+                where: { productId: m.productId, locationId: resolvedLocationId, outletId: resolvedOutletId }
              });
 
              let stockChange = Number(m.quantity);
@@ -326,8 +353,8 @@ router.post('/', async (req: any, res: any) => {
                 await prisma.productInventory.create({
                    data: {
                       productId: m.productId,
-                      locationId: targetLocationId || m.locationId,
-                      outletId: targetOutletId || m.outletId || null,
+                      locationId: resolvedLocationId,
+                      outletId: resolvedOutletId,
                       stock: stockChange,
                       updatedAt: new Date()
                    }
@@ -356,7 +383,7 @@ router.post('/', async (req: any, res: any) => {
                          data: { status: safeStatus as any, updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date() }
                       });
                   } else {
-                      await prisma.receipt.create({
+                      const createdReceipt = await prisma.receipt.create({
                          data: {
                             businessId, locationId: targetLocationId, outletId: targetOutletId || null,
                             receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
@@ -366,6 +393,21 @@ router.post('/', async (req: any, res: any) => {
                             updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date()
                          }
                       });
+                      
+                      if (t.items && Array.isArray(t.items)) {
+                          for (const item of t.items) {
+                              if (!item.product) continue;
+                              await prisma.receiptItem.create({
+                                  data: {
+                                      receiptId: createdReceipt.id,
+                                      productName: item.product.name || 'Unknown Item',
+                                      quantity: Number(item.quantity) || 1,
+                                      unitPrice: Number(item.product.price) || 0,
+                                      totalPrice: (Number(item.quantity) || 1) * (Number(item.product.price) || 0)
+                                  }
+                              });
+                          }
+                      }
                   }
                   results.transactions++;
               }
