@@ -14,6 +14,7 @@ import InventoryManagement from '../components/InventoryManagement';
 import LoyaltyProgram from '../components/LoyaltyProgram';
 import BarcodeScanner from '../components/BarcodeScanner';
 import OfflineSyncStatus from '../components/OfflineSyncStatus';
+import SyncHistoryPage from '../components/SyncHistoryPage';
 import BusinessRegistrationPage from './BusinessRegistrationPage';
 
 import LoginScreen from '../components/LoginScreen';
@@ -92,6 +93,7 @@ const MainNavigator = () => {
         <Route path="/salaries" element={<SalariesPage />} />
         <Route path="/closing" element={<DailyClosingScreen />} />
         <Route path="/sync" element={<OfflineSyncStatus />} />
+        <Route path="/sync-history" element={<SyncHistoryPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/register" element={<BusinessRegistrationPage />} />
         <Route path="/dashboard" element={<Dashboard />} />

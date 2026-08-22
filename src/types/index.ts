@@ -192,3 +192,15 @@ export interface PurchaseOrder {
   createdAt: string;
   receivedAt?: string;
 }
+
+export interface StockMovement {
+    id: string;
+    businessId?: string;
+    outletId?: string;
+    productId: string;
+    type: 'SALE' | 'ADJUSTMENT_UP' | 'ADJUSTMENT_DOWN' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'INITIAL' | 'RECONCILIATION';
+    quantity: number;
+    reference?: string;
+    sourceTerminal?: string;
+    timestamp: string;
+}

@@ -325,13 +325,33 @@ export default function SettingsPage() {
                    <input type="email" name="email" value={businessData.email || ''} onChange={handleBusinessDataChange} disabled={!editingBusiness} className="w-full p-3 border rounded-lg bg-gray-50 disabled:bg-gray-200" />
                  </div>
                </div>
-               <div className="md:col-span-2">
+
+               {/* PAYMENT OPTIONS */}
+               <div className="md:col-span-2 pt-4 border-t">
+                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Payment Options (Receipt Inject)</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700">M-Pesa Paybill</label>
+                     <input type="text" name="mpesaPaybill" value={businessData.mpesaPaybill || ''} onChange={handleBusinessDataChange} disabled={!editingBusiness} placeholder="e.g. 123456" className="w-full p-3 border rounded-lg bg-gray-50 disabled:bg-gray-200" />
+                   </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700">Account Number</label>
+                     <input type="text" name="accountNumber" value={businessData.accountNumber || ''} onChange={handleBusinessDataChange} disabled={!editingBusiness} placeholder="e.g. Business Name" className="w-full p-3 border rounded-lg bg-gray-50 disabled:bg-gray-200" />
+                   </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700">M-Pesa Till Number</label>
+                     <input type="text" name="tillNumber" value={businessData.tillNumber || ''} onChange={handleBusinessDataChange} disabled={!editingBusiness} placeholder="e.g. 987654" className="w-full p-3 border rounded-lg bg-gray-50 disabled:bg-gray-200" />
+                   </div>
+                 </div>
+               </div>
+
+               <div className="md:col-span-2 pt-4 border-t">
                  <label className="block text-sm font-medium text-gray-700">Receipt Footer</label>
                  <textarea name="receiptFooter" value={businessData.receiptFooter || ''} onChange={handleBusinessDataChange} disabled={!editingBusiness} className="w-full p-3 border rounded-lg bg-gray-50 disabled:bg-gray-200" rows={3}></textarea>
                </div>
                <div>
                  <label className="block text-sm font-medium text-gray-700">"Served By" Label</label>
-                 <input type="text" name="servedByLabel" value={businessData.servedByLabel || ''} onChange={handleBusinessDataChange} disabled={!editingBusiness} className="w-full p-3 border rounded-lg bg-gray-50 disabled:bg-gray-200" />
+                 <input type="text" name="servedBy" value={businessData.servedBy || ''} onChange={handleBusinessDataChange} disabled={!editingBusiness} className="w-full p-3 border rounded-lg bg-gray-50 disabled:bg-gray-200" />
                </div>
              </div>
            </div>
@@ -424,6 +444,8 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+
+        
 
         {/* --- CATEGORIES --- */}
         {activeTab === 'categories' && (

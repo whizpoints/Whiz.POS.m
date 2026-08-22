@@ -97,7 +97,7 @@ export default function MpesaQR({ totalAmount }: Props) {
             {/* Optional M-Pesa Logo in center overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="bg-white p-1 rounded-full shadow-sm">
-                <img src="/mpesa.png" alt="M-Pesa" className="w-6 h-6 object-contain" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="w-6 h-6 object-contain" />
               </div>
             </div>
           </div>

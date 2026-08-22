@@ -68,10 +68,57 @@ router.post('/mpesa', async (req: any, res: any) => {
     
     res.json({ success: true, config });
   } catch (error) {
-    console.error('Error saving M-Pesa config:', error);
+    console.error('Error updating M-Pesa config:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-export default router;
+// Get Cloud Config
+router.get('/cloud', async (req: any, res: any) => {
+  try {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const configPath = path.join(__dirname, '..', '..', '..', 'server-config.json');
+    let config: any = {};
+    try {
+      const data = await fs.readFile(configPath, 'utf-8');
+      config = JSON.parse(data);
+    } catch (e) {}
+    res.json({
+      cloudUrl: config.backOfficeUrl || 'https://api.whizpoint.app',
+      cloudToken: config.cloudToken || config.backOfficeApiKey || ''
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read cloud config' });
+  }
+});
 
+// Update Cloud Config
+router.post('/cloud', async (req: any, res: any) => {
+  try {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const configPath = path.join(__dirname, '..', '..', '..', 'server-config.json');
+    
+    let config: any = {};
+    try {
+      const data = await fs.readFile(configPath, 'utf-8');
+      config = JSON.parse(data);
+    } catch (e) {}
+
+    config.backOfficeUrl = req.body.cloudUrl;
+    config.cloudToken = req.body.cloudToken;
+    config.backOfficeApiKey = req.body.cloudToken;
+
+    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save cloud config' });
+  }
+});
+
+export default router;

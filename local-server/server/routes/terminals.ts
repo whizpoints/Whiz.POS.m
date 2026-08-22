@@ -48,21 +48,27 @@ router.post('/:id/approve', async (req, res) => {
 
     const apiKey = crypto.randomBytes(32).toString('hex');
 
-    // Create the Outlet
-    const outlet = await prisma.outlet.create({
-      data: {
-        name: terminalRequest.name,
-        businessId: business.id,
-        locationId: location.id
-      }
+    // Find if outlet already exists for this terminal name
+    let outlet = await prisma.outlet.findFirst({
+      where: { name: terminalRequest.name, businessId: business.id }
     });
 
-    const terminal = await prisma.terminal.update({
+    if (!outlet) {
+      outlet = await prisma.outlet.create({
+        data: {
+          name: terminalRequest.name,
+          businessId: business.id,
+          locationId: location.id
+        }
+      });
+    }
+
+    const updatedTerminal = await prisma.terminal.update({
       where: { id },
-      data: { status: 'APPROVED', apiKey }
+      data: { status: 'APPROVED', apiKey, outletId: outlet.id }
     });
 
-    res.json({ success: true, terminal, outlet });
+    res.json({ success: true, terminal: updatedTerminal, outlet });
   } catch (error: any) {
     console.error('Approve error:', error);
     res.status(500).json({ error: 'Failed to approve terminal' });
@@ -106,6 +112,31 @@ router.get('/:id', async (req, res) => {
     res.json(terminal);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to fetch terminal status' });
+  }
+});
+
+// Admin calls this from Web UI to completely delete a terminal
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const terminal = await prisma.terminal.findUnique({ where: { id } });
+    if (terminal) {
+      // Find and delete the associated outlet
+      const outlet = await prisma.outlet.findFirst({
+        where: { name: terminal.name, businessId: (terminal as any).businessId }
+      });
+      
+      if (outlet) {
+        await prisma.outlet.delete({ where: { id: outlet.id } });
+      }
+      
+      await prisma.terminal.delete({
+        where: { id }
+      });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to delete terminal' });
   }
 });
 

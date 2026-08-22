@@ -39,8 +39,12 @@ router.get('/location/:locationId', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const { locationId } = req.params;
+    const whereClause: any = { businessId };
+    if (locationId !== 'ALL') {
+        whereClause.locationId = locationId;
+    }
     const outlets = await prisma.outlet.findMany({
-      where: { locationId, businessId },
+      where: whereClause,
       orderBy: { createdAt: 'asc' }
     });
     res.json(outlets);
@@ -165,7 +169,7 @@ router.delete('/:id/users/:userId', async (req: any, res: any) => {
 router.post('/:id/products', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { productId, locationId } = req.body;
+    const { productId, locationId, stock = 0 } = req.body;
     const outletId = req.params.id;
 
     const outlet = await prisma.outlet.findUnique({
@@ -194,9 +198,25 @@ router.post('/:id/products', async (req: any, res: any) => {
         productId,
         outletId,
         locationId: targetLocationId,
-        stock: 0
+        stock: Number(stock)
       }
     });
+
+    if (Number(stock) > 0) {
+      await prisma.stockMovement.create({
+        data: {
+          businessId,
+          productId,
+          locationId: targetLocationId,
+          outletId,
+          type: 'INITIAL',
+          quantity: Number(stock),
+          sourceTerminal: 'SERVER',
+          reference: 'Product assigned to outlet'
+        }
+      });
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('Outlets POST products error:', error);
@@ -207,7 +227,7 @@ router.post('/:id/products', async (req: any, res: any) => {
 router.post('/:id/products/batch', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { productIds, locationId } = req.body;
+    const { productIds, locationId, stock = 0 } = req.body;
     const outletId = req.params.id;
 
     if (!Array.isArray(productIds)) {
@@ -234,14 +254,31 @@ router.post('/:id/products/batch', async (req: any, res: any) => {
       });
 
       if (!existing) {
+        // Read stock from req.body if passed as object array? The request accepts productIds, but if it expects initial stock...
+        // The assignment says "Similarly in POST /:id/products/batch". In batch, usually it's just productIds string array. If we want stock, we could check if it's passed or just use 0. But we just implement the same logic, if stock was provided somehow or default to 0. Actually, let's assume `stock` can be passed globally for the batch or we just use 0. Wait, in batch, productIds is just an array. We can just set stock to 0 or check if there is a stock field. Let's do `const { productIds, locationId, stock = 0 } = req.body;`.
         await prisma.productInventory.create({
           data: {
             productId,
             outletId,
             locationId: targetLocationId,
-            stock: 0
+            stock: Number(stock)
           }
         });
+
+        if (Number(stock) > 0) {
+          await prisma.stockMovement.create({
+            data: {
+              businessId,
+              productId,
+              locationId: targetLocationId,
+              outletId,
+              type: 'INITIAL',
+              quantity: Number(stock),
+              sourceTerminal: 'SERVER',
+              reference: 'Product assigned to outlet'
+            }
+          });
+        }
         addedCount++;
       }
     }
@@ -280,10 +317,70 @@ router.post('/:id/inventory/adjust', async (req: any, res: any) => {
       data: { stock: newStock }
     });
 
+    await prisma.stockMovement.create({
+      data: {
+        id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        businessId,
+        productId: inventory.productId,
+        locationId: inventory.locationId,
+        outletId: req.params.id,
+        type: type === 'ADD' ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+        quantity: amount,
+        reference: 'Outlet Manual Adjust',
+        sourceTerminal: 'SERVER',
+        timestamp: new Date()
+      }
+    });
+
     res.json({ success: true, stock: newStock });
   } catch (error) {
     console.error('Outlets POST inventory adjust error:', error);
     res.status(500).json({ error: 'Failed to adjust stock' });
+  }
+});
+
+router.post('/:id/force-sync', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const outletId = req.params.id;
+
+    const outlet = await prisma.outlet.findUnique({
+      where: { id: outletId, businessId }
+    });
+    if (!outlet) return res.status(404).json({ error: 'Outlet not found' });
+
+    // Touch all product inventory for this outlet
+    await prisma.productInventory.updateMany({
+      where: { outletId },
+      data: { updatedAt: new Date() }
+    });
+
+    // Touch all users for this outlet
+    await prisma.user.updateMany({
+      where: { outletId },
+      data: { updatedAt: new Date() }
+    });
+
+    // Touch outlet itself
+    await prisma.outlet.update({
+      where: { id: outletId },
+      data: { updatedAt: new Date() }
+    });
+    // Touch business setup
+    await prisma.business.updateMany({
+      where: { id: req.user.businessId },
+      data: { updatedAt: new Date() }
+    });
+    // Touch categories
+    await prisma.category.updateMany({
+      where: { businessId: req.user.businessId },
+      data: { updatedAt: new Date() }
+    });
+
+    res.json({ success: true, message: 'Current data marked for push to terminals' });
+  } catch (error) {
+    console.error('Outlets POST force-sync error:', error);
+    res.status(500).json({ error: 'Failed to force sync data' });
   }
 });
 

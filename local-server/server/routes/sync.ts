@@ -59,6 +59,15 @@ router.post('/sales', async (req: any, res: any) => {
           paymentMethod: receipt.paymentMethod,
           customerPhone: receipt.customerPhone,
           status: receipt.status || 'COMPLETED',
+          cashierName: receipt.cashier || null,
+          items: {
+            create: (receipt.items || []).map((item: any) => ({
+              productName: item.product?.name || item.productName || 'Unknown',
+              quantity: Number(item.quantity) || 1,
+              unitPrice: Number(item.product?.price || item.unitPrice || 0),
+              totalPrice: Number(item.product?.price || item.unitPrice || 0) * (Number(item.quantity) || 1),
+            }))
+          }
         }
       });
       createdReceipts.push(dbReceipt);
@@ -225,6 +234,7 @@ router.post('/full', (req: any, res: any) => {
           const existing = await prisma.receipt.findFirst({ where: { businessId, receiptNumber: String(t.id) } });
           const rawStatus = (t.status || '').toUpperCase();
           if (!existing && rawStatus !== 'CANCELLED') {
+              require('fs').appendFileSync('sync-debug.log', JSON.stringify(t) + '\n');
               let safeStatus = 'COMPLETED';
               if (rawStatus === 'PENDING' || rawStatus === 'REFUNDED') safeStatus = rawStatus;
 
@@ -232,13 +242,23 @@ router.post('/full', (req: any, res: any) => {
                  data: {
                     businessId,
                     locationId: targetLocationId,
+                    outletId: targetOutletId || undefined,
                     receiptNumber: String(t.id),
                     totalAmount: Number(t.totalAmount || t.total) || 0,
                     paymentMethod: String(t.paymentMethod || 'CASH'),
                     customerPhone: t.customerPhone ? String(t.customerPhone) : null,
                     mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null,
                     status: safeStatus as any,
-                    createdAt: t.timestamp ? new Date(t.timestamp) : undefined
+                    createdAt: t.timestamp ? new Date(t.timestamp) : undefined,
+                    cashierName: t.cashier || null,
+                    items: {
+                      create: (t.items || []).map((item: any) => ({
+                        productName: item.product?.name || item.productName || 'Unknown',
+                        quantity: Number(item.quantity) || 1,
+                        unitPrice: Number(item.product?.price || item.unitPrice || 0),
+                        totalPrice: Number(item.product?.price || item.unitPrice || 0) * (Number(item.quantity) || 1),
+                      }))
+                    }
                  }
               });
               syncedSales++;
@@ -381,13 +401,23 @@ router.post('/full', (req: any, res: any) => {
             });
 
             // Also deduct from absolute stock in ProductInventory
-            const inventory = await prisma.productInventory.findFirst({
+            let inventory = await prisma.productInventory.findFirst({
               where: { 
                 productId: String(log.productId), 
                 locationId: targetLocationId, 
                 outletId: targetOutletId 
               }
             });
+
+            if (!inventory) {
+               inventory = await prisma.productInventory.findFirst({
+                  where: {
+                     productId: String(log.productId),
+                     locationId: targetLocationId,
+                     outletId: null
+                  }
+               });
+            }
 
             if (inventory) {
               await prisma.productInventory.update({

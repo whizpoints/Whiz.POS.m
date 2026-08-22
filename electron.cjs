@@ -24,7 +24,7 @@ const store = new Store();
 
 // Define paths for storing user data and assets.
 // Switch to a more secure/stable directory on Windows (e.g., C:\ProgramData) to prevent crashes on first launch or user-specific permissions issues.
-let baseDataPath;
+let baseDataPath; console.log('ACTUAL USER DATA:', app.getPath('userData'));
 if (process.platform === 'win32') {
     // Safely get commonAppData or fallback to environment variable / hardcoded C:\ProgramData
     let commonAppData;
@@ -1141,7 +1141,7 @@ app.whenReady().then(async () => {
         return { success: true, data: data || [] };
     } catch (error) {
         console.error(`Failed to read data from ${fileName}:`, error);
-        return { success: false, error: e.message };
+        return { success: false, error: error.message };
     }
   });
 
@@ -1151,6 +1151,16 @@ app.whenReady().then(async () => {
           return { success: true };
       } catch (error) {
           console.error(`Failed to merge data to ${fileName}:`, error);
+          return { success: false, error: error.message };
+      }
+  });
+
+  ipcMain.handle('apply-stock-movements', async (event, movements) => {
+      try {
+          const applied = sqliteDb.applyStockMovements(movements);
+          return { success: true, applied };
+      } catch (error) {
+          console.error('Failed to apply stock movements:', error);
           return { success: false, error: error.message };
       }
   });
@@ -1723,59 +1733,33 @@ ipcMain.handle('get-api-config', async () => {
 });
 
 ipcMain.handle('complete-atomic-sale', async (event, saleData, paymentData) => {
-    const db = sqliteDb.db;
-    if (!db) throw new Error("Database not initialized");
-
-    return new Promise((resolve, reject) => {
-        try {
-            // We use db.transaction for atomic commits
-            const runTransaction = db.transaction(() => {
-                // 1. Insert Sale (Transaction)
-                const stmtSale = db.prepare(`INSERT OR REPLACE INTO transactions (id, data) VALUES (?, ?)`);
-                stmtSale.run(String(saleData.id), JSON.stringify(saleData));
-
-                // 2. Insert Payment
-                if (paymentData) {
-                    const stmtPayment = db.prepare(`INSERT OR REPLACE INTO payments (id, saleId, paymentMethod, amount, reference, status, source, rawCallback, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-                    stmtPayment.run(
-                        paymentData.id,
-                        paymentData.saleId,
-                        paymentData.paymentMethod,
-                        paymentData.amount,
-                        paymentData.reference || null,
-                        paymentData.status || 'COMPLETED',
-                        paymentData.source || 'POS',
-                        paymentData.rawCallback ? JSON.stringify(paymentData.rawCallback) : null,
-                        paymentData.timestamp || new Date().toISOString()
-                    );
-                }
-
-                // 3. Deduct Stock Ledger / Products
-                // We'll read existing products from the DB, update their stock, and write back
-                const stmtGetProduct = db.prepare(`SELECT data FROM products WHERE id = ?`);
-                const stmtUpdateProduct = db.prepare(`INSERT OR REPLACE INTO products (id, data) VALUES (?, ?)`);
-                
-                for (const item of saleData.items) {
-                    if (item.product && item.product.id) {
-                        const row = stmtGetProduct.get(String(item.product.id));
-                        if (row) {
-                            const product = JSON.parse(row.data);
-                            if (typeof product.stock === 'number') {
-                                product.stock = Math.max(0, product.stock - item.quantity);
-                                stmtUpdateProduct.run(String(product.id), JSON.stringify(product));
-                            }
-                        }
-                    }
-                }
-            });
-
-            runTransaction();
-            resolve({ success: true, transactionId: saleData.id });
-        } catch (error) {
-            console.error('Atomic sale failed:', error);
-            resolve({ success: false, error: error.message });
+    try {
+        if (!sqliteDb.db) throw new Error("Database not initialized");
+        
+        // Use the native relational atomic sale method from sqlite-db.cjs
+        const txId = sqliteDb.completeAtomicSale(saleData, saleData.items || []);
+        
+        // Also insert payment data if provided
+        if (paymentData) {
+            const stmtPayment = sqliteDb.db.prepare(`INSERT OR REPLACE INTO payments (id, saleId, paymentMethod, amount, reference, status, source, rawCallback, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+            stmtPayment.run(
+                paymentData.id || 'PAY_' + Date.now(),
+                txId,
+                paymentData.paymentMethod || 'cash',
+                paymentData.amount || 0,
+                paymentData.reference || null,
+                paymentData.status || 'COMPLETED',
+                paymentData.source || 'POS',
+                paymentData.rawCallback ? JSON.stringify(paymentData.rawCallback) : null,
+                paymentData.timestamp || new Date().toISOString()
+            );
         }
-    });
+
+        return { success: true, transactionId: txId };
+    } catch (error) {
+        console.error('Atomic sale failed:', error);
+        return { success: false, error: error.message };
+    }
 });
 
 app.on('window-all-closed', function () {

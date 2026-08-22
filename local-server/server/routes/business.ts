@@ -58,7 +58,17 @@ router.get('/profile', async (req: any, res: any) => {
       select: { id: true, name: true, email: true, logoUrl: true, createdAt: true, settings: true, apiKey: true }
     });
     if (!business) return res.status(404).json({ error: 'Business not found' });
-    res.json(business);
+    
+    let parsedSettings = {};
+    try {
+      if (business.settings && typeof business.settings === 'string') {
+        parsedSettings = JSON.parse(business.settings);
+      } else if (business.settings && typeof business.settings === 'object') {
+        parsedSettings = business.settings;
+      }
+    } catch (e) {}
+    
+    res.json({ ...business, settings: parsedSettings });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -69,11 +79,24 @@ router.post('/profile', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const { name, settings, apiKey } = req.body;
+        // Defensively ensure settings is a string since Prisma schema defines it as String
+      let finalSettings = settings;
+      if (settings && typeof settings === 'object') {
+        // Clean up any corrupted keys caused by previous string spreading bugs
+        const cleanedSettings: any = {};
+        for (const [key, value] of Object.entries(settings)) {
+           if (!/^\d+$/.test(key)) {
+              cleanedSettings[key] = value;
+           }
+        }
+        finalSettings = JSON.stringify(cleanedSettings);
+      }
+
     const business = await prisma.business.update({
       where: { id: businessId },
       data: {
         ...(name && { name }),
-        ...(settings && { settings }),
+        ...(finalSettings !== undefined && { settings: finalSettings }),
         ...(apiKey !== undefined && { apiKey })
       },
       select: { id: true, name: true, settings: true, apiKey: true }

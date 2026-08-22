@@ -543,11 +543,8 @@ const DeveloperPage = () => {
 
                 <div className="flex-1 p-4 space-y-2 overflow-y-auto">
                     {renderMenuButton('general', <Settings className="w-5 h-5" />, 'General Config')}
-                    {renderMenuButton('payments', <CreditCard className="w-5 h-5" />, 'Payment Gateways')}
-                    {renderMenuButton('etims', <FileCheck className="w-5 h-5" />, 'KRA eTIMS')}
                     {renderMenuButton('security', <Shield className="w-5 h-5" />, 'Security & Session')}
                     {renderMenuButton('database', <Database className="w-5 h-5" />, 'Database & Sync')}
-                    {renderMenuButton('messaging', <MessageSquare className="w-5 h-5" />, 'Messaging & API')}
                     {renderMenuButton('hardware', <Smartphone className="w-5 h-5" />, 'Hardware')}
                     {renderMenuButton('logs', <FileText className="w-5 h-5" />, 'System Logs')}
                 </div>

@@ -154,6 +154,7 @@ model StockMovement {
   type       String   // SALE, TRANSFER, PO, ADJUSTMENT
   quantity   Int
   reference  String?
+  sourceTerminal String?
   timestamp  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 
@@ -270,11 +271,13 @@ model Receipt {
   status        ReceiptStatus @default(PENDING)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
+  cashierName   String?
 
   business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location StoreLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
   outletId String?
   outlet   Outlet?        @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  items    ReceiptItem[]
 
   @@index([businessId])
   @@index([locationId])
@@ -282,6 +285,19 @@ model Receipt {
   @@index([receiptNumber])
   @@index([createdAt])
   @@index([updatedAt])
+}
+
+model ReceiptItem {
+  id          String  @id @default(cuid())
+  receiptId   String
+  productName String
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+
+  receipt Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  @@index([receiptId])
 }
 
 enum ReceiptStatus {
@@ -313,6 +329,23 @@ model Terminal {
   name       String
   status     String   @default("PENDING")
   apiKey     String?
+  outletId   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
+}
+
+model SyncLog {
+  id         String   @id @default(cuid())
+  businessId String
+  outletId   String?
+  terminal   String
+  type       String   
+  status     String   
+  details    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([outletId])
+  @@index([createdAt])
 }

@@ -14,10 +14,16 @@ const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 const authenticate = (req: any, res: any, next: any) => {
+  let token = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'Missing authorization header' });
+  if (authHeader) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query.token) {
+    token = req.query.token;
+  }
+  
+  if (!token) return res.status(401).json({ error: 'Missing authorization header or token' });
 
-  const token = authHeader.split(' ')[1];
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = payload;
@@ -183,15 +189,38 @@ router.put('/:id', async (req: any, res: any) => {
         const existingInventory = await prisma.productInventory.findFirst({
           where: { productId: id, locationId: targetLocationId }
         });
+        
+        const oldStock = existingInventory ? existingInventory.stock : 0;
+        const newStock = stock || 0;
+        const variance = newStock - oldStock;
+        
         if (existingInventory) {
           await prisma.productInventory.update({
             where: { id: existingInventory.id },
-            data: { stock: stock || 0, reorderLevel: reorderLevel || 5 }
+            data: { stock: newStock, reorderLevel: reorderLevel || 5 }
           });
         } else {
           await prisma.productInventory.create({
-            data: { productId: id, locationId: targetLocationId, stock: stock || 0, reorderLevel: reorderLevel || 5 }
+            data: { productId: id, locationId: targetLocationId, stock: newStock, reorderLevel: reorderLevel || 5 }
           });
+        }
+        
+        if (variance !== 0) {
+           const outletId = req.query.outletId || req.body.outletId || existingInventory?.outletId || null;
+           await prisma.stockMovement.create({
+             data: {
+               id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+               businessId,
+               productId: id,
+               locationId: targetLocationId,
+               outletId: String(outletId) !== 'undefined' && outletId !== null ? String(outletId) : null,
+               type: variance > 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+               quantity: Math.abs(variance),
+               reference: 'Server Manual Update',
+               sourceTerminal: 'SERVER',
+               timestamp: new Date()
+             }
+           });
         }
       } catch (invErr: any) {
         console.warn('Inventory update skipped:', invErr?.message || invErr);
@@ -223,15 +252,12 @@ router.get('/template/products', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const categories = await prisma.category.findMany({ where: { businessId } });
+    const products = await prisma.product.findMany({ where: { businessId }, orderBy: { name: 'asc' } });
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Whiz POS Server';
 
-    const catSheet = workbook.addWorksheet('_Categories', { state: 'hidden' });
-    const catList = categories.map((c: any) => c.name);
-    if (!catList.includes('General')) catList.push('General');
-    catSheet.getColumn(1).values = ['CategoryList', ...catList];
-
+    // MUST ADD PRODUCTS SHEET FIRST so it's the active sheet when opened
     const sheet = workbook.addWorksheet('Products', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.columns = [
       { header: 'Product Name', key: 'name', width: 30 },
@@ -248,7 +274,28 @@ router.get('/template/products', async (req: any, res: any) => {
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
 
-    for (let i = 2; i <= 1000; i++) {
+    // Pre-fill existing products
+    products.forEach((p: any) => {
+      sheet.addRow({
+        name: p.name,
+        sku: p.sku,
+        barcode: p.barcode,
+        category: p.category,
+        price: p.price,
+        costPrice: p.costPrice,
+        taxRate: p.taxRate,
+        reorderLevel: p.reorderLevel,
+      });
+    });
+
+    // Add category sheet SECOND so it's hidden and not the default
+    const catSheet = workbook.addWorksheet('_Categories', { state: 'hidden' });
+    const catList = categories.map((c: any) => c.name);
+    if (!catList.includes('General')) catList.push('General');
+    catSheet.getColumn(1).values = ['CategoryList', ...catList];
+
+    const totalRows = Math.max(1000, products.length + 1000);
+    for (let i = 2; i <= totalRows; i++) {
       sheet.getCell(`D${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
@@ -423,14 +470,17 @@ router.post('/import/reconciliation', upload.single('file'), async (req: any, re
       }
       
       try {
+        const outletId = req.query.outletId || req.body.outletId || inv?.outletId || null;
         await prisma.stockMovement.create({
           data: {
             businessId,
             productId,
             locationId: targetLocationId,
+            outletId: String(outletId) !== 'undefined' && outletId !== null ? String(outletId) : null,
             type: delta > 0 ? 'in' : 'out',
             quantity: Math.abs(delta),
-            notes: 'Excel Bulk Reconciliation'
+            reference: 'Excel Bulk Reconciliation',
+            sourceTerminal: 'SERVER'
           }
         });
       } catch (e) { }
@@ -472,6 +522,22 @@ router.post('/quick-add', async (req: any, res: any) => {
         data: { productId, locationId: targetLocationId, stock: quantity, reorderLevel: 5 }
       });
     }
+
+    const outletId = req.query.outletId || req.body.outletId || inv?.outletId || null;
+    await prisma.stockMovement.create({
+      data: {
+        id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        businessId,
+        productId,
+        locationId: targetLocationId,
+        outletId: String(outletId) !== 'undefined' && outletId !== null ? String(outletId) : null,
+        type: 'ADJUSTMENT_UP',
+        quantity: quantity,
+        reference: 'Quick Add from Server',
+        sourceTerminal: 'SERVER',
+        timestamp: new Date()
+      }
+    });
 
     res.json({ success: true, message: 'Stock added successfully' });
   } catch (error) {

@@ -146,6 +146,14 @@ export default function SyncEngine() {
       });
     });
 
+    usePosStore.getState().inventoryLogs.forEach(log => {
+      addToSyncQueue({
+        type: 'inventory-log',
+        data: log,
+        timestamp: log.timestamp
+      });
+    });
+
     creditCustomers.forEach(customer => {
       addToSyncQueue({
         type: 'customer',

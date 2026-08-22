@@ -56,13 +56,13 @@ export class NetworkClient {
       return { baseUrl: apiUrl, apiKey };
     } else {
       // LAN_ADMIN routing
-      let lanIp = this.resolvedLanIp || setup.lanAdminIp;
+      let lanIp = this.resolvedLanIp || setup.lanAdminIp || setup.apiUrl;
       
       if (!lanIp) {
         // Attempt auto-discovery
         lanIp = await this.discoverLocalServer();
         if (!lanIp) {
-           lanIp = 'http://localhost:3000'; // Final fallback
+           lanIp = 'http://localhost:5173'; // Fallback to Local Admin Server port
         }
       }
       return { baseUrl: lanIp, apiKey: setup.apiKey || '' };

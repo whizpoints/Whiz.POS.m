@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { usePosStore } from '../store/posStore';
-import { Store, Coffee, BarChart3, Users, Calendar, Settings, DollarSign, Database, Package, Gift, Camera, Activity, Building2, UserCheck, Printer, Smartphone, Maximize, Wrench, FileText, BookOpen, ShieldAlert, FileCheck2 } from 'lucide-react';
+import { Store, Coffee, BarChart3, Users, Calendar, Settings, DollarSign, Database, Package, Gift, Camera, Activity, Building2, UserCheck, Printer, Smartphone, Maximize, Wrench, FileText, BookOpen, ShieldAlert, FileCheck2, History, RefreshCw } from 'lucide-react';
 
 /**
  * Helper component to group navigation links with a title.
@@ -32,7 +32,7 @@ const Navigation = () => {
   }
 
   const userRole = currentCashier?.role;
-  const isAdminOrManager = userRole === 'admin' || userRole === 'manager';
+  const isAdminOrManager = userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'manager';
 
   /**
    * Computes class names for navigation links.
@@ -148,8 +148,12 @@ const Navigation = () => {
               <span>eTIMS Monitor</span>
             </NavLink>
             <NavLink to="/sync" className={navLinkClasses}>
-              <Database className="w-5 h-5" />
-              <span>Sync</span>
+              <RefreshCw className="w-5 h-5" />
+              <span>Synchronization</span>
+            </NavLink>
+            <NavLink to="/sync-history" className={navLinkClasses}>
+              <History className="w-5 h-5" />
+              <span>Sync History</span>
             </NavLink>
             <NavLink to="/manage" className={navLinkClasses}>
               <Settings className="w-5 h-5" />

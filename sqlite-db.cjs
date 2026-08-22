@@ -38,6 +38,7 @@ function initDB(userDataPath) {
             id TEXT PRIMARY KEY, businessId TEXT, productId TEXT, type TEXT, quantity INTEGER, 
             reference TEXT, timestamp TEXT
         );
+        CREATE INDEX IF NOT EXISTS idx_stockMovements_productId ON stockMovements(productId);
 
         CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS salaries (id TEXT PRIMARY KEY, data TEXT);
@@ -167,8 +168,20 @@ function getTableData(table) {
         });
     }
     if (table === 'stockMovements' || table === 'inventoryLogs') {
-        const stmt = db.prepare('SELECT * FROM stockMovements');
-        return stmt.all();
+        const stmt = db.prepare('SELECT sm.*, p.name as productName FROM stockMovements sm LEFT JOIN products p ON sm.productId = p.id ORDER BY sm.timestamp DESC');
+        return stmt.all().map(sm => ({
+            id: sm.id,
+            productId: sm.productId,
+            productName: sm.productName || 'Unknown Product',
+            variance: (sm.type === 'subtract' || sm.type === 'SALE' || sm.type === 'OUT' || sm.type === 'out' || sm.type === 'ADJUSTMENT_DOWN') ? -Math.abs(sm.quantity) : Math.abs(sm.quantity),
+            type: sm.type,
+            reason: sm.type,
+            timestamp: sm.timestamp,
+            reference: sm.reference,
+            oldStock: 0,
+            newStock: 0,
+            cashierName: ''
+        }));
     }
 
     try {
@@ -188,6 +201,21 @@ function getTableData(table) {
         console.error(`[DB Error] Failed to read ${table}:`, e);
         return ['businessSetup', 'serverConfig', 'dailySummaries', 'documentSettings', 'sync_metadata'].includes(table) ? (table === 'dailySummaries' ? {} : null) : [];
     }
+}
+
+function saveProductCatalog(id, dataObj) {
+    const existing = db.prepare('SELECT stock FROM products WHERE id = ?').get(String(id));
+    const preservedStock = existing ? existing.stock : (dataObj.stock || 0);
+    
+    const stmt = db.prepare(`INSERT OR REPLACE INTO products 
+        (id, businessId, sku, barcode, name, category, price, costPrice, taxRate, stock, minStock, image, updatedAt) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    stmt.run(
+        String(dataObj.id), dataObj.businessId || '', dataObj.sku || '', dataObj.barcode || '',
+        dataObj.name || '', dataObj.category || '', dataObj.price || 0, dataObj.costPrice || 0,
+        dataObj.taxRate || 0, preservedStock, dataObj.minStock || 0, dataObj.image || '',
+        dataObj.updatedAt || new Date().toISOString()
+    );
 }
 
 function saveTableData(table, id, dataObj) {
@@ -211,6 +239,37 @@ function saveTableData(table, id, dataObj) {
         const stmt = db.prepare(`INSERT OR REPLACE INTO ${table} (id, data) VALUES (?, ?)`);
         stmt.run(String(id), JSON.stringify(dataObj));
     } catch (e) {}
+}
+
+function applyStockMovement(movement) {
+    const exists = db.prepare('SELECT id FROM stockMovements WHERE id = ?').get(String(movement.id));
+    if (exists) return false;
+    
+    db.prepare(`INSERT INTO stockMovements (id, businessId, productId, type, quantity, reference, timestamp) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .run(movement.id, movement.businessId || '', String(movement.productId), 
+             movement.type, movement.quantity, movement.reference || '', 
+             movement.timestamp || new Date().toISOString());
+    
+    const delta = ['SALE', 'ADJUSTMENT_DOWN', 'TRANSFER_OUT'].includes(movement.type) 
+        ? -Math.abs(movement.quantity) 
+        : Math.abs(movement.quantity);
+    
+    db.prepare('UPDATE products SET stock = MAX(0, stock + ?) WHERE id = ?')
+        .run(delta, String(movement.productId));
+    
+    return true;
+}
+
+function applyStockMovements(movements) {
+    if (!movements || !Array.isArray(movements) || movements.length === 0) return 0;
+    let applied = 0;
+    db.transaction(() => {
+        for (const m of movements) {
+            if (applyStockMovement(m)) applied++;
+        }
+    })();
+    return applied;
 }
 
 function completeAtomicSale(tx, items) {
@@ -363,6 +422,37 @@ async function writeJsonFileFallback(filename, data) {
              })();
              return;
         }
+        if (mapInfo.table === 'stockMovements' || mapInfo.table === 'inventoryLogs') {
+             const incomingIds = new Set();
+             db.transaction(() => {
+                 for (const item of data) {
+                     const id = item.id;
+                     if (id) {
+                         incomingIds.add(String(id));
+                         const existing = db.prepare('SELECT id FROM stockMovements WHERE id = ?').get(String(id));
+                         if (!existing) {
+                             const insertStockMovement = db.prepare(`INSERT INTO stockMovements 
+                                 (id, businessId, productId, type, quantity, reference, timestamp) 
+                                 VALUES (?, ?, ?, ?, ?, ?, ?)`);
+                             
+                             let type = item.type || item.reason || '';
+                             let qty = item.quantity;
+                             if (qty === undefined && item.variance !== undefined) {
+                                qty = Math.abs(item.variance);
+                                if (item.variance < 0 && type === '') type = 'subtract';
+                                if (item.variance > 0 && type === '') type = 'add';
+                             }
+                             
+                             insertStockMovement.run(
+                                 item.id, item.businessId || '', item.productId || '', type,
+                                 qty || 0, item.reference || '', item.timestamp || new Date().toISOString()
+                             );
+                         }
+                     }
+                 }
+             })();
+             return;
+        }
         
         const insertStmt = db.prepare(`INSERT OR REPLACE INTO ${mapInfo.table} (id, data) VALUES (?, ?)`);
         const deleteStmt = db.prepare(`DELETE FROM ${mapInfo.table} WHERE id = ?`);
@@ -397,20 +487,46 @@ async function mergeJsonFileFallback(filename, data) {
         
         if (mapInfo.table === 'products') {
             db.transaction(() => {
-                const selectStmt = db.prepare('SELECT * FROM products WHERE id = ?');
+                const incomingIds = new Set();
                 for (const item of data) {
                     const id = item.id || item.productId;
                     if (id) {
-                        let finalItem = { ...item };
-                        const existing = selectStmt.get(String(id));
-                        if (existing && existing.stock !== undefined) {
-                            finalItem.stock = existing.stock;
-                        }
-                        saveTableData('products', id, finalItem);
+                        incomingIds.add(String(id));
+                        saveProductCatalog(id, item);
                     }
                 }
             })();
             return;
+        }
+
+        if (mapInfo.table === 'stockMovements' || mapInfo.table === 'inventoryLogs') {
+             db.transaction(() => {
+                 for (const item of data) {
+                     const id = item.id;
+                     if (id) {
+                         const existing = db.prepare('SELECT id FROM stockMovements WHERE id = ?').get(String(id));
+                         if (!existing) {
+                             const insertStockMovement = db.prepare(`INSERT INTO stockMovements 
+                                 (id, businessId, productId, type, quantity, reference, timestamp) 
+                                 VALUES (?, ?, ?, ?, ?, ?, ?)`);
+                             
+                             let type = item.type || item.reason || '';
+                             let qty = item.quantity;
+                             if (qty === undefined && item.variance !== undefined) {
+                                qty = Math.abs(item.variance);
+                                if (item.variance < 0 && type === '') type = 'subtract';
+                                if (item.variance > 0 && type === '') type = 'add';
+                             }
+                             
+                             insertStockMovement.run(
+                                 item.id, item.businessId || '', item.productId || '', type,
+                                 qty || 0, item.reference || '', item.timestamp || new Date().toISOString()
+                             );
+                         }
+                     }
+                 }
+             })();
+             return;
         }
 
         const selectStmt = db.prepare(`SELECT data FROM ${mapInfo.table} WHERE id = ?`);
@@ -478,6 +594,7 @@ function removePendingSyncs(ids) {
 module.exports = {
     initDB, migrateLegacyData, getTableData, saveTableData, saveSingletonData, deleteTableData,
     readJsonFileFallback, writeJsonFileFallback, mergeJsonFileFallback, completeAtomicSale,
+    saveProductCatalog, applyStockMovement, applyStockMovements,
     addPendingSync, getPendingSyncs, removePendingSyncs, get db() { return db; },
     backupDB: async (destPath) => { await db.backup(destPath); },
     closeDB: () => { if (db) { db.close(); db = null; } }

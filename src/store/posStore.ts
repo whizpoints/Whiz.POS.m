@@ -873,7 +873,6 @@ export const usePosStore = create<PosState>()(
         state.saveTransaction(transaction);
         state.addToSyncQueue({ type: 'new-transaction', data: transaction });
 
-        // Append StockMovement records instead of pushing absolute subtraction to cloud
         transaction.items.forEach(item => {
            if (item.product.id) {
                const product = state.products.find(p => p.id === item.product.id);
@@ -881,14 +880,7 @@ export const usePosStore = create<PosState>()(
                    const oldStock = product.stock;
                    const newStock = Math.max(0, product.stock - item.quantity);
                    
-                   // 1. Update local cache quietly without triggering sync queue for absolute stock
-                   const updatedProducts = state.products.map(p =>
-                     p.id === product.id ? { ...p, stock: newStock } : p
-                   );
-                   set({ products: updatedProducts });
-                   saveDataToFile('products.json', updatedProducts);
-
-                   // 2. Append StockMovement log
+                   // Append StockMovement log
                    state.addInventoryLog({
                        id: `mov_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
                        productId: product.id,
@@ -905,6 +897,12 @@ export const usePosStore = create<PosState>()(
                }
            }
         });
+
+        if (window.electron && window.electron.readData) {
+            const productsRes = await window.electron.readData('products.json');
+            const freshProducts = (productsRes?.data || []).filter((p: any) => p && p.name && p.price > 0);
+            set({ products: freshProducts });
+        }
 
         // Handle credit customer
         if (paymentMethod === 'credit' && creditCustomerName) {
@@ -1346,7 +1344,7 @@ export const usePosStore = create<PosState>()(
         try {
           const payload = {
               transactions: [] as any[],
-              inventoryLogs: [] as any[],
+              stockMovements: [] as any[],
               products: [] as any[],
               users: [] as any[],
               customers: [] as any[],
@@ -1357,12 +1355,16 @@ export const usePosStore = create<PosState>()(
               if (item.type === 'new-transaction' || item.type === 'transaction') {
                   payload.transactions.push(item.data);
               } else if (item.type === 'inventory-log') {
-                  payload.inventoryLogs.push(item.data);
+                  payload.stockMovements.push(item.data);
               } else if (item.type === 'add-product') {
-                  payload.products.push(item.data);
+                  const { stock, ...prodWithoutStock } = item.data;
+                  payload.products.push(prodWithoutStock);
               } else if (item.type === 'update-product') {
                   const fullProduct = state.products.find(p => p.id === item.data.id);
-                  if (fullProduct) payload.products.push(fullProduct);
+                  if (fullProduct) {
+                      const { stock, ...prodWithoutStock } = fullProduct;
+                      payload.products.push(prodWithoutStock);
+                  }
               } else if (item.type === 'add-user') {
                   payload.users.push(item.data);
               } else if (item.type === 'update-user') {
@@ -1424,6 +1426,12 @@ export const usePosStore = create<PosState>()(
                   }
                 });
 
+                if (response.status === 401) {
+                   console.error('API Key invalid or revoked. Resetting POS registration.');
+                   get().saveBusinessSetup({ ...state.businessSetup, apiKey: null, backOfficeApiKey: null, isSetup: false } as any);
+                   return;
+                }
+
               if (!response.ok) {
                  return;
               }
@@ -1451,37 +1459,11 @@ const serverData = await response.json();
                           
                           await Promise.all(mergePromises);
 
-                          // --- Delta-Based Inventory Processing ---
-                          if (payload.inventoryLogs?.length > 0) {
-                              const [currentProductsRes, currentLogsRes] = await Promise.all([
-                                  window.electron.readData('products.json'),
-                                  window.electron.readData('inventory-logs.json')
-                              ]);
-                              
-                              const currentProducts = currentProductsRes?.data || [];
-                              const currentLogs = currentLogsRes?.data || [];
-                              const currentLogIds = new Set(currentLogs.map((l: any) => String(l.id)));
-                              
-                              // Only apply logs we haven't seen before to avoid double-counting
-                              const newLogs = payload.inventoryLogs.filter((l: any) => !currentLogIds.has(String(l.id)));
-                              
-                              if (newLogs.length > 0) {
-                                  let productsModified = false;
-                                  newLogs.forEach((log: any) => {
-                                      const p = currentProducts.find((prod: any) => String(prod.id) === String(log.productId) || String(prod.sku) === String(log.productId));
-                                      if (p) {
-                                          p.stock = Math.max(0, (p.stock || 0) + Number(log.variance || 0));
-                                          productsModified = true;
-                                      }
-                                  });
-                                  
-                                  if (productsModified) {
-                                      await window.electron.saveData('products.json', currentProducts);
-                                  }
-                                  await window.electron.mergeData('inventory-logs.json', newLogs);
-                              }
+                          // Apply server stock movements idempotently
+                          if (payload.stockMovements?.length > 0) {
+                              const movResult = await window.electron.applyStockMovements(payload.stockMovements);
+                              console.log(`[SYNC] Applied ${movResult.applied} stock movements from server`);
                           }
-                          // ----------------------------------------
                       }
 
                     // 2. Refresh UI by fully re-reading the merged local SQLite database state
@@ -1499,7 +1481,8 @@ const serverData = await response.json();
                         ]);
 
                         // --- Developer Console Sync Logging ---
-                        console.groupCollapsed('%c☁️ Data Pulled From Server & Saved to Local DB', 'color: #007bff; font-weight: bold;');
+                        console.log(`[DEBUG] payload.products len:`, payload.products?.length, `products.data len:`, products?.data?.length);
+                        console.groupCollapsed('%c🟢 Data Pulled From Server & Saved to Local DB', 'color: #007bff; font-weight: bold;');
                         if (payload.users?.length) console.log(`👤 Users Updated (${payload.users.length})`);
                         if (payload.products?.length) console.log(`📦 Products Updated (${payload.products.length})`);
                         if (!payload.users?.length && !payload.products?.length) console.log('No new updates since last sync.');
@@ -2206,6 +2189,11 @@ const serverData = await response.json();
             get().setSyncStatus({ progress: 100, currentTask: 'Pull complete', isSyncing: false });
         } catch (error: any) {
             console.error('Pull sync error:', error);
+            if (error.message && error.message.includes('401')) {
+                console.error('API Key invalid or revoked during Pull. Resetting POS registration.');
+                get().saveBusinessSetup({ ...state.businessSetup, apiKey: null, backOfficeApiKey: null, isSetup: false } as any);
+                return;
+            }
             get().setSyncStatus({ error: error.message, isSyncing: false, currentTask: 'Pull failed' });
         }
       },
@@ -2248,6 +2236,11 @@ const serverData = await response.json();
             
         } catch (error: any) {
             console.error('Push sync error:', error);
+            if (error.message && error.message.includes('401')) {
+                console.error('API Key invalid or revoked during Push. Resetting POS registration.');
+                get().saveBusinessSetup({ ...state.businessSetup, apiKey: null, backOfficeApiKey: null, isSetup: false } as any);
+                return;
+            }
             get().setSyncStatus({ error: error.message, currentTask: 'Push failed' });
         } finally {
             setTimeout(() => get().setSyncStatus({ isSyncing: false }), 2000);

@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('electron', {
   readData: (fileName) => ipcRenderer.invoke('read-data', fileName),
 
   mergeData: (fileName, data) => ipcRenderer.invoke('merge-data', fileName, data),
+  applyStockMovements: (movements) => ipcRenderer.invoke('apply-stock-movements', movements),
 
   addPendingSync: (syncOp) => ipcRenderer.invoke('add-pending-sync', syncOp),
   getPendingSyncs: () => ipcRenderer.invoke('get-pending-syncs'),

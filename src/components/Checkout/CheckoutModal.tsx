@@ -72,7 +72,7 @@ export default function CheckoutModal() {
             {selectedMethod === 'mpesa' && (
               <div className="flex items-center gap-4">
                 <div>
-                  <img src="/mpesa.png" alt="M-Pesa" className="h-6 object-contain mb-0.5" />
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="h-6 object-contain mb-0.5" />
                   <p className="text-[10px] text-gray-500">Scan QR, STK Push, or Till</p>
                 </div>
               </div>
