@@ -2244,7 +2244,19 @@ const serverData = await response.json();
                 customers: state.creditCustomers,
                 transactions: state.transactions,
                 businessSetup: state.businessSetup,
-                suppliers: state.suppliers
+                suppliers: state.suppliers,
+                stockMovements: state.inventoryLogs.map((data: any) => ({
+                    id: data.id || `mov_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+                    productId: data.productId,
+                    locationId: state.businessSetup?.locationId,
+                    outletId: state.businessSetup?.outletId,
+                    type: data.type || (data.variance < 0 ? 'SALE' : 'ADJUSTMENT_UP'),
+                    quantity: Math.abs(data.variance || 0),
+                    reference: data.reference || data.reason || 'Sync',
+                    sourceTerminal: 'POS',
+                    timestamp: data.timestamp || new Date().toISOString(),
+                    updatedAt: data.timestamp || new Date().toISOString()
+                }))
             };
 
             get().setSyncStatus({ progress: 50, currentTask: 'Uploading to Network Client' });

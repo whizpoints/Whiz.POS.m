@@ -148,7 +148,7 @@ export default function SyncEngine() {
 
     usePosStore.getState().inventoryLogs.forEach(log => {
       addToSyncQueue({
-        type: 'inventory-log',
+        type: 'add-inventory-log',
         data: log,
         timestamp: log.timestamp
       });
