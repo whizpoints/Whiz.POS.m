@@ -875,10 +875,10 @@ export const usePosStore = create<PosState>()(
 
         transaction.items.forEach(item => {
            if (item.product.id) {
-               const product = state.products.find(p => p.id === item.product.id);
-               if (product && typeof product.stock === 'number') {
-                   const oldStock = product.stock;
-                   const newStock = Math.max(0, product.stock - item.quantity);
+                 const product = state.products.find(p => p.id === item.product.id);
+                 if (product) {
+                     const oldStock = Number(product.stock) || 0;
+                     const newStock = Math.max(0, oldStock - item.quantity);
                    
                    // Append StockMovement log
                    state.addInventoryLog({
@@ -1126,9 +1126,9 @@ export const usePosStore = create<PosState>()(
           set((state) => {
               const updatedLogs = [log, ...state.inventoryLogs];
               saveDataToFile('inventory-logs.json', updatedLogs);
-              state.addToSyncQueue({ type: 'add-inventory-log', data: log });
               return { inventoryLogs: updatedLogs };
           });
+          get().addToSyncQueue({ type: 'add-inventory-log', data: log });
       },
 
       deleteCreditCustomer: (id) => {
