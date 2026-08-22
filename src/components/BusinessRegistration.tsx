@@ -121,12 +121,14 @@ export default function BusinessRegistration() {
         soundManager.playPop();
         
         const networkSetup = {
-          businessName: terminalName || 'Network Terminal',
+          businessName: terminalName || 'Network Terminal', // Will be overwritten by sync with real business name
+          terminalName: terminalName || 'Network Terminal',
           apiKey: terminal.apiKey,
+          outletId: terminal.outletId,
           deviceRole: 'TerminalMode',
           lanAdminIp: ip,
           apiUrl: ip,
-          isLoggedIn: true,
+          isLoggedIn: false,
           isSetup: true,
           printerType: 'thermal',
           createdAt: new Date().toISOString()
@@ -141,6 +143,7 @@ export default function BusinessRegistration() {
 
         // Trigger an immediate sync to get users before reload
         try {
+           localStorage.removeItem('lastSyncTime');
            await syncFromServer();
         } catch (e) {
            console.error('Initial sync failed', e);

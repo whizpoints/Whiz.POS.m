@@ -841,7 +841,7 @@ export const usePosStore = create<PosState>()(
 
         if (paymentMethod === 'mpesa' && additionalData?.mpesaCode) {
             try {
-                const rawUrl = (state.businessSetup as any)?.backOfficeUrl || (state.businessSetup as any)?.apiUrl || 'http://localhost:3000';
+                const rawUrl = (state.businessSetup as any)?.lanAdminIp || (state.businessSetup as any)?.apiUrl || (state.businessSetup as any)?.backOfficeUrl || 'http://localhost:3000';
                 const baseUrl = rawUrl.replace(/\/$/, '').replace(/\/api$/, '');
                 const bId = (state.businessSetup as any)?.businessId || (state.businessSetup as any)?.cloudBusinessId;
                 
@@ -1334,7 +1334,7 @@ export const usePosStore = create<PosState>()(
 
       processSyncQueue: async () => {
         const state = get();
-        let rawUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
+        let rawUrl = state.businessSetup?.lanAdminIp || state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
         let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
         const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
 
@@ -1405,7 +1405,7 @@ export const usePosStore = create<PosState>()(
 
         syncFromServer: async () => {
             const state = get();
-            let rawUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
+              let rawUrl = state.businessSetup?.lanAdminIp || state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
             let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
             const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
 
@@ -1428,26 +1428,61 @@ export const usePosStore = create<PosState>()(
                  return;
               }
 
-              const serverData = await response.json();
+const serverData = await response.json();
                 if (serverData && serverData.success) {
                     const payload = serverData.data || serverData;
                     set({ lastSyncTime: serverData.timestamp || new Date().toISOString() });
 
-                    // 1. Write directly to local SQLite database via IPC to maintain .wpos compatibility
-                    if (window.electron && window.electron.mergeData) {
-                        if (payload.products?.length > 0) window.electron.mergeData('products.json', payload.products);
-                        if (payload.users?.length > 0) window.electron.mergeData('users.json', payload.users);
-                        if (payload.categories?.length > 0) window.electron.mergeData('categories.json', payload.categories);
-                        if (payload.outlets?.length > 0) window.electron.mergeData('outlets.json', payload.outlets);
-                        if (payload.terminals?.length > 0) window.electron.mergeData('terminals.json', payload.terminals);
-                        if (payload.customers?.length > 0) window.electron.mergeData('credit-customers.json', payload.customers);
-                        if (payload.suppliers?.length > 0) window.electron.mergeData('suppliers.json', payload.suppliers);
-                        if (payload.transactions?.length > 0) window.electron.mergeData('transactions.json', payload.transactions);
-                        if (payload.businessSetup) window.electron.mergeData('business-setup.json', payload.businessSetup);
-                        
-                        // We also save sync-metadata to SQLite
-                        window.electron.mergeData('sync-metadata.json', { lastPullSync: serverData.timestamp || new Date().toISOString() });
-                    }
+                      // 1. Write directly to local SQLite database via IPC to maintain .wpos compatibility
+                      if (window.electron && window.electron.mergeData) {
+                          const mergePromises = [];
+                          if (payload.products?.length > 0) mergePromises.push(window.electron.mergeData('products.json', payload.products));
+                          if (payload.users?.length > 0) mergePromises.push(window.electron.mergeData('users.json', payload.users));
+                          if (payload.categories?.length > 0) mergePromises.push(window.electron.mergeData('categories.json', payload.categories));
+                          if (payload.outlets?.length > 0) mergePromises.push(window.electron.mergeData('outlets.json', payload.outlets));
+                          if (payload.terminals?.length > 0) mergePromises.push(window.electron.mergeData('terminals.json', payload.terminals));
+                          if (payload.customers?.length > 0) mergePromises.push(window.electron.mergeData('credit-customers.json', payload.customers));
+                          if (payload.suppliers?.length > 0) mergePromises.push(window.electron.mergeData('suppliers.json', payload.suppliers));
+                          if (payload.transactions?.length > 0) mergePromises.push(window.electron.mergeData('transactions.json', payload.transactions));
+                          if (payload.businessSetup) mergePromises.push(window.electron.mergeData('business-setup.json', payload.businessSetup));
+                          
+                          // We also save sync-metadata to SQLite
+                          mergePromises.push(window.electron.mergeData('sync-metadata.json', { lastPullSync: serverData.timestamp || new Date().toISOString() }));
+                          
+                          await Promise.all(mergePromises);
+
+                          // --- Delta-Based Inventory Processing ---
+                          if (payload.inventoryLogs?.length > 0) {
+                              const [currentProductsRes, currentLogsRes] = await Promise.all([
+                                  window.electron.readData('products.json'),
+                                  window.electron.readData('inventory-logs.json')
+                              ]);
+                              
+                              const currentProducts = currentProductsRes?.data || [];
+                              const currentLogs = currentLogsRes?.data || [];
+                              const currentLogIds = new Set(currentLogs.map((l: any) => String(l.id)));
+                              
+                              // Only apply logs we haven't seen before to avoid double-counting
+                              const newLogs = payload.inventoryLogs.filter((l: any) => !currentLogIds.has(String(l.id)));
+                              
+                              if (newLogs.length > 0) {
+                                  let productsModified = false;
+                                  newLogs.forEach((log: any) => {
+                                      const p = currentProducts.find((prod: any) => String(prod.id) === String(log.productId) || String(prod.sku) === String(log.productId));
+                                      if (p) {
+                                          p.stock = Math.max(0, (p.stock || 0) + Number(log.variance || 0));
+                                          productsModified = true;
+                                      }
+                                  });
+                                  
+                                  if (productsModified) {
+                                      await window.electron.saveData('products.json', currentProducts);
+                                  }
+                                  await window.electron.mergeData('inventory-logs.json', newLogs);
+                              }
+                          }
+                          // ----------------------------------------
+                      }
 
                     // 2. Refresh UI by fully re-reading the merged local SQLite database state
                     if (window.electron && window.electron.readData) {
@@ -1910,7 +1945,8 @@ export const usePosStore = create<PosState>()(
           // Load Categories
           const { data: catData } = await readDataFromFile('categories.json');
           if (catData && Array.isArray(catData)) {
-            set({ categories: catData });
+            const normalized = catData.map((c: any) => c.name || c);
+            set({ categories: normalized });
           }
 
           for (const fileName of fileNames) {

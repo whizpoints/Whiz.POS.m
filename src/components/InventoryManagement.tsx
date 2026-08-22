@@ -6,7 +6,7 @@ import cartPlaceholder from '../assets/cart.png';
 import toast from 'react-hot-toast';
 
 export default function InventoryManagement() {
-  const { products, updateProduct, addProduct, deleteProduct, categories: storeCategories } = usePosStore();
+  const { products, updateProduct, addProduct, deleteProduct, categories: storeCategories, addInventoryLog, currentCashier } = usePosStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -37,12 +37,13 @@ export default function InventoryManagement() {
     return matchesSearch && matchesCategory;
   });
 
-  const lowStockProducts = filteredProducts.filter(product => 
-    product.stock !== undefined && product.stock <= (product.minStock || 10)
-  );
+  const lowStockProducts = filteredProducts.filter(product => {
+    const stock = product.stock || 0;
+    return stock > 0 && stock <= (product.minStock || 10);
+  });
 
   const outOfStockProducts = filteredProducts.filter(product => 
-    product.stock === 0
+    !product.stock || product.stock <= 0
   );
 
   const totalStockValue = filteredProducts.reduce((sum, product) => 
@@ -67,8 +68,45 @@ export default function InventoryManagement() {
 
     if (editingProduct) {
       updateProduct(editingProduct.id, productData);
+      
+      const oldStock = editingProduct.stock || 0;
+      const newStock = productData.stock || 0;
+      const variance = newStock - oldStock;
+      
+      if (variance !== 0) {
+          addInventoryLog({
+               id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+               productId: editingProduct.id,
+               productName: editingProduct.name,
+               oldStock,
+               newStock,
+               variance,
+               cashierName: currentCashier?.name || 'Admin',
+               timestamp: new Date().toISOString(),
+               reason: variance > 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+               reference: 'Manual Update',
+               type: variance > 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN'
+          });
+      }
     } else {
-      addProduct({ ...productData, id: Math.random().toString(36).substr(2, 9) });
+      const newId = Math.random().toString(36).substr(2, 9);
+      addProduct({ ...productData, id: newId });
+      
+      if (productData.stock > 0) {
+          addInventoryLog({
+               id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+               productId: newId,
+               productName: productData.name,
+               oldStock: 0,
+               newStock: productData.stock,
+               variance: productData.stock,
+               cashierName: currentCashier?.name || 'Admin',
+               timestamp: new Date().toISOString(),
+               reason: 'INITIAL_STOCK',
+               reference: 'New Product',
+               type: 'ADJUSTMENT_UP'
+          });
+      }
     }
 
     resetForm();
@@ -136,8 +174,27 @@ export default function InventoryManagement() {
               // Casting id to number if product.id is number
               const product = products.find(p => p.id == productId);
               if (product) {
-                  updateProduct(product.id, { stock: count });
-                  // Log adjustment? For now, updating stock is sufficient for MVP.
+                  const oldStock = product.stock || 0;
+                  const variance = count - oldStock;
+                  
+                  if (variance !== 0) {
+                      updateProduct(product.id, { stock: count });
+                      
+                      // Log the adjustment so it syncs up to the server via Delta Sync
+                      addInventoryLog({
+                           id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+                           productId: product.id,
+                           productName: product.name,
+                           oldStock,
+                           newStock: count,
+                           variance,
+                           cashierName: currentCashier?.name || 'Admin',
+                           timestamp: new Date().toISOString(),
+                           reason: variance > 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+                           reference: 'Manual Adjustment',
+                           type: variance > 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN'
+                      });
+                  }
               }
           });
           setReconciliationData({});
@@ -293,11 +350,14 @@ export default function InventoryManagement() {
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                  </option>
-                ))}
+                {categories.map((cat: any) => {
+                  const catName = typeof cat === 'string' ? cat : (cat.name || '');
+                  return (
+                    <option key={typeof cat === 'string' ? cat : cat.id || catName} value={catName}>
+                      {catName ? catName.charAt(0).toUpperCase() + catName.slice(1) : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
