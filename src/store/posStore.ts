@@ -873,15 +873,19 @@ export const usePosStore = create<PosState>()(
         state.saveTransaction(transaction);
         state.addToSyncQueue({ type: 'new-transaction', data: transaction });
 
+        console.log(`[SALE DEBUG] Transaction ${transaction.id} has ${transaction.items.length} items. Products in store: ${state.products.length}`);
+
         transaction.items.forEach(item => {
+           console.log(`[SALE DEBUG] Item: productId=${item.product.id}, name=${item.product.name}, qty=${item.quantity}`);
            if (item.product.id) {
                  const product = state.products.find(p => p.id === item.product.id);
+                 console.log(`[SALE DEBUG] Found product in store: ${!!product}, stock=${product?.stock}, typeof stock=${typeof product?.stock}`);
                  if (product) {
                      const oldStock = Number(product.stock) || 0;
                      const newStock = Math.max(0, oldStock - item.quantity);
                    
                    // Append StockMovement log
-                   state.addInventoryLog({
+                   const logEntry = {
                        id: `mov_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
                        productId: product.id,
                        productName: product.name,
@@ -893,10 +897,14 @@ export const usePosStore = create<PosState>()(
                        reason: 'SALE',
                        reference: transaction.id,
                        type: 'SALE'
-                   });
+                   };
+                   console.log(`[SALE DEBUG] Calling addInventoryLog with:`, logEntry.id, logEntry.type, logEntry.variance);
+                   state.addInventoryLog(logEntry);
                }
            }
         });
+
+        console.log(`[SALE DEBUG] After forEach, syncQueue length: ${get().syncQueue.length}, items: ${get().syncQueue.map((s: any) => s.type).join(', ')}`);
 
         if (window.electron && window.electron.readData) {
             const productsRes = await window.electron.readData('products.json');
@@ -1418,10 +1426,7 @@ export const usePosStore = create<PosState>()(
         } catch (error) {
           console.error('Sync failed:', error);
           // Put items back in queue if failed
-          if (!useSqlite) {
-              // Put items back in queue if failed
-              set((state) => ({ syncQueue: [...queue, ...state.syncQueue] }));
-          }
+          set((state) => ({ syncQueue: [...queue, ...state.syncQueue] }));
         }
       },
 
