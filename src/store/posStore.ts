@@ -1348,15 +1348,25 @@ export const usePosStore = create<PosState>()(
               products: [] as any[],
               users: [] as any[],
               customers: [] as any[],
-              suppliers: [] as any[]
+              suppliers: [] as any[],
+              businessSetup: state.businessSetup
           };
 
           queue.forEach(item => {
-              if (item.type === 'new-transaction' || item.type === 'transaction') {
-                  payload.transactions.push(item.data);
-              } else if (item.type === 'inventory-log') {
-                  payload.stockMovements.push(item.data);
-              } else if (item.type === 'add-product') {
+                if (item.type === 'new-transaction' || item.type === 'transaction') {
+                    payload.transactions.push(item.data);
+                } else if (item.type === 'inventory-log' || item.type === 'add-inventory-log') {
+                    const data = item.data;
+                    const movement = {
+                        id: data.id,
+                        productId: data.productId,
+                        type: data.type || data.reason || 'SALE',
+                        quantity: data.quantity !== undefined ? data.quantity : Math.abs(data.variance || 0),
+                        reference: data.reference || '',
+                        timestamp: data.timestamp
+                    };
+                    payload.stockMovements.push(movement);
+                } else if (item.type === 'add-product') {
                   const { stock, ...prodWithoutStock } = item.data;
                   payload.products.push(prodWithoutStock);
               } else if (item.type === 'update-product') {
