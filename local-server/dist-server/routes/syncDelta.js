@@ -1,19 +1,44 @@
 import { Router } from 'express';
 import prisma from '../prisma.js';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 const router = Router();
 // const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 // Middleware to authenticate sync requests
 const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
-    const apiKey = req.headers['x-api-key'];
+    let apiKey = req.headers['x-api-key'];
+    if (apiKey === 'null' || apiKey === 'undefined')
+        apiKey = undefined;
+    console.log('[SyncDelta Auth] Path:', req.path, 'Headers:', req.headers);
     if (apiKey) {
-        const business = await prisma.business.findFirst({ where: { apiKey } });
+        // Check if it's a Business API Key
+        let business = await prisma.business.findFirst({ where: { apiKey } });
+        let outletId = undefined;
+        let locationId = undefined;
+        let terminalName = undefined;
+        // If not a business, check if it's a Terminal API Key
+        if (!business) {
+            const terminal = await prisma.terminal.findFirst({ where: { apiKey } });
+            if (terminal) {
+                terminalName = terminal.name;
+                // Find the LATEST outlet created for this terminal by matching name
+                const outlet = await prisma.outlet.findFirst({
+                    where: { name: terminal.name },
+                    orderBy: { createdAt: 'desc' }
+                });
+                if (outlet) {
+                    business = await prisma.business.findUnique({ where: { id: outlet.businessId } });
+                    outletId = outlet.id;
+                    locationId = outlet.locationId;
+                }
+            }
+        }
         if (!business) {
             return res.status(401).json({ error: 'Invalid API Key' });
         }
-        req.user = { businessId: business.id };
+        req.user = { businessId: business.id, outletId, locationId, terminalName };
         return next();
     }
     if (!authHeader) {
@@ -26,51 +51,117 @@ const authenticate = async (req, res, next) => {
         next();
     }
     catch (err) {
-        return res.status(401).json({ error: 'Invalid or expired token' });
+        console.error('[SyncDelta Auth] JWT Verification failed:', err);
+        return res.status(401).json({ error: 'Invalid or expired token', details: String(err) });
     }
 };
 router.use(authenticate);
 // 1. GET /api/sync/delta?since={timestamp} (PULL)
 router.get('/', async (req, res) => {
     try {
-        const { businessId } = req.user;
-        const { since, locationId, outletId } = req.query;
+        const { businessId, terminalName } = req.user;
+        const since = req.query.since;
         if (!since)
             return res.status(400).json({ error: 'Missing "since" timestamp parameter' });
         const sinceDate = new Date(since);
-        const [users, products, inventory, customers, suppliers, transactions, business] = await Promise.all([
-            prisma.user.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
-            prisma.product.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
+        const locationId = req.user.locationId || req.query.locationId;
+        const outletId = req.user.outletId || req.query.outletId;
+        const [users, products, categories, inventory, customers, suppliers, business, outlets, terminals] = await Promise.all([
+            // Strict user filtering: Admin/Manager or explicitly assigned to this outlet
+            prisma.user.findMany({
+                where: {
+                    businessId,
+                    updatedAt: { gt: sinceDate },
+                    ...(outletId ? { OR: [{ outletId: outletId }, { role: 'ADMIN' }] } : {})
+                }
+            }),
+            // Products only sync if they have inventory specifically assigned to this outlet
+            prisma.product.findMany({
+                where: {
+                    businessId,
+                    ...(outletId ? { inventory: { some: { outletId: outletId } } } : {}),
+                    OR: [
+                        { updatedAt: { gt: sinceDate } },
+                        { inventory: { some: { updatedAt: { gt: sinceDate }, outletId: outletId ? String(outletId) : undefined } } }
+                    ]
+                }
+            }),
+            prisma.category.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
+            // Inventory is strictly filtered by outlet
             prisma.productInventory.findMany({
                 where: {
-                    locationId: locationId ? String(locationId) : undefined,
-                    outletId: outletId ? String(outletId) : undefined,
                     updatedAt: { gt: sinceDate },
+                    outletId: outletId ? String(outletId) : undefined,
                     product: { businessId } // Ensure it belongs to the business
-                },
-                include: { product: true }
+                }
             }),
             prisma.customer.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
             prisma.supplier.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
-            prisma.receipt.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
-            prisma.business.findUnique({ where: { id: businessId } })
+            prisma.business.findUnique({ where: { id: businessId } }),
+            prisma.outlet.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
+            prisma.terminal.findMany({ where: { updatedAt: { gt: sinceDate } } })
         ]);
-        res.json({
+        // Map stock into products for legacy compatibility
+        const enrichedProducts = products.map((p) => {
+            const inv = inventory.find((i) => i.productId === p.id);
+            return { ...p, stock: inv ? inv.stock : 0 };
+        });
+        // Format businessSetup for POS client expectations
+        let formattedBusinessSetup = null;
+        if (business && business.updatedAt > sinceDate) {
+            let settings = {};
+            try {
+                settings = JSON.parse(business.settings || '{}');
+            }
+            catch (e) { }
+            formattedBusinessSetup = {
+                businessId: business.id,
+                businessName: business.name,
+                ...(terminalName ? { terminalName } : {}),
+                address: business.address || '',
+                phone: business.contact || '',
+                email: business.email || '',
+                ...settings
+            };
+        }
+        const responsePayload = {
             success: true,
             timestamp: new Date().toISOString(),
             data: {
                 users,
-                products,
+                products: enrichedProducts,
+                categories,
                 inventory,
                 customers,
                 suppliers,
-                transactions,
-                businessSetup: business && business.updatedAt > sinceDate ? business : null
+                transactions: [], // Intentionally empty: fresh terminals do not download historical ledgers
+                outlets,
+                terminals,
+                businessSetup: formattedBusinessSetup
             }
-        });
+        };
+        try {
+            await prisma.$executeRaw `
+        INSERT INTO "SyncLog" ("id", "businessId", "outletId", "terminal", "type", "status", "details", "createdAt", "updatedAt") 
+        VALUES (${randomUUID()}, ${businessId}, ${outletId || null}, ${terminalName || 'Unknown Terminal'}, 'PULL', 'SUCCESS', ${`Pulled ${users.length} users, ${enrichedProducts.length} products`}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `;
+        }
+        catch (e) {
+            console.error('Raw log error', e);
+        }
+        res.json(responsePayload);
     }
     catch (error) {
         console.error('Delta Pull error:', error);
+        try {
+            await prisma.$executeRaw `
+        INSERT INTO "SyncLog" ("id", "businessId", "outletId", "terminal", "type", "status", "details", "createdAt", "updatedAt") 
+        VALUES (${randomUUID()}, ${req.user?.businessId || null}, ${req.user?.outletId || req.query.outletId || null}, ${req.user?.terminalName || 'Unknown Terminal'}, 'PULL', 'FAILED', ${error instanceof Error ? error.message : String(error)}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `;
+        }
+        catch (e) {
+            console.error('Raw log error', e);
+        }
         res.status(500).json({ error: 'Internal server error during pull sync' });
     }
 });
@@ -266,22 +357,70 @@ router.post('/', async (req, res) => {
         if (businessSetup) {
             const b = await prisma.business.findUnique({ where: { id: businessId } });
             if (resolveConflict(businessSetup, b)) {
+                // We stringify businessSetup because settings in Prisma is a String type
+                const settingsString = typeof businessSetup === 'string' ? businessSetup : JSON.stringify(businessSetup);
                 await prisma.business.update({
                     where: { id: businessId },
-                    data: { settings: businessSetup, updatedAt: businessSetup.updatedAt ? new Date(businessSetup.updatedAt) : new Date() }
+                    data: { settings: settingsString, updatedAt: businessSetup.updatedAt ? new Date(businessSetup.updatedAt) : new Date() }
                 });
             }
         }
-        res.json({
+        const responsePayload = {
             success: true,
             timestamp: new Date().toISOString(),
             message: 'Delta sync processed successfully',
             results
-        });
+        };
+        try {
+            await prisma.$executeRaw `
+        INSERT INTO "SyncLog" ("id", "businessId", "outletId", "terminal", "type", "status", "details", "createdAt", "updatedAt") 
+        VALUES (${randomUUID()}, ${businessId}, ${targetOutletId || req.user?.outletId || req.query.outletId || null}, ${req.user?.terminalName || businessSetup?.terminalName || 'Unknown Terminal'}, 'PUSH', 'SUCCESS', ${`Pushed ${results.users} users, ${results.products} products, ${results.transactions} txns`}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `;
+        }
+        catch (e) {
+            console.error('Raw log error', e);
+        }
+        res.json(responsePayload);
     }
     catch (error) {
         console.error('Delta Push error:', error);
+        try {
+            await prisma.$executeRaw `
+        INSERT INTO "SyncLog" ("id", "businessId", "outletId", "terminal", "type", "status", "details", "createdAt", "updatedAt") 
+        VALUES (${randomUUID()}, ${req.user?.businessId || null}, ${req.user?.outletId || req.query.outletId || null}, ${req.user?.terminalName || req.body?.businessSetup?.terminalName || 'Unknown Terminal'}, 'PUSH', 'FAILED', ${error instanceof Error ? error.message : String(error)}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `;
+        }
+        catch (e) {
+            console.error('Raw log error', e);
+        }
         res.status(500).json({ error: 'Internal server error during push sync' });
+    }
+});
+// 3. GET /api/sync/logs (Fetch sync logs)
+router.get('/logs', async (req, res) => {
+    try {
+        const { businessId } = req.user;
+        // Fetch logs using raw SQL to bypass Prisma Client types missing the new model
+        const logs = await prisma.$queryRaw `
+      SELECT * FROM "SyncLog" 
+      WHERE "businessId" = ${businessId} 
+      ORDER BY "createdAt" DESC 
+      LIMIT 200
+    `;
+        // Optionally fetch outlets to enrich the logs with outlet names
+        const outlets = await prisma.outlet.findMany({ where: { businessId } });
+        const enrichedLogs = logs.map((log) => {
+            const outlet = outlets.find(o => o.id === log.outletId);
+            return {
+                ...log,
+                outletName: outlet ? outlet.name : (log.outletId ? 'Unknown Outlet' : 'Global / Unassigned')
+            };
+        });
+        res.json({ success: true, logs: enrichedLogs });
+    }
+    catch (error) {
+        console.error('Fetch sync logs error:', error);
+        res.status(500).json({ error: 'Failed to fetch sync logs' });
     }
 });
 export default router;

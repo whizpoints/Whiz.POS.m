@@ -58,6 +58,15 @@ router.post('/sales', async (req: any, res: any) => {
           paymentMethod: receipt.paymentMethod,
           customerPhone: receipt.customerPhone,
           status: receipt.status || 'COMPLETED',
+          cashierName: receipt.cashier || null,
+          items: {
+            create: (receipt.items || []).map((item: any) => ({
+              productName: item.product?.name || item.productName || 'Unknown',
+              quantity: Number(item.quantity) || 1,
+              unitPrice: Number(item.product?.price || item.unitPrice || 0),
+              totalPrice: Number(item.product?.price || item.unitPrice || 0) * (Number(item.quantity) || 1),
+            }))
+          }
         }
       });
       createdReceipts.push(dbReceipt);
@@ -185,33 +194,7 @@ router.post('/full', (req: any, res: any) => {
           });
         }
         
-        // Find newly inserted or updated product ID
-        const finalProduct = await prisma.product.findFirst({ where: { businessId, sku } });
-        if (finalProduct) {
-          const existingInventory = await prisma.productInventory.findFirst({
-            where: { 
-              productId: finalProduct.id, 
-              locationId: targetLocationId, 
-              outletId: targetOutletId || null 
-            }
-          });
-
-          if (existingInventory) {
-            await prisma.productInventory.update({
-              where: { id: existingInventory.id },
-              data: { stock: Number(p.stock) || 0 }
-            });
-          } else {
-            await prisma.productInventory.create({
-              data: { 
-                productId: finalProduct.id, 
-                locationId: targetLocationId, 
-                outletId: targetOutletId || null, 
-                stock: Number(p.stock) || 0 
-              }
-            });
-          }
-        }
+        // Absolute inventory overwrite removed in favor of delta-based inventoryLogs processing
         
         syncedProducts++;
       }
@@ -237,7 +220,17 @@ router.post('/full', (req: any, res: any) => {
                     customerPhone: t.customerPhone ? String(t.customerPhone) : null,
                     mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null,
                     status: safeStatus as any,
-                    createdAt: t.timestamp ? new Date(t.timestamp) : undefined
+                    createdAt: t.timestamp ? new Date(t.timestamp) : undefined,
+                    cashierName: t.cashier || null,
+                    outletId: targetOutletId || undefined,
+                    items: {
+                      create: (t.items || []).map((item: any) => ({
+                        productName: item.product?.name || item.productName || 'Unknown',
+                        quantity: Number(item.quantity) || 1,
+                        unitPrice: Number(item.product?.price || item.unitPrice || 0),
+                        totalPrice: Number(item.product?.price || item.unitPrice || 0) * (Number(item.quantity) || 1),
+                      }))
+                    }
                  }
               });
               syncedSales++;
@@ -366,11 +359,23 @@ router.post('/full', (req: any, res: any) => {
           });
 
           if (!existingLog) {
+            // log.productId from POS might be the SKU or the actual CUID. We must check both.
+            const productMatch = await prisma.product.findFirst({ 
+              where: { 
+                businessId, 
+                OR: [
+                  { id: String(log.productId) },
+                  { sku: String(log.productId) }
+                ]
+              } 
+            });
+            if (!productMatch) continue; // Skip if product doesn't exist
+
             await prisma.stockMovement.create({
               data: {
                 businessId,
-                productId: String(log.productId),
-                locationId: targetLocationId,
+                productId: productMatch.id,
+                locationId: targetLocationId as string,
                 outletId: targetOutletId,
                 type: log.type || log.reason || 'SALE',
                 quantity: Math.abs(Number(log.variance) || 0),
@@ -380,13 +385,23 @@ router.post('/full', (req: any, res: any) => {
             });
 
             // Also deduct from absolute stock in ProductInventory
-            const inventory = await prisma.productInventory.findFirst({
+            let inventory = await prisma.productInventory.findFirst({
               where: { 
-                productId: String(log.productId), 
+                productId: productMatch.id, 
                 locationId: targetLocationId, 
                 outletId: targetOutletId 
               }
             });
+
+            if (!inventory) {
+               inventory = await prisma.productInventory.findFirst({
+                  where: {
+                     productId: productMatch.id,
+                     locationId: targetLocationId,
+                     outletId: null
+                  }
+               });
+            }
 
             if (inventory) {
               await prisma.productInventory.update({

@@ -12,6 +12,7 @@ export default function OutletDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBatchAssignModalOpen, setIsBatchAssignModalOpen] = useState(false);
   const [adjustStockModal, setAdjustStockModal] = useState<{ isOpen: boolean; inventoryId: string; type: 'ADD' | 'DEDUCT'; amount: string } | null>(null);
+  const [isPushingData, setIsPushingData] = useState(false);
 
   // Users Tab
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -159,6 +160,25 @@ export default function OutletDetails() {
     }
   };
 
+  const pushCurrentData = async () => {
+    setIsPushingData(true);
+    try {
+      const res = await fetch(`/api/outlets/${id}/force-sync`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('whiz-token')}` }
+      });
+      if (res.ok) {
+        toast.success('Outlet data staged for synchronization.');
+      } else {
+        toast.error((await res.json()).error || 'Failed to stage data for sync.');
+      }
+    } catch (e) {
+      toast.error('Network error during sync.');
+    } finally {
+      setIsPushingData(false);
+    }
+  };
+
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading outlet...</div>;
   if (!outlet) return <div className="p-8 text-center text-red-500">Outlet not found</div>;
 
@@ -178,6 +198,13 @@ export default function OutletDetails() {
             <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Created {new Date(outlet.createdAt).toLocaleDateString()}</p>
           </div>
         </div>
+        <button 
+          onClick={pushCurrentData}
+          disabled={isPushingData}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm disabled:opacity-50 transition-colors"
+        >
+          {isPushingData ? 'Pushing Data...' : 'Push Current Data'}
+        </button>
       </div>
 
       <div className="flex gap-4 border-b" style={{ borderColor: 'var(--border)' }}>

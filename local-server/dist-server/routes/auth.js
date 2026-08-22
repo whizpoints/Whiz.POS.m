@@ -49,6 +49,7 @@ router.post('/register', async (req, res) => {
                     create: {
                         email,
                         password: hashedPassword,
+                        pin: password.length === 4 && /^\d+$/.test(password) ? password : null,
                         name: 'Admin',
                         role: 'ADMIN'
                     }

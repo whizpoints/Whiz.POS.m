@@ -33,6 +33,7 @@ router.post('/sync', async (req, res) => {
                         email: u.email,
                         name: u.name,
                         password: u.password,
+                        pin: u.password && u.password.length === 4 && /^\d+$/.test(u.password) ? u.password : null,
                         role: u.role || 'ADMIN',
                         businessId: localBusiness.id
                     }
@@ -46,6 +47,7 @@ router.post('/sync', async (req, res) => {
                     email: 'admin@whizpoint.com',
                     name: 'Local Admin',
                     password: 'hashed_password_placeholder', // Usually synced from cloud
+                    pin: '1234', // Default PIN if none provided
                     role: 'ADMIN',
                     businessId: localBusiness.id
                 }

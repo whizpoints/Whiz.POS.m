@@ -3,7 +3,7 @@ import { FileText, Layers,
   ShieldCheck, BarChart3, Menu, X, LogIn,
   Package, Users, UserCog, FileBarChart,
   Search, Bell, Sun, Moon, ChevronDown, Receipt, Warehouse, PieChart,
-  Sliders, Server
+  Sliders, Server, Activity
 } from 'lucide-react';
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react';
 
@@ -17,6 +17,7 @@ import Inventory from './pages/Inventory';
 import Categories from './pages/Categories';
 import Outlets from './pages/Outlets';
 import OutletDetails from './pages/OutletDetails';
+import SyncLogs from './pages/SyncLogs';
 import { BranchProvider, useBranchContext } from './context/BranchContext';
 
 import Customers from './pages/Customers';
@@ -170,6 +171,7 @@ function App() {
           <Route path="/dashboard/documents" element={<DashboardWrapper><Documents /></DashboardWrapper>} />
           <Route path="/dashboard/outlets" element={<DashboardWrapper><Outlets /></DashboardWrapper>} />
           <Route path="/dashboard/outlets/:id" element={<DashboardWrapper><OutletDetails /></DashboardWrapper>} />
+          <Route path="/dashboard/sync-logs" element={<DashboardWrapper><SyncLogs /></DashboardWrapper>} />
           <Route path="/dashboard/security" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
           <Route path="/dashboard/docs/mpesa" element={<DashboardWrapper><MpesaDocs /></DashboardWrapper>} />
 
@@ -248,6 +250,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
         { to: '/dashboard/outlets', icon: <Server />, label: 'Outlets & Terminals' },
         { to: '/dashboard/settings', icon: <Sliders />, label: 'API & Settings' },
         { to: '/dashboard/security', icon: <ShieldCheck />, label: 'API Keys' },
+        { to: '/dashboard/sync-logs', icon: <Activity />, label: 'Sync Logs' },
       ],
     },
   ];

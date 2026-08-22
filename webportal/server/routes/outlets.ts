@@ -1,15 +1,40 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
-// Get all outlets for a location
-router.get('/:locationId', async (req, res) => {
+const authenticate = (req: any, res: any, next: any) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader ? authHeader.split(' ')[1] : req.query.token;
+  if (!token) return res.status(401).json({ error: 'Missing token' });
   try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+router.use(authenticate);
+
+// Get all outlets for a location (or all for business)
+router.get('/:locationId', async (req: any, res: any) => {
+  try {
+    const businessId = req.user.businessId;
     const { locationId } = req.params;
+    
+    const whereClause: any = {};
+    if (locationId !== 'ALL') {
+        whereClause.locationId = locationId;
+    } else {
+        whereClause.businessId = businessId;
+    }
+
     const outlets = await prisma.outlet.findMany({
-      where: { locationId },
+      where: whereClause,
       orderBy: { createdAt: 'asc' }
     });
     res.json(outlets);

@@ -8,6 +8,11 @@ export default defineConfig(({ command }) => {
   return {
     plugins: [react()],
     base: isServe ? '/' : './', // Use absolute path for dev and relative for build
+    server: {
+      watch: {
+        ignored: ['**/*.json', '**/*.db*', '**/*.sqlite*', '**/data/**'],
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

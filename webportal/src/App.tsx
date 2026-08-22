@@ -3,7 +3,7 @@ import { FileText,
   ShieldCheck, BarChart3, Menu, X, LogIn,
   Package, Users, UserCog, FileBarChart,
   Search, Bell, Sun, Moon, ChevronDown, Receipt, Warehouse, PieChart,
-  Sliders
+  Sliders, Building2
 } from 'lucide-react';
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react';
 
@@ -12,6 +12,7 @@ import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import SettingsPage from './pages/Settings';
+import OutletsDevices from './pages/OutletsDevices';
 import Pricing from './pages/Pricing';
 import FAQ from './pages/FAQ';
 import Docs from './pages/Docs';
@@ -162,6 +163,7 @@ function App() {
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardWrapper><Dashboard /></DashboardWrapper></ProtectedRoute>} />
           <Route path="/dashboard/settings" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
+          <Route path="/dashboard/outlets" element={<DashboardWrapper><OutletsDevices /></DashboardWrapper>} />
           <Route path="/dashboard/inventory" element={<DashboardWrapper><Inventory /></DashboardWrapper>} />
           <Route path="/dashboard/sales" element={<DashboardWrapper><Sales /></DashboardWrapper>} />
           <Route path="/dashboard/customers" element={<DashboardWrapper><Customers /></DashboardWrapper>} />
@@ -301,6 +303,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
     {
       label: 'System',
       items: [
+        { to: '/dashboard/outlets', icon: <Building2 />, label: 'Outlets & Devices' },
         { to: '/dashboard/settings', icon: <Sliders />, label: 'API & Settings' },
         { to: '/dashboard/security', icon: <ShieldCheck />, label: 'API Keys' },
       ],
@@ -314,6 +317,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
       const seg = path.replace('/dashboard', '').replace(/^\//, '');
       const labelMap: Record<string, string> = {
         '': 'Overview',
+        outlets: 'Outlets & Devices',
         settings: 'API & Settings',
         security: 'API Keys',
         inventory: 'Inventory',
@@ -418,13 +422,29 @@ function DashboardLayout({ children }: { children: ReactNode }) {
                 <input placeholder="Search sales, products..." />
               </div>
               <ThemeToggle />
-              <button className="btn btn-icon btn-secondary relative" aria-label="Notifications">
+              <button 
+                onClick={() => navigate('/dashboard/settings')}
+                className="btn btn-icon btn-secondary relative" 
+                title="Notifications"
+                aria-label="Notifications"
+              >
                 <Bell />
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full" style={{ background: 'var(--accent-error)', boxShadow: '0 0 0 2px var(--bg-secondary)' }}></span>
               </button>
-              <div className="user-avatar hidden sm:flex" title="Account">
-                {user?.name ? user.name.slice(0,2).toUpperCase() : 'AM'}
-              </div>
+              <button 
+                onClick={() => navigate('/dashboard/settings')}
+                className="user-avatar hidden sm:flex border-0 cursor-pointer hover:opacity-80 transition-opacity" 
+                title="Account Settings"
+              >
+                {user?.name ? user.name.slice(0,2).toUpperCase() : 'AD'}
+              </button>
+              <button 
+                className="btn btn-icon btn-ghost hidden sm:flex text-[color:var(--text-muted)] hover:text-red-500" 
+                title="Logout" 
+                onClick={handleLogout}
+              >
+                <LogIn className="rotate-180 w-5 h-5" />
+              </button>
             </div>
           </header>
 

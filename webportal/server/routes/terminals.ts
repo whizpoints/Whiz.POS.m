@@ -35,13 +35,34 @@ router.post('/:id/approve', async (req, res) => {
 
   try {
     const apiKey = crypto.randomBytes(32).toString('hex');
+    const terminalRequest = await prisma.terminal.findUnique({ where: { id } });
+    if (!terminalRequest) return res.status(404).json({ error: 'Terminal not found' });
 
-    const terminal = await prisma.terminal.update({
+    let outlet = await prisma.outlet.findFirst({ where: { name: terminalRequest.name } });
+
+    if (!outlet) {
+      const business = await prisma.business.findFirst();
+      const location = await prisma.location.findFirst();
+
+      if (!business || !location) {
+        return res.status(400).json({ error: 'System configuration missing (Business/Location)' });
+      }
+
+      outlet = await prisma.outlet.create({
+        data: {
+          name: terminalRequest.name,
+          businessId: business.id,
+          locationId: location.id
+        }
+      });
+    }
+
+    const updatedTerminal = await prisma.terminal.update({
       where: { id },
-      data: { status: 'APPROVED', apiKey }
+      data: { status: 'APPROVED', apiKey, outletId: outlet.id }
     });
 
-    res.json({ success: true, terminal });
+    res.json({ success: true, terminal: updatedTerminal, outlet });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to approve terminal' });
   }

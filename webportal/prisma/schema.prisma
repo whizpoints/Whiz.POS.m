@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./local.db"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Business {
@@ -13,7 +14,7 @@ model Business {
   email             String   @unique
   kraPin            String?
   logoUrl           String?
-  settings          String?  @default("{}")
+  settings          Json?    @default("{}")
   emailVerified     Boolean  @default(false)
   setupComplete     Boolean  @default(false)
   verificationToken String?
@@ -78,7 +79,7 @@ model User {
   email      String   @unique
   password   String
   name       String
-  role       String   @default("CASHIER")
+  role       Role     @default(CASHIER)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 
@@ -94,7 +95,12 @@ model User {
   @@index([updatedAt])
 }
 
-// Enums replaced with Strings for SQLite compatibility
+enum Role {
+  ADMIN
+  CASHIER
+  MANAGER
+}
+
 model StoreLocation {
   id         String   @id @default(cuid())
   businessId String
@@ -261,10 +267,13 @@ model Receipt {
   paymentMethod String
   customerPhone String?
   mpesaCode     String?
-  status        String        @default("COMPLETED")
+  status        ReceiptStatus @default(PENDING)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
 
+  cashierName   String?
+  items         ReceiptItem[]
+  
   business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location StoreLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
   outletId String?
@@ -278,7 +287,24 @@ model Receipt {
   @@index([updatedAt])
 }
 
-// Enums replaced with Strings for SQLite compatibility
+model ReceiptItem {
+  id          String   @id @default(cuid())
+  receiptId   String
+  receipt     Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  productName String
+  quantity    Float
+  unitPrice   Float
+  totalPrice  Float
+
+  @@index([receiptId])
+}
+
+enum ReceiptStatus {
+  COMPLETED
+  PENDING
+  REFUNDED
+}
+
 model Supplier {
   id         String   @id @default(cuid())
   businessId String
@@ -302,6 +328,7 @@ model Terminal {
   name       String
   status     String   @default("PENDING")
   apiKey     String?
+  outletId   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 }

@@ -2245,7 +2245,7 @@ const serverData = await response.json();
                 transactions: state.transactions,
                 businessSetup: state.businessSetup,
                 suppliers: state.suppliers,
-                stockMovements: state.inventoryLogs.map((data: any) => ({
+                stockMovements: state.inventoryLogs.filter((data: any) => !data.id?.startsWith('MOV_')).map((data: any) => ({
                     id: data.id || `mov_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
                     productId: data.productId,
                     locationId: state.businessSetup?.locationId,

@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "server": "tsx server/index.ts",
     "start": "tsx server/index.ts",
-    "pre-electron": "node -e \"require('fs').copyFileSync('prisma/schema.sqlite.prisma', 'prisma/schema.prisma')\" && npx prisma db push --skip-generate",
+    "pre-electron": "node -e \"require('fs').copyFileSync('prisma/schema.sqlite.prisma', 'prisma/schema.prisma')\" && npx prisma db push",
     "post-electron": "node -e \"require('fs').copyFileSync('prisma/schema.postgres.prisma', 'prisma/schema.prisma')\"",
     "wipe": "cd .. && wipe-data.bat",
     "electron:dev": "npm run pre-electron && tsc --project tsconfig.electron.json && concurrently \"vite --port 5175\" \"wait-on tcp:5175 && electron .\"",
@@ -55,6 +55,7 @@
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1",
+    "sqlite3": "^6.0.1",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.14"
   },

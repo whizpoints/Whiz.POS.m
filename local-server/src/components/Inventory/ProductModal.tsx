@@ -49,6 +49,7 @@ export default function ProductModal({ isOpen, onClose, product, onComplete }: P
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('whiz-token');

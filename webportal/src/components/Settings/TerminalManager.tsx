@@ -41,6 +41,21 @@ export default function TerminalManager() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this terminal?')) return;
+    try {
+      const res = await fetch(`/api/terminals/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Terminal deleted successfully!');
+        fetchTerminals();
+      } else {
+        toast.error('Failed to delete terminal');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    }
+  };
+
   return (
     <div className="space-y-4">
       {loading ? (
@@ -81,15 +96,25 @@ export default function TerminalManager() {
                     Approve
                   </button>
                   <button 
+                    onClick={() => handleDelete(term.id)}
                     className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 text-sm font-medium py-2 rounded-lg transition-colors"
                   >
-                    Reject
+                    Reject / Delete
                   </button>
                 </div>
               ) : (
-                <div className="bg-black/30 rounded-lg p-3">
-                  <p className="text-xs text-gray-400 mb-1">API Key assigned</p>
-                  <code className="text-xs font-mono text-green-400">{term.apiKey}</code>
+                <div className="bg-black/30 rounded-lg p-3 flex justify-between items-center">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">API Key assigned</p>
+                    <code className="text-xs font-mono text-green-400">{term.apiKey}</code>
+                  </div>
+                  <button 
+                    onClick={() => handleDelete(term.id)}
+                    className="text-red-500 hover:bg-red-500/20 p-2 rounded-lg transition-colors"
+                    title="Delete Terminal"
+                  >
+                    Delete
+                  </button>
                 </div>
               )}
             </div>

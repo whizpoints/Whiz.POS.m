@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
       strictPort: false,
       host: true,
       allowedHosts: ['api.whizpoint.app', 'localhost', '127.0.0.1', '.local'],
+      watch: {
+        ignored: ['**/*.json', '**/*.db*', '**/*.sqlite*', '**/data/**'],
+      },
       proxy: {
         '/api': {
           target: apiTarget,

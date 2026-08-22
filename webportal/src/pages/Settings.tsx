@@ -2,20 +2,16 @@ import { useState, useEffect, type ReactNode } from 'react';
 import {
   Key, Copy, CheckCircle2, CreditCard, ShieldCheck, AlertTriangle,
   RefreshCw, Eye, EyeOff, Save, Building2, Globe, Lock, User2,
-  Bell, Palette, Database, Download, Trash2, ChevronRight
+  Bell, Palette, Database, Download, Trash2, ChevronRight, Mail, MessageSquare, MonitorSmartphone
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import OutletsManager from '../components/Settings/OutletsManager';
-import TerminalManager from '../components/Settings/TerminalManager';
 
-type Tab = 'security' | 'payments' | 'outlets' | 'terminals' | 'etims' | 'profile' | 'notifications';
+type Tab = 'security' | 'payments' | 'etims' | 'profile' | 'notifications';
 
 const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'security', label: 'API Keys', icon: <Key className="w-4 h-4" /> },
   { id: 'payments', label: 'M-Pesa', icon: <CreditCard className="w-4 h-4" /> },
-  { id: 'outlets', label: 'Registers & Outlets', icon: <Building2 className="w-4 h-4" /> },
-  { id: 'terminals', label: 'POS Terminals', icon: <Database className="w-4 h-4" /> },
   { id: 'etims', label: 'eTIMS KRA', icon: <ShieldCheck className="w-4 h-4" /> },
   { id: 'profile', label: 'Business Profile', icon: <Building2 className="w-4 h-4" /> },
   { id: 'notifications', label: 'Alerts', icon: <Bell className="w-4 h-4" /> }
@@ -52,10 +48,18 @@ export default function Settings() {
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+      
+      let parsedSettings = {};
+      try {
+        parsedSettings = typeof profile?.settings === 'string' ? JSON.parse(profile.settings) : (profile?.settings || {});
+      } catch (e) {}
+
+      const mergedSettings = { ...parsedSettings, ...updates };
+
       const res = await fetch(`${API_BASE_URL}/api/business/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ settings: { ...profile?.settings, ...updates } })
+        body: JSON.stringify({ settings: JSON.stringify(mergedSettings) })
       });
       if (res.ok) {
         fetchProfile();
@@ -89,7 +93,18 @@ export default function Settings() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button className="btn btn-secondary !px-3 inline-flex items-center gap-1.5 text-sm">
+          <button 
+            onClick={() => {
+              const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(profile, null, 2));
+              const downloadAnchorNode = document.createElement('a');
+              downloadAnchorNode.setAttribute("href", dataStr);
+              downloadAnchorNode.setAttribute("download", "whiz_pos_config.json");
+              document.body.appendChild(downloadAnchorNode); // required for firefox
+              downloadAnchorNode.click();
+              downloadAnchorNode.remove();
+            }}
+            className="btn btn-secondary !px-3 inline-flex items-center gap-1.5 text-sm"
+          >
             <Download className="w-4 h-4" />
             Export Config
           </button>
@@ -120,18 +135,6 @@ export default function Settings() {
       <div className="space-y-4">
         {tab === 'security' && <SecurityPanel profile={profile} fetchProfile={fetchProfile} />}
         {tab === 'payments' && <PaymentsPanel />}
-        {tab === 'outlets' && <OutletsManager />}
-        {tab === 'terminals' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="section-header mb-6">
-              <div>
-                <h3 className="section-title">POS Terminals (LAN Setup)</h3>
-                <p className="section-desc">Approve or revoke local POS terminals attempting to connect to this server.</p>
-              </div>
-            </div>
-            <TerminalManager />
-          </div>
-        )}
         {tab === 'etims' && <ETimsPanel profile={profile} onSave={updateProfileSettings} />}
         {tab === 'profile' && <ProfilePanel profile={profile} onSave={updateProfileSettings} />}
         {tab === 'notifications' && <NotificationsPanel profile={profile} onSave={updateProfileSettings} />}
@@ -946,9 +949,9 @@ function NotificationsPanel({ profile, onSave }: any) {
                 <div className="text-xs text-[color:var(--text-secondary)] leading-relaxed mt-0.5">{r.hint}</div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <ChannelChip icon="📩" active={(formData as any)[r.key]} />
-                <ChannelChip icon="🔔" active={(formData as any)[r.key]} />
-                <ChannelChip icon="💬" active={false} />
+                <ChannelChip icon={<Mail className="w-3.5 h-3.5"/>} active={(formData as any)[r.key]} />
+                <ChannelChip icon={<MonitorSmartphone className="w-3.5 h-3.5"/>} active={(formData as any)[r.key]} />
+                <ChannelChip icon={<MessageSquare className="w-3.5 h-3.5"/>} active={false} />
               </div>
             </label>
           ))}
@@ -960,9 +963,9 @@ function NotificationsPanel({ profile, onSave }: any) {
               <Database className="w-4 h-4 text-[color:var(--accent)]" />
               <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">Channels</div>
             </div>
-            <ChannelRow icon="📩" name="Email" value={profile?.settings?.email || "admin@whizretail.co.ke"} />
-            <ChannelRow icon="💬" name="SMS (Twilio)" value={profile?.settings?.phone || "+254 712 345 678"} muted />
-            <ChannelRow icon="🔔" name="In-app" value="All staff with Admin role" />
+              <ChannelRow icon={<Mail className="w-4 h-4" />} name="Email" value={profile?.settings?.email || profile?.email || "Set email in Profile"} />
+              <ChannelRow icon={<MessageSquare className="w-4 h-4" />} name="SMS (Twilio)" value={profile?.settings?.phone || profile?.phone || "Set phone in Profile"} muted />
+              <ChannelRow icon={<MonitorSmartphone className="w-4 h-4" />} name="In-app" value="All staff with Admin role" />
           </div>
 
           <div className="flex justify-end pt-1">
@@ -1014,7 +1017,7 @@ function StatRow({ label, value, accent }: { label: string; value: string; accen
   );
 }
 
-function ChannelChip({ icon, active }: { icon: string; active: boolean }) {
+  function ChannelChip({ icon, active }: { icon: ReactNode; active: boolean }) {
   return (
     <span
       className={`w-7 h-7 rounded-lg inline-flex items-center justify-center text-xs transition-all border ${
@@ -1028,7 +1031,7 @@ function ChannelChip({ icon, active }: { icon: string; active: boolean }) {
   );
 }
 
-function ChannelRow({ icon, name, value, muted }: { icon: string; name: string; value: string; muted?: boolean }) {
+  function ChannelRow({ icon, name, value, muted }: { icon: ReactNode; name: string; value: string; muted?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 py-1">
       <span className="w-7 h-7 shrink-0 rounded-lg inline-flex items-center justify-center text-sm"

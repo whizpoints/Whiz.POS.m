@@ -46,7 +46,7 @@ router.post('/transfer', async (req, res) => {
 
       await tx.productInventory.update({
         where: { id: hubInventory.id },
-        data: { stock: hubInventory.stock - qty }
+        data: { stock: { decrement: qty } }
       });
 
       // 2. Add to Terminal (Outlet) inventory
@@ -57,7 +57,7 @@ router.post('/transfer', async (req, res) => {
       if (outletInventory) {
         await tx.productInventory.update({
           where: { id: outletInventory.id },
-          data: { stock: outletInventory.stock + qty }
+          data: { stock: { increment: qty } }
         });
       } else {
         await tx.productInventory.create({

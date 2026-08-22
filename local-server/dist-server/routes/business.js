@@ -64,11 +64,16 @@ router.post('/profile', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { name, settings, apiKey } = req.body;
+        // Defensively ensure settings is a string since Prisma schema defines it as String
+        let finalSettings = settings;
+        if (settings && typeof settings === 'object') {
+            finalSettings = JSON.stringify(settings);
+        }
         const business = await prisma.business.update({
             where: { id: businessId },
             data: {
                 ...(name && { name }),
-                ...(settings && { settings }),
+                ...(finalSettings !== undefined && { settings: finalSettings }),
                 ...(apiKey !== undefined && { apiKey })
             },
             select: { id: true, name: true, settings: true, apiKey: true }

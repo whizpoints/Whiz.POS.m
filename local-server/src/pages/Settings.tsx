@@ -7,23 +7,18 @@ import {
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
 
-import OutletsManager from '../components/Settings/OutletsManager';
-import TerminalManager from '../components/Settings/TerminalManager';
 
-type Tab = 'security' | 'payments' | 'outlets' | 'terminals' | 'etims' | 'profile' | 'notifications';
+type Tab = 'profile' | 'security' | 'payments' | 'etims';
 
 const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
-  { id: 'security', label: 'API Keys', icon: <Key className="w-4 h-4" /> },
-  { id: 'payments', label: 'M-Pesa', icon: <CreditCard className="w-4 h-4" /> },
-  { id: 'outlets', label: 'Registers & Outlets', icon: <Building2 className="w-4 h-4" /> },
-  { id: 'terminals', label: 'POS Terminals', icon: <Database className="w-4 h-4" /> },
-  { id: 'etims', label: 'eTIMS KRA', icon: <ShieldCheck className="w-4 h-4" /> },
   { id: 'profile', label: 'Business Profile', icon: <Building2 className="w-4 h-4" /> },
-  { id: 'notifications', label: 'Alerts', icon: <Bell className="w-4 h-4" /> }
+  { id: 'security', label: 'Server Link (API)', icon: <Key className="w-4 h-4" /> },
+  { id: 'payments', label: 'Payment Methods', icon: <CreditCard className="w-4 h-4" /> },
+  { id: 'etims', label: 'eTIMS KRA', icon: <ShieldCheck className="w-4 h-4" /> }
 ];
 
 export default function Settings() {
-  const [tab, setTab] = useState<Tab>('security');
+  const [tab, setTab] = useState<Tab>('profile');
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -121,21 +116,8 @@ export default function Settings() {
       <div className="space-y-4">
         {tab === 'security' && <SecurityPanel profile={profile} fetchProfile={fetchProfile} />}
         {tab === 'payments' && <PaymentsPanel />}
-        {tab === 'outlets' && <OutletsManager />}
-        {tab === 'terminals' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="section-header mb-6">
-              <div>
-                <h3 className="section-title">POS Terminals (LAN Setup)</h3>
-                <p className="section-desc">Approve or revoke local POS terminals attempting to connect to this server.</p>
-              </div>
-            </div>
-            <TerminalManager />
-          </div>
-        )}
         {tab === 'etims' && <ETimsPanel profile={profile} onSave={updateProfileSettings} />}
         {tab === 'profile' && <ProfilePanel profile={profile} onSave={updateProfileSettings} />}
-        {tab === 'notifications' && <NotificationsPanel profile={profile} onSave={updateProfileSettings} />}
       </div>
     </div>
   );
@@ -201,128 +183,81 @@ function ApiKeyRow({ label, keyStr, status, badge }: { label: string; keyStr: st
 }
 
 function SecurityPanel({ profile, fetchProfile }: any) {
-  const [pairingCode, setPairingCode] = useState<string | null>(null);
-  const [isGeneratingPairing, setIsGeneratingPairing] = useState(false);
+  const [url, setUrl] = useState(profile?.settings?.backOfficeUrl || 'https://api.whizpoint.app');
+  const [apiKey, setApiKey] = useState(profile?.settings?.backOfficeApiKey || '');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleGenerateKey = async () => {
+  const handleSave = async () => {
+    setIsSaving(true);
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();
       const res = await fetch(`${API_BASE_URL}/api/business/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ apiKey: 'sk_live_' + Math.random().toString(36).substr(2, 16) })
+        body: JSON.stringify({ settings: { ...profile?.settings, backOfficeUrl: url, backOfficeApiKey: apiKey } })
       });
       if (res.ok) {
+        toast.success('Server link saved successfully');
         fetchProfile();
+      } else {
+        toast.error('Failed to save settings');
       }
     } catch (err) {
       console.error(err);
-    }
-  };
-
-  const generatePairingCode = async () => {
-    setIsGeneratingPairing(true);
-    try {
-      const token = localStorage.getItem('whiz-token');
-      const API_BASE_URL = getApiBaseUrl();
-      const res = await fetch(`${API_BASE_URL}/api/auth/generate-pairing-code`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setPairingCode(data.pairingCode);
-      }
-    } catch (err) {
-      console.error(err);
+      toast.error('Error saving settings');
     } finally {
-      setIsGeneratingPairing(false);
+      setIsSaving(false);
     }
   };
 
   return (
-    <>
+    <div className="space-y-6">
       <SectionHeader
-        eyebrow="Security"
-        title="API Credentials"
-        description="Authenticate your POS terminals and third-party integrations. Treat these keys like passwords."
-        icon={<ShieldCheck className="w-5 h-5" />}
+        eyebrow="Server Link"
+        title="Connect to Back Office"
+        description="Link this local server to your online WhizPOS back office for cloud synchronization."
+        icon={<Globe className="w-5 h-5" />}
         gradient="linear-gradient(135deg, rgba(59,130,246,0.25), rgba(168,85,247,0.18))"
       />
 
-      <div className="alert alert-warning rounded-xl">
-        <div className="flex gap-2.5 items-start">
-          <AlertTriangle className="w-4.5 h-4.5 shrink-0 mt-0.5 text-amber-500" />
-          <div className="text-sm leading-relaxed">
-            <strong className="font-semibold">Do not share these keys.</strong> If you suspect a key has been compromised, rotate it immediately.
+      <div className="glass-panel p-5 space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium text-[color:var(--text-secondary)]">Back Office URL</label>
+          <div className="relative">
+            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
+            <input
+              type="text"
+              className="input pl-9 w-full"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://api.whizpoint.app"
+            />
           </div>
         </div>
-      </div>
 
-      <div className="grid gap-3">
-        {profile?.apiKey ? (
-          <ApiKeyRow label="Live Production Key" keyStr={profile.apiKey} status="live" badge="LIVE" />
-        ) : (
-          <div className="glass-subtle rounded-xl p-4 space-y-3 flex flex-col items-center justify-center">
-             <p className="text-sm text-[color:var(--text-secondary)]">No API key generated yet.</p>
-             <button onClick={handleGenerateKey} className="btn btn-primary text-sm inline-flex items-center gap-1.5">
-               <Key className="w-4 h-4" />
-               Generate Live Key
-             </button>
-          </div>
-        )}
-      </div>
-
-      {profile?.apiKey && (
-        <div className="mt-8 border-t border-[color:var(--border-default)] pt-8">
-          <SectionHeader
-            eyebrow="Device Pairing"
-            title="POS 2FA Authentication"
-            description="Generate a temporary 6-digit code to securely pair a new POS terminal to this account."
-            icon={<ShieldCheck className="w-5 h-5" />}
-            gradient="linear-gradient(135deg, rgba(16,185,129,0.25), rgba(5,150,105,0.18))"
-          />
-          
-          <div className="glass-subtle rounded-xl p-6 flex flex-col items-center justify-center space-y-4">
-            {pairingCode ? (
-              <div className="text-center space-y-2">
-                <p className="text-sm text-[color:var(--text-secondary)]">Your one-time pairing code is:</p>
-                <div className="text-4xl font-mono font-bold tracking-widest text-[color:var(--text-primary)] bg-[color:var(--bg-default)] py-3 px-6 rounded-lg shadow-inner">
-                  {pairingCode}
-                </div>
-                <p className="text-xs text-amber-600 mt-2">Enter this on the POS along with your API key.</p>
-              </div>
-            ) : (
-              <button 
-                onClick={generatePairingCode} 
-                disabled={isGeneratingPairing}
-                className="btn btn-primary"
-              >
-                {isGeneratingPairing ? 'Generating...' : 'Generate 2FA Pairing Code'}
-              </button>
-            )}
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium text-[color:var(--text-secondary)]">Production API Key</label>
+          <div className="relative">
+            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
+            <input
+              type="password"
+              className="input pl-9 w-full font-mono text-sm"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk_live_..."
+            />
           </div>
         </div>
-      )}
 
-      <div className="glass-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-start gap-3.5">
-          <div className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center"
-               style={{ background: 'color-mix(in oklab, var(--accent) 15%, transparent)' }}>
-            <User2 className="w-5 h-5 text-[color:var(--accent)]" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-[0.95rem] text-[color:var(--text-primary)] mb-0.5">Webhook Endpoints</h3>
-            <p className="text-sm text-[color:var(--text-secondary)]">Subscribe to payment confirmations, stock alerts, and eTIMS events.</p>
-          </div>
+        <div className="pt-2">
+          <button onClick={handleSave} disabled={isSaving} className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2">
+            <Save className="w-4 h-4" />
+            {isSaving ? 'Saving...' : 'Save Connection Details'}
+          </button>
         </div>
-        <button className="btn btn-secondary inline-flex items-center gap-1.5 self-start sm:self-center text-sm">
-          <ChevronRight className="w-4 h-4" />
-          Manage Webhooks
-        </button>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -764,7 +699,11 @@ function ProfilePanel({ profile, onSave }: any) {
     address: profile?.settings?.address || '',
     currency: profile?.settings?.currency || 'KES',
     timezone: profile?.settings?.timezone || 'Africa/Nairobi',
-    receiptFooterNote: profile?.settings?.receiptFooterNote || ''
+    receiptFooterNote: profile?.settings?.receiptFooterNote || '',
+    servedBy: profile?.settings?.servedBy || '',
+    mpesaPaybill: profile?.settings?.mpesaPaybill || '',
+    accountNumber: profile?.settings?.accountNumber || '',
+    tillNumber: profile?.settings?.tillNumber || ''
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -880,6 +819,22 @@ function ProfilePanel({ profile, onSave }: any) {
             </div>
             <label className="label !text-[11px] !mb-1.5">Receipt Footer Note</label>
             <textarea name="receiptFooterNote" value={formData.receiptFooterNote} onChange={handleChange} className="textarea min-h-[64px] !text-xs" />
+            
+            <label className="label !text-[11px] !mb-1.5 mt-3">Served By (Default Cashier Name)</label>
+            <input type="text" name="servedBy" value={formData.servedBy} onChange={handleChange} className="input !text-xs" placeholder="e.g. Counter 1" />
+            
+            <div className="mt-4 border-t border-[color:var(--border-default)] pt-4">
+               <h4 className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-3">Receipt Payment Details</h4>
+               
+               <label className="label !text-[11px] !mb-1.5">M-Pesa Paybill</label>
+               <input type="text" name="mpesaPaybill" value={formData.mpesaPaybill} onChange={handleChange} className="input !text-xs mb-3" placeholder="e.g. 123456" />
+               
+               <label className="label !text-[11px] !mb-1.5">Account Number</label>
+               <input type="text" name="accountNumber" value={formData.accountNumber} onChange={handleChange} className="input !text-xs mb-3" placeholder="e.g. Shop1" />
+               
+               <label className="label !text-[11px] !mb-1.5">Till Number</label>
+               <input type="text" name="tillNumber" value={formData.tillNumber} onChange={handleChange} className="input !text-xs" placeholder="e.g. 987654" />
+            </div>
           </div>
 
           <div className="glass-subtle rounded-2xl p-4">

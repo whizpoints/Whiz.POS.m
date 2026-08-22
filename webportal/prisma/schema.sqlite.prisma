@@ -265,6 +265,9 @@ model Receipt {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
 
+  cashierName   String?
+  items         ReceiptItem[]
+  
   business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location StoreLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
   outletId String?
@@ -276,6 +279,18 @@ model Receipt {
   @@index([receiptNumber])
   @@index([createdAt])
   @@index([updatedAt])
+}
+
+model ReceiptItem {
+  id          String   @id @default(cuid())
+  receiptId   String
+  receipt     Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  productName String
+  quantity    Float
+  unitPrice   Float
+  totalPrice  Float
+
+  @@index([receiptId])
 }
 
 // Enums replaced with Strings for SQLite compatibility
@@ -302,6 +317,7 @@ model Terminal {
   name       String
   status     String   @default("PENDING")
   apiKey     String?
+  outletId   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 }

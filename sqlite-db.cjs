@@ -309,8 +309,9 @@ function completeAtomicSale(tx, items) {
             
             if (productId) {
                 updateStock.run(qty, String(productId));
-                const moveId = 'MOV_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-                insertStockMovement.run(moveId, tx.businessId || '', String(productId), 'SALE', qty, tx.id, new Date().toISOString());
+                // Duplicate stock movement generation removed: posStore.ts addInventoryLog already handles this
+                // const moveId = 'MOV_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                // insertStockMovement.run(moveId, tx.businessId || '', String(productId), 'SALE', qty, tx.id, new Date().toISOString());
             }
         }
     })();

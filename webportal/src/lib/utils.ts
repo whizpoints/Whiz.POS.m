@@ -5,6 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function getApiBaseUrl(): string {
+  if (typeof window === 'undefined') return '';
+  return window.location.protocol === 'file:' ? 'http://localhost:5050' : '';
+}
+
 export function numberToWords(num: number): string {
   if (num === 0) return 'Zero';
   

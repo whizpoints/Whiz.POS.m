@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Server, CheckCircle, XCircle, Clock, ChevronRight } from 'lucide-react';
+import { Server, CheckCircle, XCircle, Clock, ChevronRight, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -21,7 +21,7 @@ interface Outlet {
 }
 
 export default function Outlets() {
-  const [activeTab, setActiveTab] = useState<'terminals' | 'outlets'>('terminals');
+  const [activeTab, setActiveTab] = useState<'terminals' | 'outlets'>('outlets');
   const [terminals, setTerminals] = useState<Terminal[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,6 +105,28 @@ export default function Outlets() {
     }
   };
 
+  const handleDeleteOutlet = async (outletId: string, outletName: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to permanently delete the outlet "${outletName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/outlets/${outletId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('whiz-token')}` }
+      });
+      if (res.ok) {
+        toast.success('Outlet deleted successfully');
+        fetchOutlets();
+      } else {
+        toast.error('Failed to delete outlet');
+      }
+    } catch (error) {
+      toast.error('Error deleting outlet');
+    }
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -117,6 +139,12 @@ export default function Outlets() {
       {/* Tabs */}
       <div className="flex gap-4 border-b" style={{ borderColor: 'var(--border)' }}>
         <button
+          onClick={() => setActiveTab('outlets')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'outlets' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+        >
+          Active Outlets
+        </button>
+        <button
           onClick={() => setActiveTab('terminals')}
           className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'terminals' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
         >
@@ -126,12 +154,6 @@ export default function Outlets() {
               {terminals.filter(t => t.status === 'PENDING').length}
             </span>
           )}
-        </button>
-        <button
-          onClick={() => setActiveTab('outlets')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'outlets' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-        >
-          Active Outlets
         </button>
       </div>
 
@@ -218,13 +240,13 @@ export default function Outlets() {
               </div>
             ) : (
               outlets.map(outlet => (
-                <Link to={`/dashboard/outlets/${outlet.id}`} key={outlet.id} className="p-5 rounded-xl border flex flex-col gap-4 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group block" style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}>
+                <Link to={`/dashboard/outlets/${outlet.id}`} key={outlet.id} className="p-5 rounded-xl border flex flex-col gap-4 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group block relative" style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}>
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
                         <Server size={20} />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 pr-8">
                         <h3 className="font-semibold truncate group-hover:text-blue-600 transition-colors" title={outlet.name} style={{ color: 'var(--text-main)' }}>{outlet.name}</h3>
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Created {new Date(outlet.createdAt).toLocaleDateString()}</p>
                       </div>
@@ -232,9 +254,18 @@ export default function Outlets() {
                   </div>
                   <div className="mt-auto pt-4 border-t flex justify-between items-center" style={{ borderColor: 'var(--border)' }}>
                     <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-md">Online</span>
-                    <span className="text-blue-600 group-hover:translate-x-1 transition-transform">
-                      <ChevronRight size={18} />
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={(e) => handleDeleteOutlet(outlet.id, outlet.name, e)}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        title="Delete Outlet"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <span className="text-blue-600 group-hover:translate-x-1 transition-transform">
+                        <ChevronRight size={18} />
+                      </span>
+                    </div>
                   </div>
                 </Link>
               ))

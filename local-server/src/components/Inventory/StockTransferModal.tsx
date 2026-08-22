@@ -40,7 +40,7 @@ export default function StockTransferModal({ isOpen, onClose, products, onTransf
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProductId || !selectedOutletId || quantity <= 0) return;
+    if (!selectedProductId || !selectedOutletId || quantity <= 0 || isSubmitting) return;
 
     setIsSubmitting(true);
     try {

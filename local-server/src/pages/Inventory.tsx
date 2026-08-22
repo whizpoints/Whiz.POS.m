@@ -4,6 +4,7 @@ import { useBranchContext } from '../context/BranchContext';
 import { getApiBaseUrl } from '../lib/utils';
 import StockTransferModal from '../components/Inventory/StockTransferModal';
 import ProductModal from '../components/Inventory/ProductModal';
+import { Modal } from '../components/ui/modal';
 import toast from 'react-hot-toast';
 
 export default function Inventory() {
@@ -12,6 +13,8 @@ export default function Inventory() {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [quickAddProduct, setQuickAddProduct] = useState<string | null>(null);
+  const [quickAddQty, setQuickAddQty] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { activeLocationId } = useBranchContext();
 
@@ -67,9 +70,14 @@ export default function Inventory() {
     setIsProductModalOpen(true);
   };
 
-  const handleQuickAdd = async (productId: string) => {
-    const qty = prompt("Enter quantity to add to stock:");
-    if (!qty || isNaN(Number(qty))) return;
+  const handleQuickAdd = (productId: string) => {
+    setQuickAddProduct(productId);
+    setQuickAddQty('');
+  };
+
+  const submitQuickAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickAddProduct || !quickAddQty || isNaN(Number(quickAddQty))) return;
 
     try {
       const token = localStorage.getItem('whiz-token');
@@ -81,15 +89,16 @@ export default function Inventory() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          productId,
-          quantity: Number(qty),
+          productId: quickAddProduct,
+          quantity: Number(quickAddQty),
           locationId: activeLocationId === 'ALL' ? null : activeLocationId
         })
       });
 
       if (res.ok) {
-        toast.success(`Added ${qty} items to stock!`);
+        toast.success(`Added ${quickAddQty} items to stock!`);
         fetchProducts();
+        setQuickAddProduct(null);
       } else {
         const d = await res.json();
         toast.error(d.error || 'Failed to add stock');
@@ -113,7 +122,7 @@ export default function Inventory() {
       setLoading(true);
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();
-      const res = await fetch(`${API_BASE_URL}/api/inventory/import`, {
+      const res = await fetch(`${API_BASE_URL}/api/inventory/import/products`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -134,12 +143,21 @@ export default function Inventory() {
     }
   };
 
-  const handleExport = () => {
-    const token = localStorage.getItem('whiz-token');
-    const API_BASE_URL = getApiBaseUrl();
-    const query = activeLocationId === 'ALL' ? '' : `&locationId=${activeLocationId}`;
-    window.open(`${API_BASE_URL}/api/inventory/export?token=${token}${query}`, '_blank');
-  };
+    const triggerDownload = (url: string, filename: string) => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    };
+
+    const handleExport = () => {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const query = activeLocationId === 'ALL' ? '' : `&locationId=${activeLocationId}`;
+      triggerDownload(`${API_BASE_URL}/api/inventory/template/products?token=${token}${query}`, 'Products_Template.xlsx');
+    };
 
   return (
     <div className="space-y-4 animate-in p-6">
@@ -268,6 +286,27 @@ export default function Inventory() {
         product={selectedProduct}
         onComplete={fetchProducts}
       />
+      
+      <Modal isOpen={!!quickAddProduct} onClose={() => setQuickAddProduct(null)} title="Quick Add Stock">
+        <form onSubmit={submitQuickAdd} className="space-y-4 mt-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to add</label>
+            <input 
+              type="number" 
+              required
+              className="w-full p-2 border rounded-lg" 
+              value={quickAddQty} 
+              onChange={e => setQuickAddQty(e.target.value)} 
+              placeholder="e.g. 50"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setQuickAddProduct(null)} className="btn btn-ghost">Cancel</button>
+            <button type="submit" className="btn btn-primary">Add Stock</button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

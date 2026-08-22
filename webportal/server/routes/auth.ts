@@ -78,7 +78,9 @@ router.post('/register', async (req, res) => {
 
     // Send verification email
     const frontendUrl = process.env.CORS_ORIGINS?.split(',')[0] || 'http://localhost:5173';
-    const verifyLink = `${process.env.VITE_API_BASE_URL || 'http://localhost:5050'}/api/auth/verify-email?token=${verificationToken}`;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5050';
+    const verifyLink = `${protocol}://${host}/api/auth/verify-email?token=${verificationToken}`;
     
     try {
       await transporter.sendMail({

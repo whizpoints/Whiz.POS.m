@@ -341,13 +341,13 @@ router.post('/', async (req: any, res: any) => {
              });
 
              let stockChange = Number(m.quantity);
-             if (m.type === 'SALE' || m.type === 'TRANSFER_OUT') stockChange = -Math.abs(stockChange);
-             else if (m.type === 'TRANSFER_IN' || m.type === 'PO' || m.type === 'INITIAL' || m.type === 'RETURN') stockChange = Math.abs(stockChange);
+             if (m.type === 'SALE' || m.type === 'TRANSFER_OUT' || m.type === 'ADJUSTMENT_DOWN' || m.type === 'subtract') stockChange = -Math.abs(stockChange);
+             else if (m.type === 'TRANSFER_IN' || m.type === 'PO' || m.type === 'INITIAL' || m.type === 'RETURN' || m.type === 'ADJUSTMENT_UP' || m.type === 'add') stockChange = Math.abs(stockChange);
 
              if (invExisting) {
                 await prisma.productInventory.update({
                    where: { id: invExisting.id },
-                   data: { stock: invExisting.stock + stockChange, updatedAt: new Date() }
+                   data: { stock: { increment: stockChange }, updatedAt: new Date() }
                 });
              } else {
                 await prisma.productInventory.create({

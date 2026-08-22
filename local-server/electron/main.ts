@@ -88,6 +88,9 @@ function createWindow() {
     mainWindow.loadURL(`http://localhost:${PORT}`);
   }
 
+  // Always launch on whole screen not restore
+  mainWindow.maximize();
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

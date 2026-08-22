@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Search, Download, Filter, Printer, FileText } from 'lucide-react';
+import { ShoppingCart, Search, Download, Filter, Printer, FileText, X } from 'lucide-react';
 import { useBranchContext } from '../context/BranchContext';
 
 export default function Sales() {
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { activeLocationId } = useBranchContext();
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSales = async () => {
@@ -47,7 +48,7 @@ export default function Sales() {
   const handlePrint = (type: 'receipt' | 'invoice', id: string) => {
     const token = localStorage.getItem('whiz-token');
     const API_BASE_URL = window.location.protocol === 'file:' ? 'http://localhost:5050' : '';
-    window.open(`${API_BASE_URL}/api/documents/${type}/${id}?token=${token}`, '_blank');
+    setDocumentUrl(`${API_BASE_URL}/api/documents/${type}/${id}?token=${token}`);
   };
 
   return (
@@ -135,6 +136,26 @@ export default function Sales() {
           </table>
         </div>
       </div>
+      
+      {documentUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="font-bold text-lg">Document Viewer</h3>
+              <button onClick={() => setDocumentUrl(null)} className="p-2 hover:bg-gray-100 rounded-full">
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            <div className="flex-1 bg-gray-50 p-4 relative">
+              <iframe 
+                src={documentUrl} 
+                className="w-full h-full bg-white shadow-sm border border-gray-200"
+                title="Document Viewer"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

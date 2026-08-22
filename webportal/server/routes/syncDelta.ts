@@ -82,7 +82,10 @@ router.get('/', async (req: any, res: any) => {
         customers,
         suppliers,
         transactions,
-        businessSetup: business && business.updatedAt > sinceDate ? business : null
+        businessSetup: business && business.updatedAt > sinceDate ? {
+          ...(typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings),
+          businessName: business.name
+        } : null
       }
     });
   } catch (error) {
@@ -199,30 +202,72 @@ router.post('/', async (req: any, res: any) => {
             results.skipped++;
         }
 
-        // Handle Inventory Stock
-        if (targetLocationId && typeof p.stock !== 'undefined') {
-             const finalProduct = await prisma.product.findFirst({ where: { businessId, sku } });
-             if (finalProduct) {
-                 const existingInventory = await prisma.productInventory.findFirst({
-                    where: { productId: finalProduct.id, locationId: targetLocationId, outletId: targetOutletId || null }
-                 });
+        // Handle Inventory Stock removed - moving to inventoryLogs processing
+      }
+    }
+    // 2.5 Inventory Logs
+    if (inventoryLogs && Array.isArray(inventoryLogs)) {
+      for (const log of inventoryLogs) {
+        if (!log.productId) continue;
+        
+        const existing = await prisma.stockMovement.findFirst({ where: { businessId, id: String(log.id) } });
+        if (!existing) {
+          const productMatch = await prisma.product.findFirst({ 
+            where: { 
+              businessId, 
+              OR: [{ id: String(log.productId) }, { sku: String(log.productId) }]
+            } 
+          });
+          if (!productMatch) continue;
 
-                 if (resolveConflict(p, existingInventory)) {
-                     if (existingInventory) {
-                        await prisma.productInventory.update({
-                          where: { id: existingInventory.id },
-                          data: { stock: Number(p.stock) || 0, updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date() }
-                        });
-                     } else {
-                        await prisma.productInventory.create({
-                          data: { 
-                            productId: finalProduct.id, locationId: targetLocationId, outletId: targetOutletId || null, 
-                            stock: Number(p.stock) || 0, updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date()
-                          }
-                        });
-                     }
-                 }
-             }
+          await prisma.stockMovement.create({
+            data: {
+              id: String(log.id),
+              businessId,
+              productId: productMatch.id,
+              locationId: targetLocationId || '',
+              outletId: targetOutletId || null,
+              type: log.type || log.reason || 'SALE',
+              quantity: Math.abs(Number(log.variance) || 0),
+              reference: String(log.reference || log.id),
+              timestamp: new Date(log.timestamp || Date.now())
+            }
+          });
+
+          const inventories = await prisma.productInventory.findMany({
+            where: { 
+              productId: productMatch.id, 
+              locationId: targetLocationId, 
+              OR: [{ outletId: targetOutletId || null }, { outletId: null }]
+            }
+          });
+
+          let inventoryToUpdate = inventories.find(i => i.outletId === (targetOutletId || null)) || inventories.find(i => i.outletId === null);
+          
+          if (!inventoryToUpdate) {
+             inventoryToUpdate = await prisma.productInventory.create({
+                data: {
+                   productId: productMatch.id,
+                   locationId: targetLocationId || '',
+                   outletId: null,
+                   stock: 0,
+                   reorderLevel: 5
+                }
+             });
+          }
+
+          if (inventoryToUpdate) {
+            await prisma.productInventory.update({
+              where: { id: inventoryToUpdate.id },
+              data: { 
+                stock: { increment: Number(log.variance || 0) },
+                updatedAt: new Date()
+              }
+            });
+          }
+          results.inventory++;
+        } else {
+          results.skipped++;
         }
       }
     }
@@ -285,13 +330,20 @@ router.post('/', async (req: any, res: any) => {
        }
     }
     
-    // Update business settings if sent and newer
+    // Update business settings safely by merging
     if (businessSetup) {
        const b = await prisma.business.findUnique({ where: { id: businessId } });
-       if (resolveConflict(businessSetup, b)) {
+       if (b) {
+           let currentSettings = typeof b.settings === 'object' && b.settings !== null ? b.settings : {};
+           const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : businessSetup;
+           const mergedSettings = { ...currentSettings, ...incomingSetup };
+           
            await prisma.business.update({
               where: { id: businessId },
-              data: { settings: businessSetup, updatedAt: businessSetup.updatedAt ? new Date(businessSetup.updatedAt) : new Date() }
+              data: { 
+                  settings: mergedSettings, 
+                  updatedAt: new Date() 
+              }
            });
        }
     }

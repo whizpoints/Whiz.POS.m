@@ -112,7 +112,7 @@ export default function ProductModal({ isOpen, onClose, product, onComplete }: P
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Initial Stock</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Initial In-Store Stock (Main Warehouse)</label>
               <input type="number" required min="0" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.stock} onChange={e => setFormData({ ...formData, stock: Number(e.target.value) })} disabled={!!product} />
             </div>
             <div>

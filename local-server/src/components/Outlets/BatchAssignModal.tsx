@@ -54,7 +54,7 @@ export default function BatchAssignModal({
   };
 
   const handleSubmit = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0 || isSubmitting) return;
     setIsSubmitting(true);
     
     try {
