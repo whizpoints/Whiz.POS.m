@@ -1326,8 +1326,14 @@ export const usePosStore = create<PosState>()(
         set((state) => ({
           syncQueue: [...state.syncQueue, operation]
         }));
-        // Trigger sync in background without blocking UI
-        setTimeout(() => get().processSyncQueue(), 0);
+        // Debounce: wait 500ms for all items to accumulate before processing
+        if ((window as any).__syncDebounceTimer) {
+          clearTimeout((window as any).__syncDebounceTimer);
+        }
+        (window as any).__syncDebounceTimer = setTimeout(() => {
+          (window as any).__syncDebounceTimer = null;
+          get().processSyncQueue();
+        }, 500);
       },
 
       processSyncQueue: async () => {
@@ -1336,9 +1342,11 @@ export const usePosStore = create<PosState>()(
         let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
         const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
 
-        if (!state.isOnline || state.syncQueue.length === 0 || !apiUrl || !apiKey) return;
+        // Read queue FRESH from store, not from stale snapshot
+        const currentQueue = get().syncQueue;
+        if (!state.isOnline || currentQueue.length === 0 || !apiUrl || !apiKey) return;
 
-        const queue = [...state.syncQueue];
+        const queue = [...currentQueue];
         set({ syncQueue: [] }); // Optimistically clear queue
 
         try {
@@ -1392,6 +1400,8 @@ export const usePosStore = create<PosState>()(
                   if (fullS) payload.suppliers.push(fullS);
               }
           });
+
+          console.log(`[SYNC PUSH] Queue had ${queue.length} items. Payload: ${payload.transactions.length} txns, ${payload.stockMovements.length} stock movements, ${payload.products.length} products`);
 
           const response = await fetch(`${apiUrl}/api/sync/delta`, {
             method: 'POST',

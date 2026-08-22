@@ -72,16 +72,16 @@ export default function SyncEngine() {
     };
   }, [setOnlineStatus]);
 
-  // Auto-sync when online
+  // Auto-sync when coming back online (not on every queue change — the store handles that via debounce)
   useEffect(() => {
     if (isOnline && syncQueue.length > 0 && !isSyncing) {
       const timer = setTimeout(() => {
         handleAutoSync();
-      }, 5000); // Wait 5 seconds after coming online
+      }, 10000); // Wait 10 seconds after coming online (store debounce handles immediate syncs)
 
       return () => clearTimeout(timer);
     }
-  }, [isOnline, syncQueue.length, isSyncing]);
+  }, [isOnline, isSyncing]); // Removed syncQueue.length from deps — store handles queue-driven syncs
 
   // Periodic sync (every 15 minutes)
   useEffect(() => {
