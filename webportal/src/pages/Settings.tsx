@@ -804,7 +804,8 @@ function ProfilePanel({ profile, onSave }: any) {
     address: profile?.settings?.address || '',
     currency: profile?.settings?.currency || 'KES',
     timezone: profile?.settings?.timezone || 'Africa/Nairobi',
-    receiptFooterNote: profile?.settings?.receiptFooterNote || ''
+    receiptFooterNote: profile?.settings?.receiptFooterNote || '',
+      businessDescription: profile?.settings?.businessDescription || ''
   });
 
   useEffect(() => {
@@ -817,7 +818,8 @@ function ProfilePanel({ profile, onSave }: any) {
         address: profile?.settings?.address || '',
         currency: profile?.settings?.currency || 'KES',
         timezone: profile?.settings?.timezone || 'Africa/Nairobi',
-        receiptFooterNote: profile?.settings?.receiptFooterNote || ''
+        receiptFooterNote: profile?.settings?.receiptFooterNote || '',
+      businessDescription: profile?.settings?.businessDescription || ''
       });
       setLogoUrl(profile?.documentLogoUrl || profile?.logoUrl || null);
     }
