@@ -1,5 +1,6 @@
 import express from 'express';
-import prisma from '../prisma.js';
+import { randomUUID } from 'crypto';
+import db from '../db.js';
 import jwt from 'jsonwebtoken';
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
@@ -22,10 +23,11 @@ router.use(authenticate);
 router.get('/', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const categories = await prisma.category.findMany({
-            where: { businessId },
-            orderBy: { name: 'asc' }
-        });
+        const categories = await db.selectFrom('Category')
+            .selectAll()
+            .where('businessId', '=', businessId)
+            .orderBy('name', 'asc')
+            .execute();
         res.json(categories);
     }
     catch (error) {
@@ -40,12 +42,14 @@ router.post('/', async (req, res) => {
         const { name } = req.body;
         if (!name)
             return res.status(400).json({ error: 'Category name is required' });
-        const category = await prisma.category.create({
-            data: {
-                businessId,
-                name
-            }
-        });
+        const category = await db.insertInto('Category')
+            .values({
+            id: randomUUID(),
+            businessId,
+            name
+        })
+            .returningAll()
+            .executeTakeFirstOrThrow();
         res.json(category);
     }
     catch (error) {
@@ -58,10 +62,12 @@ router.put('/:id', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { name } = req.body;
-        const category = await prisma.category.update({
-            where: { id: req.params.id, businessId },
-            data: { name }
-        });
+        const category = await db.updateTable('Category')
+            .set({ name })
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', businessId)
+            .returningAll()
+            .executeTakeFirstOrThrow();
         res.json(category);
     }
     catch (error) {
@@ -73,9 +79,10 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const { businessId } = req.user;
-        await prisma.category.delete({
-            where: { id: req.params.id, businessId }
-        });
+        await db.deleteFrom('Category')
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', businessId)
+            .execute();
         res.json({ success: true });
     }
     catch (error) {

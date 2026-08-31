@@ -1,6 +1,7 @@
 import express from 'express';
-import prisma from '../prisma.js';
+import db from '../db.js';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const authenticate = (req, res, next) => {
@@ -21,10 +22,10 @@ router.use(authenticate);
 router.get('/', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const outlets = await prisma.outlet.findMany({
-            where: { businessId },
-            orderBy: { createdAt: 'asc' }
-        });
+        const outlets = await db.selectFrom('Outlet').selectAll()
+            .where('businessId', '=', businessId)
+            .orderBy('createdAt', 'asc')
+            .execute();
         res.json(outlets);
     }
     catch (error) {
@@ -36,14 +37,11 @@ router.get('/location/:locationId', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { locationId } = req.params;
-        const whereClause = { businessId };
+        let query = db.selectFrom('Outlet').selectAll().where('businessId', '=', businessId);
         if (locationId !== 'ALL') {
-            whereClause.locationId = locationId;
+            query = query.where('locationId', '=', locationId);
         }
-        const outlets = await prisma.outlet.findMany({
-            where: whereClause,
-            orderBy: { createdAt: 'asc' }
-        });
+        const outlets = await query.orderBy('createdAt', 'asc').execute();
         res.json(outlets);
     }
     catch (error) {
@@ -54,20 +52,33 @@ router.get('/location/:locationId', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const outlet = await prisma.outlet.findUnique({
-            where: { id: req.params.id, businessId },
-            include: {
-                users: true,
-                inventory: {
-                    include: {
-                        product: true
-                    }
-                }
-            }
-        });
+        const outlet = await db.selectFrom('Outlet')
+            .selectAll()
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', businessId)
+            .executeTakeFirst();
         if (!outlet)
             return res.status(404).json({ error: 'Outlet not found' });
-        res.json(outlet);
+        const users = await db.selectFrom('User').selectAll().where('outletId', '=', outlet.id).execute();
+        const inventory = await db.selectFrom('ProductInventory').selectAll().where('outletId', '=', outlet.id).execute();
+        let inventoryWithProducts = [];
+        if (inventory.length > 0) {
+            const productIds = inventory.map(i => i.productId);
+            const products = await db.selectFrom('Product').selectAll().where('id', 'in', productIds).execute();
+            const productMap = {};
+            for (const p of products) {
+                productMap[p.id] = p;
+            }
+            inventoryWithProducts = inventory.map(inv => ({
+                ...inv,
+                product: productMap[inv.productId] || null
+            }));
+        }
+        res.json({
+            ...outlet,
+            users,
+            inventory: inventoryWithProducts
+        });
     }
     catch (error) {
         console.error('Outlets GET by id error:', error);
@@ -84,9 +95,12 @@ router.post('/', async (req, res) => {
         if (!name) {
             return res.status(400).json({ error: 'name is required' });
         }
-        const outlet = await prisma.outlet.create({
-            data: { businessId, locationId, name }
-        });
+        const outlet = await db.insertInto('Outlet').values({
+            id: randomUUID(),
+            businessId,
+            locationId,
+            name
+        }).returningAll().executeTakeFirstOrThrow();
         res.json(outlet);
     }
     catch (error) {
@@ -97,10 +111,12 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const outlet = await prisma.outlet.update({
-            where: { id: req.params.id, businessId },
-            data: req.body
-        });
+        const outlet = await db.updateTable('Outlet')
+            .set(req.body)
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', businessId)
+            .returningAll()
+            .executeTakeFirstOrThrow();
         res.json(outlet);
     }
     catch (error) {
@@ -111,9 +127,10 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const { businessId } = req.user;
-        await prisma.outlet.delete({
-            where: { id: req.params.id, businessId }
-        });
+        await db.deleteFrom('Outlet')
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', businessId)
+            .execute();
         res.json({ success: true });
     }
     catch (error) {
@@ -125,15 +142,17 @@ router.post('/:id/users', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { userId } = req.body;
-        const outlet = await prisma.outlet.findUnique({
-            where: { id: req.params.id, businessId }
-        });
+        const outlet = await db.selectFrom('Outlet')
+            .selectAll()
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', businessId)
+            .executeTakeFirst();
         if (!outlet)
             return res.status(404).json({ error: 'Outlet not found' });
-        await prisma.user.update({
-            where: { id: userId },
-            data: { outletId: req.params.id }
-        });
+        await db.updateTable('User')
+            .set({ outletId: req.params.id })
+            .where('id', '=', userId)
+            .execute();
         res.json({ success: true });
     }
     catch (error) {
@@ -145,15 +164,17 @@ router.delete('/:id/users/:userId', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { userId } = req.params;
-        const outlet = await prisma.outlet.findUnique({
-            where: { id: req.params.id, businessId }
-        });
+        const outlet = await db.selectFrom('Outlet')
+            .selectAll()
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', businessId)
+            .executeTakeFirst();
         if (!outlet)
             return res.status(404).json({ error: 'Outlet not found' });
-        await prisma.user.update({
-            where: { id: userId },
-            data: { outletId: null }
-        });
+        await db.updateTable('User')
+            .set({ outletId: null })
+            .where('id', '=', userId)
+            .execute();
         res.json({ success: true });
     }
     catch (error) {
@@ -166,46 +187,49 @@ router.post('/:id/products', async (req, res) => {
         const { businessId } = req.user;
         const { productId, locationId, stock = 0 } = req.body;
         const outletId = req.params.id;
-        const outlet = await prisma.outlet.findUnique({
-            where: { id: outletId, businessId }
-        });
+        const outlet = await db.selectFrom('Outlet')
+            .selectAll()
+            .where('id', '=', outletId)
+            .where('businessId', '=', businessId)
+            .executeTakeFirst();
         if (!outlet)
             return res.status(404).json({ error: 'Outlet not found' });
         let targetLocationId = locationId;
         if (!targetLocationId) {
-            const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+            const loc = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
             if (loc)
                 targetLocationId = loc.id;
         }
         if (!targetLocationId)
             return res.status(400).json({ error: 'No location available for inventory' });
-        const existing = await prisma.productInventory.findFirst({
-            where: { productId, outletId, locationId: targetLocationId }
-        });
+        const existing = await db.selectFrom('ProductInventory')
+            .selectAll()
+            .where('productId', '=', productId)
+            .where('outletId', '=', outletId)
+            .where('locationId', '=', targetLocationId)
+            .executeTakeFirst();
         if (existing) {
             return res.status(400).json({ error: 'Product is already assigned to this outlet' });
         }
-        await prisma.productInventory.create({
-            data: {
-                productId,
-                outletId,
-                locationId: targetLocationId,
-                stock: Number(stock)
-            }
-        });
+        await db.insertInto('ProductInventory').values({
+            id: randomUUID(),
+            productId,
+            outletId,
+            locationId: targetLocationId,
+            stock: Number(stock)
+        }).execute();
         if (Number(stock) > 0) {
-            await prisma.stockMovement.create({
-                data: {
-                    businessId,
-                    productId,
-                    locationId: targetLocationId,
-                    outletId,
-                    type: 'INITIAL',
-                    quantity: Number(stock),
-                    sourceTerminal: 'SERVER',
-                    reference: 'Product assigned to outlet'
-                }
-            });
+            await db.insertInto('StockMovement').values({
+                id: randomUUID(),
+                businessId,
+                productId,
+                locationId: targetLocationId,
+                outletId,
+                type: 'INITIAL',
+                quantity: Number(stock),
+                sourceTerminal: 'SERVER',
+                reference: 'Product assigned to outlet'
+            }).execute();
         }
         res.json({ success: true });
     }
@@ -222,14 +246,16 @@ router.post('/:id/products/batch', async (req, res) => {
         if (!Array.isArray(productIds)) {
             return res.status(400).json({ error: 'productIds must be an array' });
         }
-        const outlet = await prisma.outlet.findUnique({
-            where: { id: outletId, businessId }
-        });
+        const outlet = await db.selectFrom('Outlet')
+            .selectAll()
+            .where('id', '=', outletId)
+            .where('businessId', '=', businessId)
+            .executeTakeFirst();
         if (!outlet)
             return res.status(404).json({ error: 'Outlet not found' });
         let targetLocationId = locationId;
         if (!targetLocationId) {
-            const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+            const loc = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
             if (loc)
                 targetLocationId = loc.id;
         }
@@ -237,33 +263,32 @@ router.post('/:id/products/batch', async (req, res) => {
             return res.status(400).json({ error: 'No location available for inventory' });
         let addedCount = 0;
         for (const productId of productIds) {
-            const existing = await prisma.productInventory.findFirst({
-                where: { productId, outletId, locationId: targetLocationId }
-            });
+            const existing = await db.selectFrom('ProductInventory')
+                .selectAll()
+                .where('productId', '=', productId)
+                .where('outletId', '=', outletId)
+                .where('locationId', '=', targetLocationId)
+                .executeTakeFirst();
             if (!existing) {
-                // Read stock from req.body if passed as object array? The request accepts productIds, but if it expects initial stock...
-                // The assignment says "Similarly in POST /:id/products/batch". In batch, usually it's just productIds string array. If we want stock, we could check if it's passed or just use 0. But we just implement the same logic, if stock was provided somehow or default to 0. Actually, let's assume `stock` can be passed globally for the batch or we just use 0. Wait, in batch, productIds is just an array. We can just set stock to 0 or check if there is a stock field. Let's do `const { productIds, locationId, stock = 0 } = req.body;`.
-                await prisma.productInventory.create({
-                    data: {
-                        productId,
-                        outletId,
-                        locationId: targetLocationId,
-                        stock: Number(stock)
-                    }
-                });
+                await db.insertInto('ProductInventory').values({
+                    id: randomUUID(),
+                    productId,
+                    outletId,
+                    locationId: targetLocationId,
+                    stock: Number(stock)
+                }).execute();
                 if (Number(stock) > 0) {
-                    await prisma.stockMovement.create({
-                        data: {
-                            businessId,
-                            productId,
-                            locationId: targetLocationId,
-                            outletId,
-                            type: 'INITIAL',
-                            quantity: Number(stock),
-                            sourceTerminal: 'SERVER',
-                            reference: 'Product assigned to outlet'
-                        }
-                    });
+                    await db.insertInto('StockMovement').values({
+                        id: randomUUID(),
+                        businessId,
+                        productId,
+                        locationId: targetLocationId,
+                        outletId,
+                        type: 'INITIAL',
+                        quantity: Number(stock),
+                        sourceTerminal: 'SERVER',
+                        reference: 'Product assigned to outlet'
+                    }).execute();
                 }
                 addedCount++;
             }
@@ -279,12 +304,17 @@ router.post('/:id/inventory/adjust', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { inventoryId, amount, type } = req.body;
-        const outlet = await prisma.outlet.findUnique({
-            where: { id: req.params.id, businessId }
-        });
+        const outlet = await db.selectFrom('Outlet')
+            .selectAll()
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', businessId)
+            .executeTakeFirst();
         if (!outlet)
             return res.status(404).json({ error: 'Outlet not found' });
-        const inventory = await prisma.productInventory.findUnique({ where: { id: inventoryId } });
+        const inventory = await db.selectFrom('ProductInventory')
+            .selectAll()
+            .where('id', '=', inventoryId)
+            .executeTakeFirst();
         if (!inventory)
             return res.status(404).json({ error: 'Inventory record not found' });
         let newStock = inventory.stock;
@@ -298,24 +328,22 @@ router.post('/:id/inventory/adjust', async (req, res) => {
         else {
             return res.status(400).json({ error: 'Invalid adjustment type' });
         }
-        await prisma.productInventory.update({
-            where: { id: inventoryId },
-            data: { stock: newStock }
-        });
-        await prisma.stockMovement.create({
-            data: {
-                id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-                businessId,
-                productId: inventory.productId,
-                locationId: inventory.locationId,
-                outletId: req.params.id,
-                type: type === 'ADD' ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
-                quantity: amount,
-                reference: 'Outlet Manual Adjust',
-                sourceTerminal: 'SERVER',
-                timestamp: new Date()
-            }
-        });
+        await db.updateTable('ProductInventory')
+            .set({ stock: newStock })
+            .where('id', '=', inventoryId)
+            .execute();
+        await db.insertInto('StockMovement').values({
+            id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            businessId,
+            productId: inventory.productId,
+            locationId: inventory.locationId,
+            outletId: req.params.id,
+            type: type === 'ADD' ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+            quantity: amount,
+            reference: 'Outlet Manual Adjust',
+            sourceTerminal: 'SERVER',
+            timestamp: new Date().toISOString()
+        }).execute();
         res.json({ success: true, stock: newStock });
     }
     catch (error) {
@@ -327,36 +355,34 @@ router.post('/:id/force-sync', async (req, res) => {
     try {
         const { businessId } = req.user;
         const outletId = req.params.id;
-        const outlet = await prisma.outlet.findUnique({
-            where: { id: outletId, businessId }
-        });
+        const outlet = await db.selectFrom('Outlet')
+            .selectAll()
+            .where('id', '=', outletId)
+            .where('businessId', '=', businessId)
+            .executeTakeFirst();
         if (!outlet)
             return res.status(404).json({ error: 'Outlet not found' });
-        // Touch all product inventory for this outlet
-        await prisma.productInventory.updateMany({
-            where: { outletId },
-            data: { updatedAt: new Date() }
-        });
-        // Touch all users for this outlet
-        await prisma.user.updateMany({
-            where: { outletId },
-            data: { updatedAt: new Date() }
-        });
-        // Touch outlet itself
-        await prisma.outlet.update({
-            where: { id: outletId },
-            data: { updatedAt: new Date() }
-        });
-        // Touch business setup
-        await prisma.business.updateMany({
-            where: { id: req.user.businessId },
-            data: { updatedAt: new Date() }
-        });
-        // Touch categories
-        await prisma.category.updateMany({
-            where: { businessId: req.user.businessId },
-            data: { updatedAt: new Date() }
-        });
+        const now = new Date().toISOString();
+        await db.updateTable('ProductInventory')
+            .set({ updatedAt: now })
+            .where('outletId', '=', outletId)
+            .execute();
+        await db.updateTable('User')
+            .set({ updatedAt: now })
+            .where('outletId', '=', outletId)
+            .execute();
+        await db.updateTable('Outlet')
+            .set({ updatedAt: now })
+            .where('id', '=', outletId)
+            .execute();
+        await db.updateTable('Business')
+            .set({ updatedAt: now })
+            .where('id', '=', req.user.businessId)
+            .execute();
+        await db.updateTable('Category')
+            .set({ updatedAt: now })
+            .where('businessId', '=', req.user.businessId)
+            .execute();
         res.json({ success: true, message: 'Current data marked for push to terminals' });
     }
     catch (error) {

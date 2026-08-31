@@ -343,9 +343,9 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
       
       if (q) {
         query = query.where((eb) => eb.or([
-          eb('transactionId', 'like', \`%\${q}%\`),
-          eb('customerName', 'like', \`%\${q}%\`),
-          eb('phoneNumber', 'like', \`%\${q}%\`)
+          eb('transactionId', 'like', `%\${q}%`),
+          eb('customerName', 'like', `%\${q}%`),
+          eb('phoneNumber', 'like', `%\${q}%`)
         ]));
       }
       const txns = await query.execute();
@@ -427,4 +427,5 @@ router.post('/payments/consume', async (req: any, res: any) => {
 });
 
 export default router;
+
 

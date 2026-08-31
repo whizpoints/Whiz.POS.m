@@ -1,11 +1,7 @@
-// @ts-nocheck
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
 import jwt from 'jsonwebtoken';
 const router = Router();
-// const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 // Middleware to verify if user is super admin
 // (For demo purposes, we will assume any user with role 'ADMIN' is a super admin for now, 
@@ -30,14 +26,18 @@ const requireSuperAdmin = async (req, res, next) => {
 // GET all businesses
 router.get('/businesses', requireSuperAdmin, async (req, res) => {
     try {
-        const businesses = await prisma.business.findMany({
-            include: {
-                users: {
-                    select: { id: true, name: true, email: true, role: true }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+        const businessesRaw = await db.selectFrom('Business')
+            .selectAll()
+            .orderBy('createdAt', 'desc')
+            .execute();
+        // For each business, fetch users to mimic prisma include
+        const businesses = await Promise.all(businessesRaw.map(async (b) => {
+            const users = await db.selectFrom('User')
+                .select(['id', 'name', 'email', 'role'])
+                .where('businessId', '=', b.id)
+                .execute();
+            return { ...b, users };
+        }));
         res.json({ user: req.user, businesses });
     }
     catch (error) {
@@ -54,10 +54,9 @@ router.delete('/businesses/:id', requireSuperAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Cannot delete your active business' });
         }
         // Prisma will cascade delete users, products, etc. if relations are configured correctly.
-        // If not, we should delete them manually first.
-        await prisma.user.deleteMany({ where: { businessId } });
-        // Add other models if needed: await prisma.product.deleteMany({ where: { businessId } });
-        await prisma.business.delete({ where: { id: businessId } });
+        // For Kysely we do it manually.
+        await db.deleteFrom('User').where('businessId', '=', businessId).execute();
+        await db.deleteFrom('Business').where('id', '=', businessId).execute();
         res.json({ success: true, message: 'Business deleted successfully' });
     }
     catch (error) {

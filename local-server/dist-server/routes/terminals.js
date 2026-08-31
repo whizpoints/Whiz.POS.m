@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 import crypto from 'crypto';
 const router = Router();
 // const prisma = new PrismaClient();
@@ -11,11 +12,23 @@ router.post('/register', async (req, res) => {
     }
     try {
         // Upsert terminal request
-        const terminal = await prisma.terminal.upsert({
-            where: { macAddress },
-            update: { name, status: 'PENDING' },
-            create: { macAddress, name, status: 'PENDING' }
-        });
+        let terminal = await db.selectFrom('Terminal')
+            .selectAll()
+            .where('macAddress', '=', macAddress)
+            .executeTakeFirst();
+        if (terminal) {
+            terminal = await db.updateTable('Terminal')
+                .set({ name, status: 'PENDING' })
+                .where('macAddress', '=', macAddress)
+                .returningAll()
+                .executeTakeFirstOrThrow();
+        }
+        else {
+            terminal = await db.insertInto('Terminal')
+                .values({ id: randomUUID(), macAddress, name, status: 'PENDING' })
+                .returningAll()
+                .executeTakeFirstOrThrow();
+        }
         console.log(`[LAN Discovery] Terminal registration request received from ${name} (${macAddress})`);
         res.json({ success: true, message: 'Registration requested. Waiting for admin approval.', terminalId: terminal.id });
     }
@@ -28,33 +41,35 @@ router.post('/register', async (req, res) => {
 router.post('/:id/approve', async (req, res) => {
     const { id } = req.params;
     try {
-        const terminalRequest = await prisma.terminal.findUnique({ where: { id } });
+        const terminalRequest = await db.selectFrom('Terminal').selectAll().where('id', '=', id).executeTakeFirst();
         if (!terminalRequest)
             return res.status(404).json({ error: 'Terminal not found' });
         // Find primary business and location
-        const business = await prisma.business.findFirst();
-        const location = await prisma.storeLocation.findFirst();
+        const business = await db.selectFrom('Business').selectAll().executeTakeFirst();
+        const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
         if (!business || !location) {
             return res.status(400).json({ error: 'Business or Location not setup yet' });
         }
         const apiKey = crypto.randomBytes(32).toString('hex');
         // Find if outlet already exists for this terminal name
-        let outlet = await prisma.outlet.findFirst({
-            where: { name: terminalRequest.name, businessId: business.id }
-        });
+        let outlet = await db.selectFrom('Outlet')
+            .selectAll()
+            .where('name', '=', terminalRequest.name)
+            .where('businessId', '=', business.id)
+            .executeTakeFirst();
         if (!outlet) {
-            outlet = await prisma.outlet.create({
-                data: {
-                    name: terminalRequest.name,
-                    businessId: business.id,
-                    locationId: location.id
-                }
-            });
+            outlet = await db.insertInto('Outlet').values({
+                id: randomUUID(),
+                name: terminalRequest.name,
+                businessId: business.id,
+                locationId: location.id
+            }).returningAll().executeTakeFirstOrThrow();
         }
-        const updatedTerminal = await prisma.terminal.update({
-            where: { id },
-            data: { status: 'APPROVED', apiKey, outletId: outlet.id }
-        });
+        const updatedTerminal = await db.updateTable('Terminal')
+            .set({ status: 'APPROVED', apiKey, outletId: outlet.id })
+            .where('id', '=', id)
+            .returningAll()
+            .executeTakeFirstOrThrow();
         res.json({ success: true, terminal: updatedTerminal, outlet });
     }
     catch (error) {
@@ -65,9 +80,10 @@ router.post('/:id/approve', async (req, res) => {
 // Admin calls this to get all terminals
 router.get('/', async (req, res) => {
     try {
-        const terminals = await prisma.terminal.findMany({
-            orderBy: { createdAt: 'desc' }
-        });
+        const terminals = await db.selectFrom('Terminal')
+            .selectAll()
+            .orderBy('createdAt', 'desc')
+            .execute();
         res.json(terminals);
     }
     catch (error) {
@@ -78,10 +94,11 @@ router.get('/', async (req, res) => {
 router.post('/:id/reject', async (req, res) => {
     const { id } = req.params;
     try {
-        const terminal = await prisma.terminal.update({
-            where: { id },
-            data: { status: 'REJECTED' }
-        });
+        const terminal = await db.updateTable('Terminal')
+            .set({ status: 'REJECTED' })
+            .where('id', '=', id)
+            .returningAll()
+            .executeTakeFirstOrThrow();
         res.json({ success: true, terminal });
     }
     catch (error) {
@@ -92,9 +109,7 @@ router.post('/:id/reject', async (req, res) => {
 router.get('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const terminal = await prisma.terminal.findUnique({
-            where: { id }
-        });
+        const terminal = await db.selectFrom('Terminal').selectAll().where('id', '=', id).executeTakeFirst();
         if (!terminal)
             return res.status(404).json({ error: 'Terminal not found' });
         res.json(terminal);
@@ -107,18 +122,18 @@ router.get('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const terminal = await prisma.terminal.findUnique({ where: { id } });
+        const terminal = await db.selectFrom('Terminal').selectAll().where('id', '=', id).executeTakeFirst();
         if (terminal) {
             // Find and delete the associated outlet
-            const outlet = await prisma.outlet.findFirst({
-                where: { name: terminal.name, businessId: terminal.businessId }
-            });
+            const outlet = await db.selectFrom('Outlet')
+                .selectAll()
+                .where('name', '=', terminal.name)
+                .where('businessId', '=', terminal.businessId || '') // Provide default to satisfy TS if missing
+                .executeTakeFirst();
             if (outlet) {
-                await prisma.outlet.delete({ where: { id: outlet.id } });
+                await db.deleteFrom('Outlet').where('id', '=', outlet.id).execute();
             }
-            await prisma.terminal.delete({
-                where: { id }
-            });
+            await db.deleteFrom('Terminal').where('id', '=', id).execute();
         }
         res.json({ success: true });
     }

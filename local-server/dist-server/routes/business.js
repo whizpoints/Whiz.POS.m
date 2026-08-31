@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { uploadAsset } from '../services/s3Service.js';
@@ -24,7 +23,7 @@ const authenticate = async (req, res, next) => {
     catch (err) {
         // Fallback: Verify as API Key (Desktop POS)
         try {
-            const business = await prisma.business.findFirst({ where: { apiKey } });
+            const business = await db.selectFrom('Business').selectAll().where('apiKey', '=', apiKey).executeTakeFirst();
             if (business) {
                 req.user = { businessId: business.id };
                 return next();
@@ -37,7 +36,7 @@ const authenticate = async (req, res, next) => {
 // Check if setup is complete
 router.get('/setup-status', async (req, res) => {
     try {
-        const business = await prisma.business.findFirst();
+        const business = await db.selectFrom('Business').selectAll().executeTakeFirst();
         res.json({ isSetup: !!business, business });
     }
     catch (err) {
@@ -49,10 +48,7 @@ router.use(authenticate);
 router.get('/profile', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const business = await prisma.business.findUnique({
-            where: { id: businessId },
-            select: { id: true, name: true, email: true, logoUrl: true, createdAt: true, settings: true, apiKey: true }
-        });
+        const business = await db.selectFrom('Business').select(['id', 'name', 'email', 'logoUrl', 'createdAt', 'settings', 'apiKey']).where('id', '=', businessId).executeTakeFirst();
         if (!business)
             return res.status(404).json({ error: 'Business not found' });
         let parsedSettings = {};
@@ -88,15 +84,16 @@ router.post('/profile', async (req, res) => {
             }
             finalSettings = JSON.stringify(cleanedSettings);
         }
-        const business = await prisma.business.update({
-            where: { id: businessId },
-            data: {
-                ...(name && { name }),
-                ...(finalSettings !== undefined && { settings: finalSettings }),
-                ...(apiKey !== undefined && { apiKey })
-            },
-            select: { id: true, name: true, settings: true, apiKey: true }
-        });
+        let updateData = {};
+        if (name)
+            updateData.name = name;
+        if (finalSettings !== undefined)
+            updateData.settings = finalSettings;
+        if (apiKey !== undefined)
+            updateData.apiKey = apiKey;
+        const business = Object.keys(updateData).length > 0
+            ? await db.updateTable('Business').set(updateData).where('id', '=', businessId).returning(['id', 'name', 'settings', 'apiKey']).executeTakeFirstOrThrow()
+            : await db.selectFrom('Business').select(['id', 'name', 'settings', 'apiKey']).where('id', '=', businessId).executeTakeFirst();
         res.json({ success: true, business });
     }
     catch (error) {
@@ -117,29 +114,45 @@ router.post('/logo', upload.single('logo'), async (req, res) => {
         // Upload to R2/S3
         const logoUrl = await uploadAsset(file.buffer, fileName, file.mimetype);
         // Update DB
-        const updatedBusiness = await prisma.business.update({
-            where: { id: businessId },
-            data: { logoUrl },
-            select: { id: true, name: true, logoUrl: true }
-        });
-        res.json({ success: true, business: updatedBusiness });
+        const updatedBusiness = await db.updateTable('Business').set({ logoUrl }).where('id', '=', businessId).returning(['id', 'name', 'logoUrl']).executeTakeFirstOrThrow();
+        res.json({ success: true, business: updatedBusiness, logoUrl });
     }
     catch (error) {
         console.error('Logo upload error:', error);
         res.status(500).json({ error: 'Failed to upload logo' });
     }
 });
+// Upload generic document asset (watermark, etc)
+router.post('/document-asset', upload.single('file'), async (req, res) => {
+    try {
+        const { businessId } = req.user;
+        const { assetType } = req.body; // e.g., 'watermark', 'headerImage'
+        const file = req.file;
+        if (!file) {
+            return res.status(400).json({ error: 'No file provided' });
+        }
+        const fileExtension = file.originalname.split('.').pop();
+        const fileName = `document-assets/${businessId}-${assetType}-${Date.now()}.${fileExtension}`;
+        // Upload to R2/S3
+        const fileUrl = await uploadAsset(file.buffer, fileName, file.mimetype);
+        res.json({ success: true, fileUrl });
+    }
+    catch (error) {
+        console.error('Asset upload error:', error);
+        res.status(500).json({ error: 'Failed to upload asset' });
+    }
+});
 // Export Data Backup
 router.get('/backup', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const business = await prisma.business.findUnique({ where: { id: businessId } });
+        const business = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
         if (!business)
             return res.status(404).json({ error: 'Business not found' });
-        const categories = await prisma.category.findMany({ where: { businessId } });
-        const products = await prisma.product.findMany({ where: { businessId } });
-        const users = await prisma.user.findMany({ where: { businessId } });
-        const customers = await prisma.customer.findMany({ where: { businessId } });
+        const categories = await db.selectFrom('Category').selectAll().where('businessId', '=', businessId).execute();
+        const products = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).execute();
+        const users = await db.selectFrom('User').selectAll().where('businessId', '=', businessId).execute();
+        const customers = await db.selectFrom('Customer').selectAll().where('businessId', '=', businessId).execute();
         // Clean up sensitive/irrelevant data for export
         const cleanUsers = users.map(u => ({ ...u, id: undefined, businessId: undefined, locationId: null, outletId: null, createdAt: undefined, updatedAt: undefined }));
         const cleanCategories = categories.map(c => ({ id: c.id, name: c.name }));
@@ -175,61 +188,59 @@ router.post('/restore', async (req, res) => {
         const { settings, categories, products, users, customers } = backup.data;
         // 1. Restore Settings
         if (settings) {
-            let currentBusiness = await prisma.business.findUnique({ where: { id: businessId } });
+            let currentBusiness = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
             let currentSettings = typeof currentBusiness?.settings === 'string' ? JSON.parse(currentBusiness.settings) : (currentBusiness?.settings || {});
             let newSettings = typeof settings === 'string' ? JSON.parse(settings) : settings;
             // Preserve API keys when merging settings
             const mergedSettings = { ...newSettings, backOfficeApiKey: currentSettings.backOfficeApiKey, backOfficeUrl: currentSettings.backOfficeUrl, cloudBusinessId: currentSettings.cloudBusinessId, locationId: currentSettings.locationId };
-            await prisma.business.update({
-                where: { id: businessId },
-                data: { settings: JSON.stringify(mergedSettings) }
-            });
+            await db.updateTable('Business').set({ settings: JSON.stringify(mergedSettings) }).where('id', '=', businessId).execute();
         }
         // 2. Restore Categories
         if (categories && categories.length > 0) {
             for (const cat of categories) {
-                await prisma.category.upsert({
-                    where: { id: cat.id },
-                    update: { name: cat.name, businessId },
-                    create: { id: cat.id, name: cat.name, businessId }
-                });
+                const existingCat = await db.selectFrom('Category').selectAll().where('id', '=', cat.id).executeTakeFirst();
+                if (existingCat) {
+                    await db.updateTable('Category').set({ name: cat.name, businessId }).where('id', '=', cat.id).execute();
+                }
+                else {
+                    await db.insertInto('Category').values({ id: cat.id, name: cat.name, businessId }).execute();
+                }
             }
         }
         // 3. Restore Products
         if (products && products.length > 0) {
             for (const p of products) {
-                await prisma.product.upsert({
-                    where: { id: p.id },
-                    update: { sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel, businessId },
-                    create: { id: p.id, sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel, businessId }
-                });
+                const existingProd = await db.selectFrom('Product').selectAll().where('id', '=', p.id).executeTakeFirst();
+                if (existingProd) {
+                    await db.updateTable('Product').set({ sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel, businessId }).where('id', '=', p.id).execute();
+                }
+                else {
+                    await db.insertInto('Product').values({ id: p.id, sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel, businessId }).execute();
+                }
             }
         }
         // 4. Restore Users (match by email to avoid unique constraint errors, don't update password if exists)
         if (users && users.length > 0) {
             for (const u of users) {
-                const existing = await prisma.user.findUnique({ where: { email: u.email } });
+                const existing = await db.selectFrom('User').selectAll().where('email', '=', u.email).executeTakeFirst();
                 if (existing) {
-                    await prisma.user.update({
-                        where: { email: u.email },
-                        data: { name: u.name, role: u.role, pin: u.pin, businessId }
-                    });
+                    await db.updateTable('User').set({ name: u.name, role: u.role, pin: u.pin, businessId }).where('email', '=', u.email).execute();
                 }
                 else {
-                    await prisma.user.create({
-                        data: { email: u.email, name: u.name, role: u.role, pin: u.pin, password: u.password, businessId }
-                    });
+                    await db.insertInto('User').values({ id: randomUUID(), email: u.email, name: u.name, role: u.role, pin: u.pin, password: u.password, businessId }).execute();
                 }
             }
         }
         // 5. Restore Customers
         if (customers && customers.length > 0) {
             for (const c of customers) {
-                await prisma.customer.upsert({
-                    where: { id: c.id },
-                    update: { name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent, businessId },
-                    create: { id: c.id, name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent, businessId }
-                });
+                const existingCust = await db.selectFrom('Customer').selectAll().where('id', '=', c.id).executeTakeFirst();
+                if (existingCust) {
+                    await db.updateTable('Customer').set({ name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent, businessId }).where('id', '=', c.id).execute();
+                }
+                else {
+                    await db.insertInto('Customer').values({ id: c.id, name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent, businessId }).execute();
+                }
             }
         }
         res.json({ success: true, message: 'Backup restored successfully' });
@@ -243,10 +254,7 @@ router.post('/restore', async (req, res) => {
 router.get('/locations', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const locations = await prisma.storeLocation.findMany({
-            where: { businessId },
-            orderBy: { createdAt: 'asc' }
-        });
+        const locations = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).orderBy('createdAt', 'asc').execute();
         res.json({ success: true, locations });
     }
     catch (error) {

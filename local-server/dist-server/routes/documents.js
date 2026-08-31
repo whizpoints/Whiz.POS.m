@@ -1,11 +1,8 @@
 // @ts-nocheck
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
 import jwt from 'jsonwebtoken';
 const router = Router();
-// const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 // Helper to authenticate
 const authenticate = async (req, res, next) => {
@@ -24,14 +21,22 @@ const authenticate = async (req, res, next) => {
 // Generate Receipt HTML
 router.get('/receipt/:id', authenticate, async (req, res) => {
     try {
-        const receipt = await prisma.receipt.findUnique({
-            where: { id: req.params.id, businessId: req.businessId },
-            include: {
-                items: true,
-                business: true,
-                outlet: { include: { location: true } }
+        const receipt = await db.selectFrom('Receipt')
+            .selectAll()
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', req.businessId)
+            .executeTakeFirst();
+        if (receipt) {
+            receipt.items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', '=', receipt.id).execute();
+            receipt.business = await db.selectFrom('Business').selectAll().where('id', '=', receipt.businessId).executeTakeFirst();
+            if (receipt.outletId) {
+                const outlet = await db.selectFrom('Outlet').selectAll().where('id', '=', receipt.outletId).executeTakeFirst();
+                if (outlet) {
+                    outlet.location = await db.selectFrom('StoreLocation').selectAll().where('id', '=', outlet.locationId).executeTakeFirst();
+                    receipt.outlet = outlet;
+                }
             }
-        });
+        }
         if (!receipt)
             return res.status(404).send('Receipt not found');
         const business = receipt.business;
@@ -149,14 +154,22 @@ router.get('/receipt/:id', authenticate, async (req, res) => {
 // Generate A4 Invoice HTML
 router.get('/invoice/:id', authenticate, async (req, res) => {
     try {
-        const receipt = await prisma.receipt.findUnique({
-            where: { id: req.params.id, businessId: req.businessId },
-            include: {
-                items: true,
-                business: true,
-                outlet: { include: { location: true } }
+        const receipt = await db.selectFrom('Receipt')
+            .selectAll()
+            .where('id', '=', req.params.id)
+            .where('businessId', '=', req.businessId)
+            .executeTakeFirst();
+        if (receipt) {
+            receipt.items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', '=', receipt.id).execute();
+            receipt.business = await db.selectFrom('Business').selectAll().where('id', '=', receipt.businessId).executeTakeFirst();
+            if (receipt.outletId) {
+                const outlet = await db.selectFrom('Outlet').selectAll().where('id', '=', receipt.outletId).executeTakeFirst();
+                if (outlet) {
+                    outlet.location = await db.selectFrom('StoreLocation').selectAll().where('id', '=', outlet.locationId).executeTakeFirst();
+                    receipt.outlet = outlet;
+                }
             }
-        });
+        }
         if (!receipt)
             return res.status(404).send('Receipt not found');
         const business = receipt.business;

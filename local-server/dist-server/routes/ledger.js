@@ -1,19 +1,33 @@
 import express from 'express';
 import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 const router = express.Router();
-// const prisma = new PrismaClient();
 // Get stock movements for a business
 router.get('/:businessId', async (req, res) => {
     try {
         const { businessId } = req.params;
-        const movements = await prisma.stockMovement.findMany({
-            where: { businessId },
-            include: { product: true, location: true, outlet: true },
-            orderBy: { timestamp: 'desc' },
-            take: 100
-        });
+        const smRecords = await db.selectFrom('StockMovement')
+            .selectAll()
+            .where('businessId', '=', businessId)
+            .orderBy('timestamp', 'desc')
+            .limit(100)
+            .execute();
+        const productIds = [...new Set(smRecords.map(m => m.productId).filter(Boolean))];
+        const locationIds = [...new Set(smRecords.map(m => m.locationId).filter(Boolean))];
+        const outletIds = [...new Set(smRecords.map(m => m.outletId).filter(Boolean))];
+        const [products, locations, outlets] = await Promise.all([
+            productIds.length ? db.selectFrom('Product').selectAll().where('id', 'in', productIds).execute() : [],
+            locationIds.length ? db.selectFrom('StoreLocation').selectAll().where('id', 'in', locationIds).execute() : [],
+            outletIds.length ? db.selectFrom('Outlet').selectAll().where('id', 'in', outletIds).execute() : []
+        ]);
+        const movements = smRecords.map(sm => ({
+            ...sm,
+            product: products.find(p => p.id === sm.productId) || null,
+            location: locations.find(l => l.id === sm.locationId) || null,
+            outlet: outlets.find(o => o.id === sm.outletId) || null
+        }));
         res.json(movements);
     }
     catch (error) {
@@ -31,45 +45,56 @@ router.post('/transfer', async (req, res) => {
         if (qty <= 0)
             return res.status(400).json({ error: 'Quantity must be positive' });
         // Use a transaction to ensure ledger integrity
-        await prisma.$transaction(async (tx) => {
+        await db.transaction().execute(async (tx) => {
             // 1. Deduct from Hub (Main Store) inventory
-            const hubInventory = await tx.productInventory.findFirst({
-                where: { productId, locationId, outletId: null }
-            });
+            let hubInventoryQ = tx.selectFrom('ProductInventory')
+                .selectAll()
+                .where('productId', '=', productId)
+                .where('locationId', '=', locationId);
+            // Try to find the one where outletId is null
+            let hubInventoryResults = await hubInventoryQ.execute();
+            const hubInventory = hubInventoryResults.find((inv) => inv.outletId === null);
             if (!hubInventory || hubInventory.stock < qty) {
                 throw new Error('Insufficient stock in Main Store');
             }
-            await tx.productInventory.update({
-                where: { id: hubInventory.id },
-                data: { stock: { decrement: qty } }
-            });
+            await tx.updateTable('ProductInventory')
+                .set({ stock: hubInventory.stock - qty })
+                .where('id', '=', hubInventory.id)
+                .execute();
             // 2. Add to Terminal (Outlet) inventory
-            const outletInventory = await tx.productInventory.findFirst({
-                where: { productId, locationId, outletId }
-            });
+            let outletInventoryQ = tx.selectFrom('ProductInventory')
+                .selectAll()
+                .where('productId', '=', productId)
+                .where('locationId', '=', locationId)
+                .where('outletId', '=', outletId);
+            const outletInventory = await outletInventoryQ.executeTakeFirst();
             if (outletInventory) {
-                await tx.productInventory.update({
-                    where: { id: outletInventory.id },
-                    data: { stock: { increment: qty } }
-                });
+                await tx.updateTable('ProductInventory')
+                    .set({ stock: outletInventory.stock + qty })
+                    .where('id', '=', outletInventory.id)
+                    .execute();
             }
             else {
-                await tx.productInventory.create({
-                    data: { productId, locationId, outletId, stock: qty }
-                });
-            }
-            // 3. Write Ledger entry
-            await tx.stockMovement.create({
-                data: {
-                    businessId,
+                await tx.insertInto('ProductInventory').values({
+                    id: randomUUID(),
                     productId,
                     locationId,
                     outletId,
-                    type: 'TRANSFER',
-                    quantity: qty,
-                    reference: 'Hub to Terminal Transfer'
-                }
-            });
+                    stock: qty
+                }).execute();
+            }
+            // 3. Write Ledger entry
+            await tx.insertInto('StockMovement').values({
+                id: randomUUID(),
+                businessId,
+                productId,
+                locationId,
+                outletId,
+                type: 'TRANSFER',
+                quantity: qty,
+                reference: 'Hub to Terminal Transfer',
+                timestamp: new Date().toISOString()
+            }).execute();
         });
         res.json({ success: true });
     }

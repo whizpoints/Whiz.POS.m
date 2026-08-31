@@ -1,10 +1,7 @@
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
 import jwt from 'jsonwebtoken';
 const router = Router();
-// const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const authenticate = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -25,16 +22,15 @@ router.get('/summary', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { locationId } = req.query;
+        let q1 = db.selectFrom('Receipt').select(['totalAmount', 'status', 'createdAt']).where('businessId', '=', businessId);
+        if (locationId)
+            q1 = q1.where('locationId', '=', locationId);
+        let q2 = db.selectFrom('Receipt').selectAll().where('businessId', '=', businessId).orderBy('createdAt', 'desc').limit(10);
+        if (locationId)
+            q2 = q2.where('locationId', '=', locationId);
         const [receipts, recentReceipts] = await Promise.all([
-            prisma.receipt.findMany({
-                where: { businessId, ...(locationId ? { locationId } : {}) },
-                select: { totalAmount: true, status: true, createdAt: true }
-            }),
-            prisma.receipt.findMany({
-                where: { businessId, ...(locationId ? { locationId } : {}) },
-                orderBy: { createdAt: 'desc' },
-                take: 10
-            })
+            q1.execute(),
+            q2.execute()
         ]);
         const totalSales = receipts.reduce((sum, r) => sum + r.totalAmount, 0);
         const completedCount = receipts.filter(r => r.status === 'COMPLETED').length;
@@ -49,15 +45,15 @@ router.get('/sales', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { locationId } = req.query;
+        let q1 = db.selectFrom('Receipt').selectAll().where('businessId', '=', businessId).orderBy('createdAt', 'desc');
+        if (locationId)
+            q1 = q1.where('locationId', '=', locationId);
+        let q2 = db.selectFrom('MpesaTransaction').selectAll().where('businessId', '=', businessId).orderBy('timestamp', 'desc');
+        if (locationId)
+            q2 = q2.where('locationId', '=', locationId);
         const [receipts, mpesaTxns] = await Promise.all([
-            prisma.receipt.findMany({
-                where: { businessId, ...(locationId ? { locationId } : {}) },
-                orderBy: { createdAt: 'desc' }
-            }),
-            prisma.mpesaTransaction.findMany({
-                where: { businessId, ...(locationId ? { locationId } : {}) },
-                orderBy: { timestamp: 'desc' }
-            })
+            q1.execute(),
+            q2.execute()
         ]);
         res.json({ receipts, mpesaTxns });
     }
@@ -70,10 +66,10 @@ router.get('/staff', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { locationId } = req.query;
-        const staff = await prisma.user.findMany({
-            where: { businessId, ...(locationId ? { locationId } : {}) },
-            select: { id: true, email: true, name: true, role: true, createdAt: true }
-        });
+        let q = db.selectFrom('User').select(['id', 'email', 'name', 'role', 'createdAt']).where('businessId', '=', businessId);
+        if (locationId)
+            q = q.where('locationId', '=', locationId);
+        const staff = await q.execute();
         res.json({ staff });
     }
     catch (error) {
@@ -84,10 +80,7 @@ router.get('/staff', async (req, res) => {
 router.get('/suppliers', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const suppliers = await prisma.supplier.findMany({
-            where: { businessId },
-            orderBy: { createdAt: 'desc' }
-        });
+        const suppliers = await db.selectFrom('Supplier').selectAll().where('businessId', '=', businessId).orderBy('createdAt', 'desc').execute();
         res.json({ suppliers });
     }
     catch (error) {
@@ -99,16 +92,21 @@ router.get('/reports', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { locationId } = req.query;
-        // Aggregate stats example
-        const [totalReceipts, totalProducts, totalCustomers, receipts] = await Promise.all([
-            prisma.receipt.count({ where: { businessId, ...(locationId ? { locationId } : {}) } }),
-            prisma.product.count({ where: { businessId } }),
-            prisma.customer.count({ where: { businessId } }),
-            prisma.receipt.findMany({
-                where: { businessId, ...(locationId ? { locationId } : {}) },
-                select: { totalAmount: true }
-            })
+        let q1 = db.selectFrom('Receipt').select((eb) => eb.fn.count('id').as('count')).where('businessId', '=', businessId);
+        if (locationId)
+            q1 = q1.where('locationId', '=', locationId);
+        const [totalReceiptsRes, totalProductsRes, totalCustomersRes, receipts] = await Promise.all([
+            q1.executeTakeFirst(),
+            db.selectFrom('Product').select((eb) => eb.fn.count('id').as('count')).where('businessId', '=', businessId).executeTakeFirst(),
+            db.selectFrom('Customer').select((eb) => eb.fn.count('id').as('count')).where('businessId', '=', businessId).executeTakeFirst(),
+            (async () => {
+                let q4 = db.selectFrom('Receipt').select(['totalAmount']).where('businessId', '=', businessId);
+                if (locationId)
+                    q4 = q4.where('locationId', '=', locationId);
+                return await q4.execute();
+            })()
         ]);
+        const totalReceipts = Number(totalReceiptsRes?.count || 0);
         const totalRevenue = receipts.reduce((sum, r) => sum + r.totalAmount, 0);
         const stats = {
             revenue: totalRevenue,

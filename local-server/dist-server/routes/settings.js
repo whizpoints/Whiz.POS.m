@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 const router = Router();
 // const prisma = new PrismaClient();
 // Get M-Pesa config
@@ -9,9 +10,10 @@ router.get('/mpesa', async (req, res) => {
     try {
         const businessId = req.query.businessId || 'default-business-id';
         const locationId = req.query.locationId;
-        const config = await prisma.mpesaConfig.findFirst({
-            where: locationId ? { businessId, locationId } : { businessId }
-        });
+        let query = db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId);
+        if (locationId)
+            query = query.where('locationId', '=', locationId);
+        const config = await query.executeTakeFirst();
         res.json(config || null);
     }
     catch (error) {
@@ -38,23 +40,27 @@ router.post('/mpesa', async (req, res) => {
             c2bEnabled: c2bEnabled ?? true
         };
         const locationId = req.query.locationId;
-        let config = await prisma.mpesaConfig.findFirst({
-            where: locationId ? { businessId, locationId } : { businessId }
-        });
+        let query = db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId);
+        if (locationId)
+            query = query.where('locationId', '=', locationId);
+        let config = await query.executeTakeFirst();
         if (config) {
-            config = await prisma.mpesaConfig.update({
-                where: { id: config.id },
-                data: updateData
-            });
+            config = await db.updateTable('MpesaConfig')
+                .set(updateData)
+                .where('id', '=', config.id)
+                .returningAll()
+                .executeTakeFirstOrThrow();
         }
         else {
-            config = await prisma.mpesaConfig.create({
-                data: {
-                    businessId,
-                    locationId: locationId || undefined,
-                    ...updateData
-                }
-            });
+            config = await db.insertInto('MpesaConfig')
+                .values({
+                id: randomUUID(),
+                businessId,
+                locationId: locationId || null,
+                ...updateData
+            })
+                .returningAll()
+                .executeTakeFirstOrThrow();
         }
         res.json({ success: true, config });
     }

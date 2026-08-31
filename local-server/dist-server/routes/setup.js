@@ -1,9 +1,6 @@
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
 const router = Router();
-// const prisma = new PrismaClient();
 router.post('/sync', async (req, res) => {
     const { outletId, cloudToken, business, users } = req.body;
     if (!outletId || !cloudToken) {
@@ -16,44 +13,49 @@ router.post('/sync', async (req, res) => {
         // For this implementation, the frontend passes down the critical auth data 
         // it received from the cloud login to bootstrap the local DB.
         // 1. Clear local SQLite database (since it's a fresh setup)
-        await prisma.user.deleteMany();
-        await prisma.business.deleteMany();
+        await db.deleteFrom('User').execute();
+        await db.deleteFrom('Business').execute();
         // 2. Seed Local SQLite Database
-        const localBusiness = await prisma.business.create({
-            data: {
-                id: business?.id || 'local_bus_1',
-                name: business?.name || 'Local Outlet',
-                email: business?.email || 'admin@whizpoint.com',
-                setupComplete: true,
-            }
-        });
+        const businessData = {
+            id: business?.id || 'local_bus_1',
+            name: business?.name || 'Local Outlet',
+            email: business?.email || 'admin@whizpoint.com',
+            setupComplete: 1, // boolean becomes 1 in sqlite/kysely without transformer
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        const localBusiness = await db.insertInto('Business')
+            .values(businessData)
+            .returningAll()
+            .executeTakeFirstOrThrow();
         if (users && Array.isArray(users)) {
             for (const u of users) {
-                await prisma.user.create({
-                    data: {
-                        id: u.id,
-                        email: u.email,
-                        name: u.name,
-                        password: u.password,
-                        pin: u.password && u.password.length === 4 && /^\d+$/.test(u.password) ? u.password : null,
-                        role: u.role || 'ADMIN',
-                        businessId: localBusiness.id
-                    }
-                });
+                await db.insertInto('User').values({
+                    id: u.id,
+                    email: u.email,
+                    name: u.name,
+                    password: u.password,
+                    pin: u.password && u.password.length === 4 && /^\d+$/.test(u.password) ? u.password : null,
+                    role: u.role || 'ADMIN',
+                    businessId: localBusiness.id,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                }).execute();
             }
         }
         else {
             // Fallback admin if no users provided in payload
-            await prisma.user.create({
-                data: {
-                    email: 'admin@whizpoint.com',
-                    name: 'Local Admin',
-                    password: 'hashed_password_placeholder', // Usually synced from cloud
-                    pin: '1234', // Default PIN if none provided
-                    role: 'ADMIN',
-                    businessId: localBusiness.id
-                }
-            });
+            await db.insertInto('User').values({
+                id: 'local_admin_1', // must provide id if schema doesn't autogenerate string uuid natively
+                email: 'admin@whizpoint.com',
+                name: 'Local Admin',
+                password: 'hashed_password_placeholder', // Usually synced from cloud
+                pin: '1234', // Default PIN if none provided
+                role: 'ADMIN',
+                businessId: localBusiness.id,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            }).execute();
         }
         // Mark as complete locally
         console.log(`[Setup] Successfully downloaded and restored backup for Outlet ${outletId}`);

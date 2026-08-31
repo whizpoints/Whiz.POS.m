@@ -29,7 +29,7 @@ router.post('/register', async (req, res) => {
         .executeTakeFirstOrThrow();
     } else {
       terminal = await db.insertInto('Terminal')
-        .values({ id: randomUUID(), macAddress, name, status: 'PENDING' })
+        .values({   id: randomUUID( as any), macAddress, name, status: 'PENDING' })
         .returningAll()
         .executeTakeFirstOrThrow();
     }
@@ -68,8 +68,8 @@ router.post('/:id/approve', async (req, res) => {
       .executeTakeFirst();
 
     if (!outlet) {
-      outlet = await db.insertInto('Outlet').values({
-        id: randomUUID(),
+      outlet = await db.insertInto('Outlet').values({  
+        id: randomUUID( as any),
         name: terminalRequest.name,
         businessId: business.id,
         locationId: location.id
@@ -155,5 +155,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 export default router;
+
+
 
 

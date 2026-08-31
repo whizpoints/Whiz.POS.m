@@ -2,9 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 // We use a dynamic import or require for better-sqlite3
 import { createRequire } from 'module';
@@ -79,8 +78,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
             transactions: 0,
             customers: 0
         };
-        const defaultLocation = await prisma.storeLocation.findFirst({ where: { businessId } }) ||
-            await prisma.storeLocation.create({ data: { businessId, name: 'Main Branch' } });
+        const defaultLocation = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst() || await db.insertInto('StoreLocation').values({ id: randomUUID(), businessId, name: 'Main Branch' }).returningAll().executeTakeFirstOrThrow();
         const locationId = defaultLocation.id;
         // Import Products
         const productsList = parsedData['products.json'] || [];
@@ -88,49 +86,38 @@ router.post('/import', upload.single('file'), async (req, res) => {
             if (!p.name)
                 continue;
             const sku = String(p.sku || p.barcode || p.id || p.productId);
-            const existing = await prisma.product.findFirst({ where: { businessId, sku } });
+            const existing = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).where('sku', '=', sku).executeTakeFirst();
             let productId = '';
             if (existing) {
-                await prisma.product.update({
-                    where: { id: existing.id },
-                    data: {
-                        name: String(p.name),
-                        category: p.category ? String(p.category) : null,
-                        price: Number(p.price) || 0,
-                        costPrice: Number(p.costPrice) || 0,
-                        barcode: p.barcode ? String(p.barcode) : null
-                    }
-                });
+                await db.updateTable('Product').set({
+                    name: String(p.name),
+                    category: p.category ? String(p.category) : null,
+                    price: Number(p.price) || 0,
+                    costPrice: Number(p.costPrice) || 0,
+                    barcode: p.barcode ? String(p.barcode) : null
+                }).where('id', '=', existing.id).execute();
                 productId = existing.id;
             }
             else {
-                const newP = await prisma.product.create({
-                    data: {
-                        businessId,
-                        sku,
-                        name: String(p.name),
-                        category: p.category ? String(p.category) : null,
-                        price: Number(p.price) || 0,
-                        costPrice: Number(p.costPrice) || 0,
-                        barcode: p.barcode ? String(p.barcode) : null
-                    }
-                });
+                const newP = await db.insertInto('Product').values({
+                    id: randomUUID(),
+                    businessId,
+                    sku,
+                    name: String(p.name),
+                    category: p.category ? String(p.category) : null,
+                    price: Number(p.price) || 0,
+                    costPrice: Number(p.costPrice) || 0,
+                    barcode: p.barcode ? String(p.barcode) : null
+                }).returningAll().executeTakeFirstOrThrow();
                 productId = newP.id;
             }
             // Inventory
-            const existingInv = await prisma.productInventory.findFirst({
-                where: { productId, locationId }
-            });
+            const existingInv = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', productId).where('locationId', '=', locationId).executeTakeFirst();
             if (existingInv) {
-                await prisma.productInventory.update({
-                    where: { id: existingInv.id },
-                    data: { stock: Math.max(existingInv.stock, Number(p.stock) || 0) } // keep highest stock to avoid overwriting newer sales
-                });
+                await db.updateTable('ProductInventory').set({ stock: Math.max(existingInv.stock, Number(p.stock) || 0) }).where('id', '=', existingInv.id).execute();
             }
             else {
-                await prisma.productInventory.create({
-                    data: { productId, locationId, stock: Number(p.stock) || 0 }
-                });
+                await db.insertInto('ProductInventory').values({ id: randomUUID(), productId, locationId, stock: Number(p.stock) || 0 }).execute();
             }
             stats.products++;
         }
@@ -145,23 +132,26 @@ router.post('/import', upload.single('file'), async (req, res) => {
                 role = 'ADMIN';
             else if (u.role === 'STORE_MANAGER' || u.role === 'Manager')
                 role = 'MANAGER';
-            await prisma.user.upsert({
-                where: { email: fallbackEmail },
-                create: {
-                    businessId,
-                    locationId,
-                    email: fallbackEmail,
-                    password: u.pin || u.password || 'pos1234', // keep legacy PIN if they had it
-                    pin: u.pin || null,
-                    name: u.name,
-                    role: role
-                },
-                update: {
+            let existingUser = await db.selectFrom('User').selectAll().where('email', '=', fallbackEmail).executeTakeFirst();
+            if (existingUser) {
+                await db.updateTable('User').set({
                     name: u.name,
                     role: role,
                     locationId
-                }
-            });
+                }).where('email', '=', fallbackEmail).execute();
+            }
+            else {
+                await db.insertInto('User').values({
+                    id: randomUUID(),
+                    businessId,
+                    locationId,
+                    email: fallbackEmail,
+                    password: u.pin || u.password || 'pos1234',
+                    pin: u.pin || null,
+                    name: u.name,
+                    role: role
+                }).execute();
+            }
             stats.users++;
         }
         // Import Transactions (Receipts)
@@ -170,20 +160,19 @@ router.post('/import', upload.single('file'), async (req, res) => {
             const rawStatus = (t.status || '').toUpperCase();
             if (rawStatus === 'CANCELLED')
                 continue;
-            const existing = await prisma.receipt.findFirst({ where: { businessId, receiptNumber: String(t.id) } });
+            const existing = await db.selectFrom('Receipt').selectAll().where('businessId', '=', businessId).where('receiptNumber', '=', String(t.id)).executeTakeFirst();
             if (!existing) {
-                await prisma.receipt.create({
-                    data: {
-                        businessId,
-                        locationId,
-                        receiptNumber: String(t.id),
-                        totalAmount: Number(t.totalAmount || t.total) || 0,
-                        paymentMethod: String(t.paymentMethod || 'CASH'),
-                        customerPhone: t.customerPhone ? String(t.customerPhone) : null,
-                        status: 'COMPLETED',
-                        createdAt: t.timestamp ? new Date(t.timestamp) : undefined
-                    }
-                });
+                await db.insertInto('Receipt').values({
+                    id: randomUUID(),
+                    businessId,
+                    locationId,
+                    receiptNumber: String(t.id),
+                    totalAmount: Number(t.totalAmount || t.total) || 0,
+                    paymentMethod: String(t.paymentMethod || 'CASH'),
+                    customerPhone: t.customerPhone ? String(t.customerPhone) : null,
+                    status: 'COMPLETED',
+                    createdAt: t.timestamp ? new Date(t.timestamp).toISOString() : undefined
+                }).execute();
                 stats.transactions++;
             }
         }

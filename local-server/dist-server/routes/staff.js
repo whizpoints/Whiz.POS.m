@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import prisma from '../prisma.js';
+import { randomUUID } from 'crypto';
+import db from '../db.js';
 import jwt from 'jsonwebtoken';
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
@@ -23,13 +24,18 @@ router.use(authenticate);
 router.get('/', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const staff = await prisma.user.findMany({
-            where: { businessId },
-            include: { outlet: true }
-        }).catch(() => []);
-        const safeStaff = staff.map((s) => {
+        const staffRows = await db.selectFrom('User')
+            .selectAll()
+            .where('businessId', '=', businessId)
+            .execute().catch(() => []);
+        // Simulate include: { outlet: true }
+        const outlets = await db.selectFrom('Outlet').selectAll().execute().catch(() => []);
+        const safeStaff = staffRows.map((s) => {
             const { password, ...rest } = s;
-            return rest;
+            return {
+                ...rest,
+                outlet: outlets.find((o) => o.id === s.outletId) || null
+            };
         });
         res.json(safeStaff);
     }
@@ -53,13 +59,13 @@ router.post('/', async (req, res) => {
         const hasValidPin = !!trimmedPin;
         // Check PIN uniqueness if provided
         if (hasValidPin) {
-            const existingPin = await prisma.user.findFirst({ where: { pin: trimmedPin, businessId } });
+            const existingPin = await db.selectFrom('User').selectAll().where('pin', '=', trimmedPin).where('businessId', '=', businessId).executeTakeFirst();
             if (existingPin)
                 return res.status(400).json({ error: 'PIN is already in use by another user' });
         }
         // Check email uniqueness if provided
         if (hasValidEmail) {
-            const existingEmail = await prisma.user.findFirst({ where: { email: trimmedEmail, businessId } });
+            const existingEmail = await db.selectFrom('User').selectAll().where('email', '=', trimmedEmail).where('businessId', '=', businessId).executeTakeFirst();
             if (existingEmail)
                 return res.status(400).json({ error: 'Email is already in use' });
         }
@@ -74,24 +80,26 @@ router.post('/', async (req, res) => {
         const dummyEmail = `cashier_${Date.now()}@whizpos.local`;
         const finalEmail = hasValidEmail ? trimmedEmail : dummyEmail;
         const hashedPassword = password ? await bcrypt.hash(password, 10) : await bcrypt.hash('123456', 10);
-        const user = await prisma.user.create({
-            data: {
-                businessId,
-                name: trimmedName,
-                email: finalEmail,
-                password: hashedPassword,
-                pin: hasValidPin ? trimmedPin : null,
-                role: upperRole,
-                outletId: outletId || null,
-                locationId: locationId || null
-            }
-        });
+        const user = await db.insertInto('User')
+            .values({
+            id: randomUUID(),
+            businessId,
+            name: trimmedName,
+            email: finalEmail,
+            password: hashedPassword,
+            pin: hasValidPin ? trimmedPin : null,
+            role: upperRole,
+            outletId: outletId || null,
+            locationId: locationId || null
+        })
+            .returningAll()
+            .executeTakeFirstOrThrow();
         const { password: _, ...safeUser } = user;
         res.json(safeUser);
     }
     catch (error) {
         console.error('Staff POST error:', error?.message || error);
-        if (error?.code === 'P2002') {
+        if (error?.code === 'P2002' || error?.message?.includes('UNIQUE')) {
             const target = error?.meta?.target?.join(', ') || 'field';
             return res.status(400).json({ error: `Duplicate value for ${target}` });
         }
@@ -110,21 +118,27 @@ router.put('/:id', async (req, res) => {
         const hasValidEmail = !!trimmedEmail;
         const hasValidPin = !!trimmedPin;
         // First verify the user belongs to this business
-        const existingUser = await prisma.user.findUnique({ where: { id } });
+        const existingUser = await db.selectFrom('User').selectAll().where('id', '=', id).executeTakeFirst();
         if (!existingUser || existingUser.businessId !== businessId) {
             return res.status(404).json({ error: 'Staff not found' });
         }
         if (hasValidPin) {
-            const dupePin = await prisma.user.findFirst({
-                where: { pin: trimmedPin, businessId, NOT: { id } }
-            });
+            const dupePin = await db.selectFrom('User')
+                .selectAll()
+                .where('pin', '=', trimmedPin)
+                .where('businessId', '=', businessId)
+                .where('id', '!=', id)
+                .executeTakeFirst();
             if (dupePin)
                 return res.status(400).json({ error: 'PIN is already in use' });
         }
         if (hasValidEmail) {
-            const dupeEmail = await prisma.user.findFirst({
-                where: { email: trimmedEmail, businessId, NOT: { id } }
-            });
+            const dupeEmail = await db.selectFrom('User')
+                .selectAll()
+                .where('email', '=', trimmedEmail)
+                .where('businessId', '=', businessId)
+                .where('id', '!=', id)
+                .executeTakeFirst();
             if (dupeEmail)
                 return res.status(400).json({ error: 'Email is already in use' });
         }
@@ -143,16 +157,17 @@ router.put('/:id', async (req, res) => {
         if (password && String(password).length >= 4) {
             updateData.password = await bcrypt.hash(password, 10);
         }
-        const user = await prisma.user.update({
-            where: { id },
-            data: updateData
-        });
+        const user = await db.updateTable('User')
+            .set(updateData)
+            .where('id', '=', id)
+            .returningAll()
+            .executeTakeFirstOrThrow();
         const { password: _, ...safeUser } = user;
         res.json(safeUser);
     }
     catch (error) {
         console.error('Staff PUT error:', error?.message || error);
-        if (error?.code === 'P2002') {
+        if (error?.code === 'P2002' || error?.message?.includes('UNIQUE')) {
             const target = error?.meta?.target?.join(', ') || 'field';
             return res.status(400).json({ error: `Duplicate value for ${target}` });
         }
@@ -164,9 +179,10 @@ router.delete('/:id', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { id } = req.params;
-        await prisma.user.deleteMany({
-            where: { id, businessId }
-        });
+        await db.deleteFrom('User')
+            .where('id', '=', id)
+            .where('businessId', '=', businessId)
+            .execute();
         res.json({ success: true });
     }
     catch (error) {
