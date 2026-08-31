@@ -1,8 +1,7 @@
 // @ts-nocheck
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import * as xlsx from 'xlsx';

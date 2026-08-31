@@ -1,12 +1,9 @@
 import express from 'express';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
 
 const router = express.Router();
-// const prisma = new PrismaClient();
 
 // Configure multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });
@@ -78,15 +75,14 @@ router.post('/mpesa', upload.single('file'), async (req, res) => {
 
     // Fetch Offline POS Transactions for this business
     // Offline transactions are identified by mpesaCode starting with '***'
-    const posTransactions = await prisma.receipt.findMany({
-      where: {
-        businessId,
-        paymentMethod: 'mpesa',
-        mpesaCode: { startsWith: '***' },
-        status: { not: 'REFUNDED' } // We only reconcile pending/completed
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    const posTransactions = await db.selectFrom('Receipt')
+      .selectAll()
+      .where('businessId', '=', businessId)
+      .where('paymentMethod', '=', 'mpesa')
+      .where('mpesaCode', 'like', '***%')
+      .where('status', '!=', 'REFUNDED') // We only reconcile pending/completed
+      .orderBy('createdAt', 'desc')
+      .execute();
 
     const matched = [];
     const unmatchedPos = [...posTransactions];
@@ -140,4 +136,3 @@ router.post('/mpesa', upload.single('file'), async (req, res) => {
 });
 
 export default router;
-

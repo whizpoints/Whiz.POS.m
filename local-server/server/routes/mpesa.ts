@@ -1,14 +1,11 @@
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 import { MpesaCallbackUrlService } from '../services/mpesaUrls.js';
 import { generateSecurityCredential } from '../utils/crypto.js';
 
 const router = Router();
-// const prisma = new PrismaClient();
-
-// Helper to get OAuth Token
+// // Helper to get OAuth Token
 async function getOAuthToken(consumerKey: string, consumerSecret: string, environment: string) {
   const url = environment === 'production' 
     ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
@@ -87,10 +84,10 @@ router.post('/stkpush', async (req: any, res: any) => {
 
     let config = null;
     if (locationId) {
-      config = await prisma.mpesaConfig.findFirst({ where: { businessId, locationId } });
+      config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).where('locationId', '=', locationId).executeTakeFirst();
     }
     if (!config) {
-      config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+      config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
     }
     if (!config) {
       console.error(`[Backend STK Push] Error: M-Pesa not configured for business ${businessId}`);
@@ -156,7 +153,7 @@ router.post('/stkpush', async (req: any, res: any) => {
 router.post('/c2b/v1/registerurl', async (req: any, res: any) => {
   try {
     const { businessId } = req.body;
-    const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+    const config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
     if (!config) return res.status(400).json({ error: 'Config not found' });
 
     const token = await getOAuthToken(config.consumerKey, config.consumerSecret, config.environment);
@@ -203,19 +200,20 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
       const phone = items.find((i: any) => i.Name === 'PhoneNumber')?.Value;
       
       // Verify business config exists
-      const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+      const config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
       if (config) {
-        await prisma.mpesaTransaction.upsert({
-          where: { transactionId: receipt },
-          create: {
+        const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', receipt || TransID || 'unknown').executeTakeFirst();
+        if (!existingTx) {
+          await db.insertInto('MpesaTransaction').values({
+            id: randomUUID(),
             businessId,
-            transactionId: receipt,
-            amount: parseFloat(amount),
-            phoneNumber: phone.toString(),
-            status: 'UNLINKED'
-          },
-          update: {}
-        });
+            transactionId: typeof receipt !== 'undefined' ? receipt : (typeof TransID !== 'undefined' ? TransID : 'unknown'),
+            amount: parseFloat(typeof amount !== 'undefined' ? amount : (typeof TransAmount !== 'undefined' ? TransAmount : '0')),
+            phoneNumber: typeof phone !== 'undefined' ? phone.toString() : (typeof MSISDN !== 'undefined' ? MSISDN.toString() : ''),
+            status: 'UNLINKED',
+            customerName: typeof customerName !== 'undefined' ? customerName : null
+          }).execute();
+        }
 
         // Fetch Customer Name using Transaction Status API
         if (config.initiatorName && config.initiatorPassword) {
@@ -238,7 +236,7 @@ router.post('/callback/c2b/validation/:businessId', async (req: any, res: any) =
     const { businessId } = req.params;
     const { BusinessShortCode } = req.body;
     
-    const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+    const config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
     if (!config || config.shortcode !== BusinessShortCode) {
       return res.json({ "ResultCode": 1, "ResultDesc": "Rejected: Invalid ShortCode mapping" });
     }
@@ -257,7 +255,7 @@ router.post('/callback/c2b/confirmation/:businessId', async (req: any, res: any)
       TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode
     } = req.body;
     
-    const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+    const config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
     if (!config || config.shortcode !== BusinessShortCode) {
       // Reject spoofed callbacks
       return res.json({ "ResultCode": 1, "ResultDesc": "Rejected" });
@@ -265,18 +263,18 @@ router.post('/callback/c2b/confirmation/:businessId', async (req: any, res: any)
 
     const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ');
     
-    await prisma.mpesaTransaction.upsert({
-      where: { transactionId: TransID },
-      create: {
-        businessId,
-        transactionId: TransID,
-        amount: parseFloat(TransAmount),
-        phoneNumber: MSISDN,
-        customerName,
-        status: 'UNLINKED'
-      },
-      update: {}
-    });
+    const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', receipt || TransID || 'unknown').executeTakeFirst();
+        if (!existingTx) {
+          await db.insertInto('MpesaTransaction').values({
+            id: randomUUID(),
+            businessId,
+            transactionId: typeof receipt !== 'undefined' ? receipt : (typeof TransID !== 'undefined' ? TransID : 'unknown'),
+            amount: parseFloat(typeof amount !== 'undefined' ? amount : (typeof TransAmount !== 'undefined' ? TransAmount : '0')),
+            phoneNumber: typeof phone !== 'undefined' ? phone.toString() : (typeof MSISDN !== 'undefined' ? MSISDN.toString() : ''),
+            status: 'UNLINKED',
+            customerName: typeof customerName !== 'undefined' ? customerName : null
+          }).execute();
+        }
 
     // Trigger Transaction Status Background Job
     if (config.initiatorName && config.initiatorPassword) {
@@ -315,10 +313,7 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
           }
           formattedPhone = formattedPhone.replace(/\s+/g, ' ').trim(); // ensure single spaces
           
-          await prisma.mpesaTransaction.updateMany({
-            where: { transactionId: receiptNumber, businessId },
-            data: { customerName, phoneNumber: formattedPhone, isEnriched: true }
-          });
+          await db.updateTable('MpesaTransaction').set({ customerName, phoneNumber: formattedPhone, isEnriched: true }).where('transactionId', '=', receiptNumber).where('businessId', '=', businessId).execute();
           
           console.log(`[Transaction Status] Enriched ${receiptNumber}: Name=${customerName}, Phone=${formattedPhone}`);
         }
@@ -338,22 +333,22 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
       
       if (!businessId) return res.status(400).json({ error: 'Missing businessId' });
       
-      const txns = await prisma.mpesaTransaction.findMany({
-        where: { 
-          businessId,
-          status: 'UNLINKED',
-          isEnriched: true,
-          ...(q ? {
-            OR: [
-              { transactionId: { contains: q } },
-              { customerName: { contains: q } },
-              { phoneNumber: { contains: q } }
-            ]
-          } : {})
-        },
-        orderBy: { timestamp: 'desc' },
-        take: 20
-      });
+      let query = db.selectFrom('MpesaTransaction')
+        .selectAll()
+        .where('businessId', '=', businessId)
+        .where('status', '=', 'UNLINKED')
+        .where('isEnriched', '=', true)
+        .orderBy('timestamp', 'desc')
+        .limit(20);
+      
+      if (q) {
+        query = query.where((eb) => eb.or([
+          eb('transactionId', 'like', \`%\${q}%\`),
+          eb('customerName', 'like', \`%\${q}%\`),
+          eb('phoneNumber', 'like', \`%\${q}%\`)
+        ]));
+      }
+      const txns = await query.execute();
       res.json(txns);
     } catch (err) {
       res.status(500).json({ error: 'Internal server error' });
@@ -368,10 +363,10 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
       
       let config = null;
       if (locationId) {
-        config = await prisma.mpesaConfig.findFirst({ where: { businessId, locationId } });
+        config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).where('locationId', '=', locationId).executeTakeFirst();
       }
       if (!config) {
-        config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+        config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
       }
       if (!config || !config.consumerKey || !config.consumerSecret || !config.shortcode) {
         return res.status(400).json({ error: 'M-Pesa configuration incomplete' });
@@ -419,12 +414,9 @@ router.post('/payments/consume', async (req: any, res: any) => {
     const { transactionId, businessId } = req.body;
     if (!transactionId || !businessId) return res.status(400).json({ error: 'Missing parameters' });
     
-    const result = await prisma.mpesaTransaction.updateMany({
-      where: { transactionId, businessId, status: 'UNLINKED' },
-      data: { status: 'LINKED' }
-    });
+    const result = await db.updateTable('MpesaTransaction').set({ status: 'LINKED' }).where('transactionId', '=', transactionId).where('businessId', '=', businessId).where('status', '=', 'UNLINKED').execute();
 
-    if (result.count === 0) {
+    if (result.length === 0 || Number(result[0].numUpdatedRows) === 0) {
       return res.status(409).json({ error: 'Transaction already claimed or not found.' });
     }
     res.json({ success: true });

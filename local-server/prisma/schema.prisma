@@ -1,7 +1,7 @@
-generator client {
-  provider      = "prisma-client-js"
-  output        = "../dist-server/prisma-client"
-  binaryTargets = ["native", "windows"]
+generator kysely {
+  provider = "prisma-kysely"
+  output   = "../server/generated"
+  fileName = "types.ts"
 }
 
 datasource db {
