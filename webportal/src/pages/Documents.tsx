@@ -132,7 +132,7 @@ export default function InvoiceGenerator() {
     } else if (!documentSettings && !currentDocId) {
       setNotes("This is a computer generated document and doesn't need a stamp or signature for receiving.");
     }
-  }, [documentSettings, currentDocId, docType]);
+  }, [documentSettings, currentDocId, docType, businessSetup]);
 
   // Fetch saved clients and documents on load
   useEffect(() => {
@@ -143,9 +143,10 @@ export default function InvoiceGenerator() {
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
         const headers = { 'Authorization': `Bearer ${token}` };
         
-        const [clientsRes, docsRes] = await Promise.all([
+        const [clientsRes, docsRes, profileRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/clients`, { headers }),
-          fetch(`${API_BASE_URL}/api/saved-documents`, { headers })
+          fetch(`${API_BASE_URL}/api/saved-documents`, { headers }),
+          fetch(`${API_BASE_URL}/api/business/profile`, { headers })
         ]);
         if (clientsRes.ok) {
            const clients = await clientsRes.json();
@@ -171,6 +172,16 @@ export default function InvoiceGenerator() {
                clientAddress: d.customerAddress,
              }
            })) });
+        }
+        if (profileRes.ok) {
+           const profile = await profileRes.json();
+           try {
+             if (typeof profile.settings === 'string') profile.settings = JSON.parse(profile.settings);
+           } catch(e) {}
+           usePosStore.setState({ businessSetup: profile });
+           if (profile.settings?.documentDefaults) {
+             usePosStore.setState({ documentSettings: profile.settings.documentDefaults });
+           }
         }
       } catch (err) {}
     };
@@ -982,6 +993,7 @@ export default function InvoiceGenerator() {
     </div>
   );
 }
+
 
 
 
