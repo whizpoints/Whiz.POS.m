@@ -40,7 +40,7 @@ const DOCUMENT_TYPES: { id: DocumentType; label: string; icon: any; category: 't
   { id: 'LEGAL_NOTICE', label: 'Legal Notice', icon: Scale, category: 'letter' },
 ];
 
-import { Search } from 'lucide-react';
+
 import toast from 'react-hot-toast';
 
 export default function InvoiceGenerator() {
@@ -57,7 +57,6 @@ export default function InvoiceGenerator() {
   const [showTransactionSearch, setShowTransactionSearch] = useState(false);
   
   // Settings & Modal State
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showClientModal, setShowClientModal] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [showSavedDocs, setShowSavedDocs] = useState(false);
@@ -973,6 +972,9 @@ export default function InvoiceGenerator() {
     </div>
   );
 }
+
+
+
 
 
 

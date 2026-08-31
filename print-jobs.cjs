@@ -46,7 +46,7 @@ async function generateReceipt(transaction, businessSetup, isReprint = false) {
     // Dynamic replacement removed.
 
     template = template.replace('{{businessName}}', businessSetup?.businessName || 'WHIZ POS');
-    template = template.replace('{{location}}', 'Kagwe Town | ' + (businessSetup?.phone || ''));
+    template = template.replace('{{location}}', businessSetup?.phone || '');
     template = template.replace('{{address}}', businessSetup?.address || '');
     template = template.replace('{{phone}}', '');
     template = template.replace('{{receiptId}}', transaction.id + (isReprint ? ' (REPRINT)' : ''));

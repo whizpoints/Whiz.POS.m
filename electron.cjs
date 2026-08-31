@@ -252,8 +252,8 @@ function createWindow() {
     // Open the DevTools.
     mainWindow.webContents.openDevTools();
   } else {
-    // In production, load the static build
-    mainWindow.loadURL('file://' + path.join(__dirname, 'dist/index.html'));
+    // In production, load the static build using loadFile to avoid Windows file:// protocol issues
+    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
   }
 }
 
