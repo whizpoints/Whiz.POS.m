@@ -3,8 +3,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { X, Download, Printer, ZoomIn, ZoomOut } from 'lucide-react';
 import { DocumentPreview } from './DocumentPreview';
 import type { DocumentType } from './DocumentPreview';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { usePosStore } from '../../store/posStore';
 import toast from 'react-hot-toast';
 
@@ -50,6 +48,10 @@ export function DocumentModal({ isOpen, onClose, type, data, branding, signatory
             ${styles}
             <style>
               @page { margin: 0; }
+              * {
+                 font-family: Arial, Helvetica, sans-serif !important;
+                 letter-spacing: normal !important;
+              }
               body { margin: 0; padding: 0; background-color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; display: flex; justify-content: center; align-items: flex-start; }
               .preview-container-wrapper { width: 100%; height: 100%; display: flex; justify-content: center; }
             </style>
@@ -63,16 +65,46 @@ export function DocumentModal({ isOpen, onClose, type, data, branding, signatory
       `;
 
       // @ts-ignore
-      const response = await window.electron.generatePdf({
-        htmlContent,
-        paperSize,
-        defaultFileName: `${type.toLowerCase()}-${data?.docNumber || 'document'}.pdf`,
-        author: businessSetup?.businessName || 'Whizpoint Solutions',
-        applicationName: 'Whizpoint Solutions'
-      });
+      if (typeof window !== 'undefined' && (window as any).electron?.generatePdf) {
+        // @ts-ignore
+        const response = await (window as any).electron.generatePdf({
+          htmlContent,
+          paperSize,
+          defaultFileName: `${type.toLowerCase()}-${data?.docNumber || 'document'}.pdf`,
+          author: branding?.businessName || 'Your Business',
+          applicationName: branding?.businessName || 'Your Business'
+        });
 
-      if (!response.success && !response.canceled) {
-         throw new Error(response.error || 'Unknown error');
+        if (!response.success && !response.canceled) {
+           throw new Error(response.error || 'Unknown error');
+        }
+      } else {
+        // Web fallback
+        const { toPng } = await import('html-to-image');
+        const { jsPDF } = await import('jspdf');
+        
+        const toastId = toast.loading("Generating PDF...");
+        try {
+          if (!previewRef.current) throw new Error("Preview not found");
+          
+          const imgData = await toPng(previewRef.current, { quality: 1.0, pixelRatio: 2 });
+          const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: paperSize
+          });
+          
+          const rect = previewRef.current.getBoundingClientRect();
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = (rect.height * pdfWidth) / rect.width;
+          
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          pdf.save(`${type.toLowerCase()}-${data?.docNumber || 'document'}.pdf`);
+          toast.success("PDF Downloaded!", { id: toastId });
+        } catch (err) {
+          toast.error("Failed to generate PDF.", { id: toastId });
+          throw err;
+        }
       }
     } catch (error) {
       console.error("PDF Gen Error", error);

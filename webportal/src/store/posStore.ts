@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export interface SavedDocument {
   id: string;
@@ -26,8 +27,10 @@ const businessStr = localStorage.getItem('whiz-business') || '{}';
 let business = null;
 try { business = JSON.parse(businessStr); } catch (e) {}
 
-export const usePosStore = create((set, get) => ({
-  businessSetup: business,
+export const usePosStore = create(
+  persist(
+    (set, get: any) => ({
+      businessSetup: business,
   transactions: [],
   currentCashier: user,
   documentSettings: {
@@ -53,4 +56,9 @@ export const usePosStore = create((set, get) => ({
     const state: any = get();
     set({ documents: state.documents.filter((d: any) => d.id !== id) });
   }
-}));
+    }),
+    {
+      name: 'pos-store',
+    }
+  )
+);

@@ -1,6 +1,8 @@
 import { Router } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
@@ -18,7 +20,7 @@ const transporter = nodemailer.createTransport({
 // Admin / Business Registration
 router.post('/register', async (req, res) => {
     try {
-        const { businessName, email, password, kraPin, businessInfo, address, phone, apiKey, servedBy, receiptFooter, printerType, mpesaPaybill, mpesaTill, mpesaAccount } = req.body;
+        const { businessName, email, password, kraPin, businessInfo, address, phone, apiKey, servedBy, receiptFooter, cloudBusinessId, cloudLocationId, printerType, mpesaPaybill, mpesaTill, mpesaAccount } = req.body;
         const existingBusiness = await prisma.business.findUnique({ where: { email } });
         if (existingBusiness) {
             return res.status(400).json({ error: 'Business email already registered' });
@@ -33,10 +35,12 @@ router.post('/register', async (req, res) => {
             printerType: printerType || 'thermal',
             mpesaPaybill: mpesaPaybill || '',
             mpesaTill: mpesaTill || '',
-            mpesaAccount: mpesaAccount || ''
+            mpesaAccount: mpesaAccount || '',
+            locationId: cloudLocationId
         });
         const business = await prisma.business.create({
             data: {
+                id: cloudBusinessId || undefined,
                 name: businessName,
                 email,
                 kraPin: kraPin || null,

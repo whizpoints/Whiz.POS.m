@@ -2,7 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 import jwt from 'jsonwebtoken';
 // We use a dynamic import or require for better-sqlite3

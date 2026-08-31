@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { Router } from 'express';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 import jwt from 'jsonwebtoken';
 const router = Router();
@@ -26,7 +28,8 @@ router.get('/receipt/:id', authenticate, async (req, res) => {
             where: { id: req.params.id, businessId: req.businessId },
             include: {
                 items: true,
-                business: true
+                business: true,
+                outlet: { include: { location: true } }
             }
         });
         if (!receipt)
@@ -53,52 +56,70 @@ router.get('/receipt/:id', authenticate, async (req, res) => {
           .right { text-align: right; }
           @media print {
             body { width: 100%; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
           }
+          .print-button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: center;
+          }
+          .print-button:hover { background: #1d4ed8; }
         </style>
       </head>
-      <body onload="window.print()">
+      <body>
+        <button class="no-print print-button" onclick="window.print()">Print Receipt</button>
         <div class="center">
           <h2 class="bold" style="margin:0">${business.name}</h2>
           ${settings.businessInfo ? `<div>${settings.businessInfo}</div>` : ''}
           ${settings.phone ? `<div>Tel: ${settings.phone}</div>` : ''}
           ${business.kraPin ? `<div>PIN: ${business.kraPin}</div>` : ''}
+          ${receipt.outlet ? `<div>Outlet: ${receipt.outlet.name}</div>` : ''}
+          ${receipt.outlet && receipt.outlet.location ? `<div>Location: ${receipt.outlet.location.name}${receipt.outlet.location.address ? ', ' + receipt.outlet.location.address : ''}</div>` : ''}
         </div>
         
         <div class="divider"></div>
         
         <div class="flex">
           <div>Receipt: ${receipt.receiptNumber}</div>
-          <div>${new Date(receipt.createdAt).toLocaleDateString()}</div>
+          <div>Date: ${new Date(receipt.createdAt).toLocaleDateString()}</div>
         </div>
         <div class="flex">
-          <div>${settings.servedBy || 'Cashier'}: ${receipt.cashierId}</div>
+          <div>Served By: ${receipt.cashierName || settings.servedBy || 'Cashier'}</div>
           <div>Time: ${new Date(receipt.createdAt).toLocaleTimeString()}</div>
         </div>
         
         <div class="divider"></div>
         
-        <table>
+        <table class="items-table">
           <thead>
             <tr>
-              <th>Item</th>
+              <th style="text-align:left">Item</th>
               <th class="right">Qty</th>
               <th class="right">Total</th>
             </tr>
           </thead>
           <tbody>
-            ${receipt.items.map(item => `
-              <tr>
-                <td>${item.productName}</td>
-                <td class="right">${item.quantity}</td>
-                <td class="right">${item.totalPrice}</td>
-              </tr>
-            `).join('')}
+            ${(receipt.items || []).map((item) => `
+                <tr>
+                  <td>${item.productName}</td>
+                  <td class="right">${item.quantity}</td>
+                  <td class="right">${item.totalPrice}</td>
+                </tr>
+              `).join('')}
           </tbody>
         </table>
         
         <div class="divider"></div>
         
-        <div class="flex bold">
+        <div class="flex" style="font-weight:bold">
           <div>TOTAL</div>
           <div>${receipt.totalAmount}</div>
         </div>
@@ -109,8 +130,11 @@ router.get('/receipt/:id', authenticate, async (req, res) => {
         
         <div class="divider"></div>
         
-        <div class="center">
-          <div>${settings.receiptFooter || 'Thank you for your business!'}</div>
+        <div class="center" style="margin-top:20px; font-style:italic">
+          ${settings.footerMessage || 'Thank you for your business!'}
+        </div>
+        <div class="center no-print" style="margin-top:10px; font-size: 0.8em; color: #888;">
+          Powered by WhizPOS
         </div>
       </body>
       </html>
@@ -118,6 +142,7 @@ router.get('/receipt/:id', authenticate, async (req, res) => {
         res.send(html);
     }
     catch (error) {
+        console.error('Receipt generation error:', error);
         res.status(500).send('Error generating receipt');
     }
 });
@@ -126,7 +151,11 @@ router.get('/invoice/:id', authenticate, async (req, res) => {
     try {
         const receipt = await prisma.receipt.findUnique({
             where: { id: req.params.id, businessId: req.businessId },
-            include: { items: true, business: true }
+            include: {
+                items: true,
+                business: true,
+                outlet: { include: { location: true } }
+            }
         });
         if (!receipt)
             return res.status(404).send('Receipt not found');
@@ -152,20 +181,44 @@ router.get('/invoice/:id', authenticate, async (req, res) => {
           .right { text-align: right; }
           .total-row { font-weight: bold; font-size: 1.2em; }
           .footer { text-align: center; margin-top: 50px; color: #64748b; font-size: 0.9em; border-top: 1px solid #eee; padding-top: 20px; }
+          .header-detail { font-size: 0.9em; color: #64748b; margin-top: 2px; }
+          @media print {
+            .no-print { display: none !important; }
+          }
+          .print-button {
+            display: block;
+            width: 100%;
+            max-width: 200px;
+            padding: 10px;
+            margin: 0 auto 30px auto;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: center;
+          }
+          .print-button:hover { background: #1d4ed8; }
         </style>
       </head>
-      <body onload="window.print()">
+      <body>
+        <button class="no-print print-button" onclick="window.print()">Print Invoice</button>
         <div class="header">
           <div>
             <h1 style="margin:0">${business.name}</h1>
             <div style="color: #64748b">${settings.businessInfo || ''}</div>
-            <div>${settings.phone || ''}</div>
+            <div>${settings.phone ? 'Tel: ' + settings.phone : ''}</div>
             <div>${business.kraPin ? 'KRA PIN: ' + business.kraPin : ''}</div>
+            ${receipt.outlet ? `<div>Outlet: ${receipt.outlet.name}</div>` : ''}
+            ${receipt.outlet && receipt.outlet.location ? `<div>Location: ${receipt.outlet.location.name}${receipt.outlet.location.address ? ', ' + receipt.outlet.location.address : ''}</div>` : ''}
           </div>
           <div class="right">
             <div class="title">INVOICE</div>
             <div>#${receipt.receiptNumber}</div>
-            <div>${new Date(receipt.createdAt).toLocaleDateString()}</div>
+            <div class="header-detail">Date: ${new Date(receipt.createdAt).toLocaleDateString()}</div>
+            <div class="header-detail">Time: ${new Date(receipt.createdAt).toLocaleTimeString()}</div>
+            <div class="header-detail">Served By: ${receipt.cashierName || settings.servedBy || 'Cashier'}</div>
           </div>
         </div>
         
@@ -175,40 +228,50 @@ router.get('/invoice/:id', authenticate, async (req, res) => {
             ${receipt.customerPhone ? receipt.customerPhone : 'Walk-in Customer'}
           </div>
           <div class="right">
-            <strong>Payment Method:</strong><br/>
-            ${receipt.paymentMethod}
+            <strong>Status:</strong><br/>
+            ${receipt.status}
           </div>
         </div>
         
         <table>
           <thead>
             <tr>
-              <th>Description</th>
-              <th class="right">Unit Price</th>
+              <th style="text-align:left">Item</th>
               <th class="right">Qty</th>
+              <th class="right">Price</th>
               <th class="right">Total</th>
             </tr>
           </thead>
           <tbody>
-            ${receipt.items.map(item => `
-              <tr>
-                <td>${item.productName}</td>
-                <td class="right">${(item.totalPrice / item.quantity).toFixed(2)}</td>
-                <td class="right">${item.quantity}</td>
-                <td class="right">${item.totalPrice.toFixed(2)}</td>
-              </tr>
-            `).join('')}
+            ${(receipt.items || []).map((item) => `
+                <tr>
+                  <td>${item.productName}</td>
+                  <td class="right">${item.quantity}</td>
+                  <td class="right">${item.unitPrice}</td>
+                  <td class="right">${item.totalPrice}</td>
+                </tr>
+              `).join('')}
           </tbody>
-          <tfoot>
-            <tr class="total-row">
-              <td colspan="3" class="right">Total Amount Due</td>
-              <td class="right">${receipt.totalAmount.toFixed(2)}</td>
-            </tr>
-          </tfoot>
         </table>
         
+        <div style="margin-top:20px">
+          <div class="flex" style="justify-content: flex-end; gap: 40px">
+            <div><strong>Subtotal:</strong></div>
+            <div>${receipt.totalAmount}</div>
+          </div>
+          <div class="flex" style="justify-content: flex-end; gap: 40px">
+            <div><strong>Payment Method:</strong></div>
+            <div>${receipt.paymentMethod}</div>
+          </div>
+          <div class="flex" style="justify-content: flex-end; gap: 40px; margin-top: 10px">
+            <div class="total-row">TOTAL:</div>
+            <div class="total-row">${receipt.totalAmount}</div>
+          </div>
+        </div>
+        
         <div class="footer">
-          ${settings.receiptFooter || 'Thank you for your business!'}
+          <div>${settings.footerMessage || 'Thank you for your business!'}</div>
+          <div class="no-print" style="margin-top:10px; font-size: 0.8em; color: #888;">Powered by WhizPOS</div>
         </div>
       </body>
       </html>
@@ -216,6 +279,7 @@ router.get('/invoice/:id', authenticate, async (req, res) => {
         res.send(html);
     }
     catch (error) {
+        console.error('Invoice generation error:', error);
         res.status(500).send('Error generating invoice');
     }
 });

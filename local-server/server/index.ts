@@ -74,12 +74,44 @@ app.get('/api/health', (req, res) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import fs from 'fs';
 const clientBuildPath = path.join(__dirname, '../dist');
-app.use(express.static(clientBuildPath));
 
-// Wildcard route to handle React Router client-side navigation
-app.use((req, res) => {
-  res.sendFile(path.join(clientBuildPath, 'index.html'));
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  
+  try {
+    let filePath = path.join(clientBuildPath, req.path === '/' ? 'index.html' : req.path);
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+      filePath = path.join(clientBuildPath, 'index.html');
+    }
+    
+    const ext = path.extname(filePath);
+    const mimeTypes: any = {
+      '.html': 'text/html',
+      '.js': 'text/javascript',
+      '.mjs': 'text/javascript',
+      '.css': 'text/css',
+      '.json': 'application/json',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.svg': 'image/svg+xml',
+      '.ico': 'image/x-icon',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2',
+      '.ttf': 'font/ttf',
+      '.txt': 'text/plain'
+    };
+    
+    const content = fs.readFileSync(filePath);
+    res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+    res.send(content);
+  } catch (err) {
+    console.error('Static serve error:', err);
+    res.status(500).send('Error loading frontend UI');
+  }
 });
 
 // -----------------------------------------

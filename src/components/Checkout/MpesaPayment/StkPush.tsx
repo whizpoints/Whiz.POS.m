@@ -38,10 +38,10 @@ export default function StkPush({ totalAmount }: Props) {
     setStatus('sending');
     
     try {
-      const baseUrl = (businessSetup as any)?.backOfficeUrl || (businessSetup as any)?.apiUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-      console.log(`[STK Push] Initiating push to ${baseUrl}/api/mpesa/stkpush for businessId ${activeBusinessId}`);
+      const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+      console.log(`[STK Push] Initiating push to ${cloudUrl}/api/mpesa/stkpush for businessId ${activeBusinessId}`);
 
-      const res = await fetch(`${baseUrl}/api/mpesa/stkpush`, {
+      const res = await fetch(`${cloudUrl}/api/mpesa/stkpush`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: validPhone, amount: totalAmount, businessId: activeBusinessId, locationId: (businessSetup as any)?.locationId })
@@ -96,3 +96,4 @@ export default function StkPush({ totalAmount }: Props) {
     </div>
   );
 }
+

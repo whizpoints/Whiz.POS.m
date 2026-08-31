@@ -6,7 +6,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run electron:build",
     "lint": "oxlint",
     "preview": "vite preview",
     "server": "tsx server/index.ts",
@@ -15,14 +15,22 @@
     "post-electron": "node -e \"require('fs').copyFileSync('prisma/schema.postgres.prisma', 'prisma/schema.prisma')\"",
     "wipe": "cd .. && wipe-data.bat",
     "electron:dev": "npm run pre-electron && tsc --project tsconfig.electron.json && concurrently \"vite --port 5175\" \"wait-on tcp:5175 && electron .\"",
-    "electron:build": "npm run pre-electron && vite build && tsc --project tsconfig.electron.json && tsc --project tsconfig.server.json && electron-builder"
+    "electron:build": "npm run pre-electron && vite build && tsc --project tsconfig.electron.json && tsc --project tsconfig.server.json && cross-env ELECTRON_MIRROR=\"https://npmmirror.com/mirrors/electron/\" ELECTRON_BUILDER_BINARIES_MIRROR=\"https://npmmirror.com/mirrors/electron-builder-binaries/\" electron-builder"
   },
   "build": {
     "appId": "com.whizpos.admin",
-    "productName": "WhizPOS Admin Server",
+    "productName": "WhizPOS Server",
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "dist-server/**/*",
+      "assets/**/*",
+      "node_modules/.prisma/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/@prisma/client/**/*",
+      "node_modules/.prisma/**/*",
+      "node_modules/prisma/**/*",
       "dist-server/**/*"
     ],
     "extraResources": [
@@ -33,12 +41,35 @@
     ],
     "directories": {
       "buildResources": "assets"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WhizPOS Server",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeader": "assets/installerHeader.bmp",
+      "installerSidebar": "assets/installerSidebar.bmp",
+      "uninstallerSidebar": "assets/installerSidebar.bmp",
+      "include": "assets/installer.nsh",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "${productName} Setup ${version}.${ext}"
     }
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1105.0",
     "@prisma/client": "^5.22.0",
-    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "bonjour-service": "^1.4.4",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
@@ -47,6 +78,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "jszip": "^3.10.0",
+    "kysely": "^0.29.5",
     "lucide-react": "^1.29.0",
     "multer": "^2.2.0",
     "nodemailer": "^9.0.5",
@@ -57,11 +89,13 @@
     "recharts": "^3.10.1",
     "sqlite3": "^6.0.1",
     "xlsx": "^0.18.5",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
@@ -73,11 +107,13 @@
     "@vitejs/plugin-react": "^6.0.4",
     "autoprefixer": "^10.5.4",
     "concurrently": "^10.0.4",
+    "cross-env": "^10.1.0",
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",
     "oxlint": "^1.75.0",
     "postcss": "^8.5.26",
     "prisma": "^5.22.0",
+    "prisma-kysely": "^3.2.1",
     "tailwindcss": "^4.3.3",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.11",

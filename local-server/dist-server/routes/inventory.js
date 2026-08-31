@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { Router } from 'express';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
@@ -177,15 +179,35 @@ router.put('/:id', async (req, res) => {
                 const existingInventory = await prisma.productInventory.findFirst({
                     where: { productId: id, locationId: targetLocationId }
                 });
+                const oldStock = existingInventory ? existingInventory.stock : 0;
+                const newStock = stock || 0;
+                const variance = newStock - oldStock;
                 if (existingInventory) {
                     await prisma.productInventory.update({
                         where: { id: existingInventory.id },
-                        data: { stock: stock || 0, reorderLevel: reorderLevel || 5 }
+                        data: { stock: newStock, reorderLevel: reorderLevel || 5 }
                     });
                 }
                 else {
                     await prisma.productInventory.create({
-                        data: { productId: id, locationId: targetLocationId, stock: stock || 0, reorderLevel: reorderLevel || 5 }
+                        data: { productId: id, locationId: targetLocationId, stock: newStock, reorderLevel: reorderLevel || 5 }
+                    });
+                }
+                if (variance !== 0) {
+                    const outletId = req.query.outletId || req.body.outletId || existingInventory?.outletId || null;
+                    await prisma.stockMovement.create({
+                        data: {
+                            id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+                            businessId,
+                            productId: id,
+                            locationId: targetLocationId,
+                            outletId: String(outletId) !== 'undefined' && outletId !== null ? String(outletId) : null,
+                            type: variance > 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+                            quantity: Math.abs(variance),
+                            reference: 'Server Manual Update',
+                            sourceTerminal: 'SERVER',
+                            timestamp: new Date()
+                        }
                     });
                 }
             }
@@ -417,14 +439,17 @@ router.post('/import/reconciliation', upload.single('file'), async (req, res) =>
                 });
             }
             try {
+                const outletId = req.query.outletId || req.body.outletId || inv?.outletId || null;
                 await prisma.stockMovement.create({
                     data: {
                         businessId,
                         productId,
                         locationId: targetLocationId,
+                        outletId: String(outletId) !== 'undefined' && outletId !== null ? String(outletId) : null,
                         type: delta > 0 ? 'in' : 'out',
                         quantity: Math.abs(delta),
-                        notes: 'Excel Bulk Reconciliation'
+                        reference: 'Excel Bulk Reconciliation',
+                        sourceTerminal: 'SERVER'
                     }
                 });
             }
@@ -464,6 +489,21 @@ router.post('/quick-add', async (req, res) => {
                 data: { productId, locationId: targetLocationId, stock: quantity, reorderLevel: 5 }
             });
         }
+        const outletId = req.query.outletId || req.body.outletId || inv?.outletId || null;
+        await prisma.stockMovement.create({
+            data: {
+                id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+                businessId,
+                productId,
+                locationId: targetLocationId,
+                outletId: String(outletId) !== 'undefined' && outletId !== null ? String(outletId) : null,
+                type: 'ADJUSTMENT_UP',
+                quantity: quantity,
+                reference: 'Quick Add from Server',
+                sourceTerminal: 'SERVER',
+                timestamp: new Date()
+            }
+        });
         res.json({ success: true, message: 'Stock added successfully' });
     }
     catch (error) {

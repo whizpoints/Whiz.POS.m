@@ -31,6 +31,10 @@ export default function Settings() {
       });
       if (res.ok) {
         const data = await res.json();
+        try {
+          if (typeof data.settings === 'string') data.settings = JSON.parse(data.settings);
+          if (typeof data.settings === 'string') data.settings = JSON.parse(data.settings);
+        } catch(e) {}
         setProfile(data);
       }
     } catch (err) {
@@ -999,3 +1003,4 @@ function ChannelRow({ icon, name, value, muted }: { icon: string; name: string; 
     </div>
   );
 }
+

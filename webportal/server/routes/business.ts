@@ -57,15 +57,17 @@ router.get('/profile', async (req: any, res: any) => {
 router.post('/profile', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { name, settings, apiKey } = req.body;
+    const { name, settings, apiKey, documentLogoUrl, watermarkUrl } = req.body;
     const business = await prisma.business.update({
       where: { id: businessId },
       data: {
         ...(name && { name }),
         ...(settings && { settings }),
-        ...(apiKey !== undefined && { apiKey })
+        ...(apiKey !== undefined && { apiKey }),
+        ...(documentLogoUrl !== undefined && { documentLogoUrl }),
+        ...(watermarkUrl !== undefined && { watermarkUrl })
       },
-      select: { id: true, name: true, settings: true, apiKey: true }
+      select: { id: true, name: true, settings: true, apiKey: true, documentLogoUrl: true, watermarkUrl: true }
     });
     res.json({ success: true, business });
   } catch (error) {
@@ -97,10 +99,34 @@ router.post('/logo', upload.single('logo'), async (req: any, res: any) => {
       select: { id: true, name: true, logoUrl: true }
     });
 
-    res.json({ success: true, business: updatedBusiness });
+    res.json({ success: true, business: updatedBusiness, logoUrl });
   } catch (error) {
     console.error('Logo upload error:', error);
     res.status(500).json({ error: 'Failed to upload logo' });
+  }
+});
+
+// Upload generic document asset (watermark, etc)
+router.post('/document-asset', upload.single('file'), async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const { assetType } = req.body; // e.g., 'watermark', 'headerImage'
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const fileExtension = file.originalname.split('.').pop();
+    const fileName = `document-assets/${businessId}-${assetType}-${Date.now()}.${fileExtension}`;
+
+    // Upload to R2/S3
+    const fileUrl = await uploadAsset(file.buffer, fileName, file.mimetype);
+
+    res.json({ success: true, fileUrl });
+  } catch (error) {
+    console.error('Asset upload error:', error);
+    res.status(500).json({ error: 'Failed to upload asset' });
   }
 });
 
@@ -120,3 +146,4 @@ router.get('/locations', async (req: any, res: any) => {
 });
 
 export default router;
+

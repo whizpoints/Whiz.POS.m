@@ -1,0 +1,1 @@
+import { PrismaClient } from '@prisma/client'; const prisma = new PrismaClient(); async function run() { console.log(await prisma.outlet.findUnique({where: {id: 'cmt33crib0002s98pu82uobtl'}})); prisma.$disconnect(); } run();

@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
@@ -24,7 +25,7 @@ router.post('/register', async (req, res) => {
   try {
     const { 
       businessName, email, password, kraPin, businessInfo, address, phone,
-      apiKey, servedBy, receiptFooter, printerType, mpesaPaybill, mpesaTill, mpesaAccount
+      apiKey, servedBy, receiptFooter, cloudBusinessId, cloudLocationId, printerType, mpesaPaybill, mpesaTill, mpesaAccount
     } = req.body;
 
     const existingBusiness = await prisma.business.findUnique({ where: { email } });
@@ -43,11 +44,13 @@ router.post('/register', async (req, res) => {
       printerType: printerType || 'thermal',
       mpesaPaybill: mpesaPaybill || '',
       mpesaTill: mpesaTill || '',
-      mpesaAccount: mpesaAccount || ''
+      mpesaAccount: mpesaAccount || '',
+      locationId: cloudLocationId
     });
 
     const business = await prisma.business.create({
-      data: {
+        data: {
+          id: cloudBusinessId || undefined,
         name: businessName,
         email,
         kraPin: kraPin || null,
@@ -315,4 +318,6 @@ router.post('/verify-api-key', async (req, res) => {
   });
 
 export default router;
+
+
 

@@ -14,6 +14,8 @@ model Business {
   email             String   @unique
   kraPin            String?
   logoUrl           String?
+  documentLogoUrl   String?
+  watermarkUrl      String?
   settings          Json?    @default("{}")
   emailVerified     Boolean  @default(false)
   setupComplete     Boolean  @default(false)
@@ -23,16 +25,18 @@ model Business {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  users        User[]
-  locations    StoreLocation[]
-  products     Product[]
-  receipts     Receipt[]
-  customers    Customer[]
-  mpesaTxns    MpesaTransaction[]
-  mpesaConfigs MpesaConfig[]
-  suppliers    Supplier[]
-  outlets      Outlet[]
+  users          User[]
+  locations      StoreLocation[]
+  products       Product[]
+  receipts       Receipt[]
+  customers      Customer[]
+  mpesaTxns      MpesaTransaction[]
+  mpesaConfigs   MpesaConfig[]
+  suppliers      Supplier[]
+  outlets        Outlet[]
   stockMovements StockMovement[]
+  Client         Client[]
+  SavedDocument  SavedDocument[]
 
   @@index([email])
   @@index([updatedAt])
@@ -106,16 +110,19 @@ model StoreLocation {
   businessId String
   name       String
   address    String?
+  pairingCode String?
+  pairingCodeExpiresAt DateTime?
+  apiKey     String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 
-  business    Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  receipts    Receipt[]
-  users       User[]
-  mpesaConfig MpesaConfig?
-  inventory   ProductInventory[]
-  mpesaTxns   MpesaTransaction[]
-  outlets     Outlet[]
+  business       Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  receipts       Receipt[]
+  users          User[]
+  mpesaConfig    MpesaConfig?
+  inventory      ProductInventory[]
+  mpesaTxns      MpesaTransaction[]
+  outlets        Outlet[]
   stockMovements StockMovement[]
 
   @@index([businessId])
@@ -132,13 +139,13 @@ model Outlet {
 
   business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location StoreLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  
-  inventory ProductInventory[]
+
+  inventory      ProductInventory[]
   stockMovements StockMovement[]
-  receipts  Receipt[]
-  users User[]
-  mpesaConfigs MpesaConfig[]
-  mpesaTxns MpesaTransaction[]
+  receipts       Receipt[]
+  users          User[]
+  mpesaConfigs   MpesaConfig[]
+  mpesaTxns      MpesaTransaction[]
 
   @@index([businessId])
   @@index([locationId])
@@ -151,7 +158,7 @@ model StockMovement {
   productId  String
   locationId String
   outletId   String?
-  type       String   // SALE, TRANSFER, PO, ADJUSTMENT
+  type       String // SALE, TRANSFER, PO, ADJUSTMENT
   quantity   Int
   reference  String?
   timestamp  DateTime @default(now())
@@ -184,8 +191,8 @@ model Product {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  business  Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  inventory ProductInventory[]
+  business       Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  inventory      ProductInventory[]
   stockMovements StockMovement[]
 
   @@index([businessId])
@@ -214,15 +221,27 @@ model ProductInventory {
 }
 
 model Customer {
-  id            String   @id @default(cuid())
-  businessId    String
-  name          String
-  phone         String?
-  email         String?
-  loyaltyPoints Int      @default(0)
-  totalSpent    Float    @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id         String  @id @default(cuid())
+  businessId String
+  name       String
+  phone      String?
+  email      String?
+  company    String?
+  address    String?
+  taxId      String?
+
+  isCredit    Boolean @default(false)
+  isLoyalty   Boolean @default(false)
+  isWholesale Boolean @default(false)
+
+  balance       Float @default(0)
+  totalCredit   Float @default(0)
+  paidAmount    Float @default(0)
+  loyaltyPoints Int   @default(0)
+  totalSpent    Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -271,9 +290,9 @@ model Receipt {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
 
-  cashierName   String?
-  items         ReceiptItem[]
-  
+  cashierName String?
+  items       ReceiptItem[]
+
   business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location StoreLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
   outletId String?
@@ -288,9 +307,9 @@ model Receipt {
 }
 
 model ReceiptItem {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   receiptId   String
-  receipt     Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receipt     Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   productName String
   quantity    Float
   unitPrice   Float
@@ -332,3 +351,44 @@ model Terminal {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 }
+
+model Client {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  phone      String?
+  email      String?
+  address    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+model SavedDocument {
+  id              String    @id
+  businessId      String
+  type            String
+  date            DateTime
+  dueDate         DateTime?
+  customerName    String
+  customerEmail   String?
+  customerPhone   String?
+  customerAddress String?
+  items           String // Storing JSON string array of items
+  subtotal        Float
+  tax             Float
+  total           Float
+  notes           String?
+  status          String
+  metadata        String? // Storing JSON string
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+

@@ -1,33 +1,23 @@
 import { Router } from 'express';
 import prisma from '../prisma.js';
-import jwt from 'jsonwebtoken';
-import { randomUUID } from 'crypto';
+import * as jwt from 'jsonwebtoken';
 const router = Router();
 // const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 // Middleware to authenticate sync requests
 const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
-    let apiKey = req.headers['x-api-key'];
-    if (apiKey === 'null' || apiKey === 'undefined')
-        apiKey = undefined;
-    console.log('[SyncDelta Auth] Path:', req.path, 'Headers:', req.headers);
+    const apiKey = req.headers['x-api-key'];
     if (apiKey) {
         // Check if it's a Business API Key
         let business = await prisma.business.findFirst({ where: { apiKey } });
         let outletId = undefined;
         let locationId = undefined;
-        let terminalName = undefined;
         // If not a business, check if it's a Terminal API Key
         if (!business) {
             const terminal = await prisma.terminal.findFirst({ where: { apiKey } });
-            if (terminal) {
-                terminalName = terminal.name;
-                // Find the LATEST outlet created for this terminal by matching name
-                const outlet = await prisma.outlet.findFirst({
-                    where: { name: terminal.name },
-                    orderBy: { createdAt: 'desc' }
-                });
+            if (terminal && terminal.outletId) {
+                const outlet = await prisma.outlet.findFirst({ where: { id: terminal.outletId } });
                 if (outlet) {
                     business = await prisma.business.findUnique({ where: { id: outlet.businessId } });
                     outletId = outlet.id;
@@ -38,7 +28,7 @@ const authenticate = async (req, res, next) => {
         if (!business) {
             return res.status(401).json({ error: 'Invalid API Key' });
         }
-        req.user = { businessId: business.id, outletId, locationId, terminalName };
+        req.user = { businessId: business.id, outletId, locationId };
         return next();
     }
     if (!authHeader) {
@@ -51,117 +41,121 @@ const authenticate = async (req, res, next) => {
         next();
     }
     catch (err) {
-        console.error('[SyncDelta Auth] JWT Verification failed:', err);
-        return res.status(401).json({ error: 'Invalid or expired token', details: String(err) });
+        return res.status(401).json({ error: 'Invalid or expired token' });
     }
 };
+// Endpoint for the admin UI SyncLogs page
+router.get('/logs', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader)
+            return res.status(401).json({ error: 'Unauthorized' });
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET); // Will throw if invalid JWT
+        const logs = await prisma.syncLog.findMany({
+            where: { businessId: decoded.businessId || decoded.id },
+            orderBy: { createdAt: 'desc' },
+            take: 100
+        });
+        res.json({ success: true, logs });
+    }
+    catch (err) {
+        res.status(401).json({ error: 'Invalid or expired token' });
+    }
+});
 router.use(authenticate);
 // 1. GET /api/sync/delta?since={timestamp} (PULL)
 router.get('/', async (req, res) => {
     try {
-        const { businessId, terminalName } = req.user;
-        const since = req.query.since;
+        const { businessId } = req.user;
+        const { since, locationId, outletId } = req.query;
         if (!since)
             return res.status(400).json({ error: 'Missing "since" timestamp parameter' });
         const sinceDate = new Date(since);
-        const locationId = req.user.locationId || req.query.locationId;
-        const outletId = req.user.outletId || req.query.outletId;
-        const [users, products, categories, inventory, customers, suppliers, business, outlets, terminals] = await Promise.all([
-            // Strict user filtering: Admin/Manager or explicitly assigned to this outlet
+        const [users, products, categories, inventory, stockMovements, customers, suppliers, businessData, outlets, terminals] = await Promise.all([
             prisma.user.findMany({
                 where: {
                     businessId,
                     updatedAt: { gt: sinceDate },
-                    ...(outletId ? { OR: [{ outletId: outletId }, { role: 'ADMIN' }] } : {})
+                    ...(req.user.outletId ? { OR: [{ outletId: req.user.outletId }, { role: 'ADMIN' }, { role: 'MANAGER' }] } : {})
                 }
             }),
-            // Products only sync if they have inventory specifically assigned to this outlet
             prisma.product.findMany({
                 where: {
                     businessId,
-                    ...(outletId ? { inventory: { some: { outletId: outletId } } } : {}),
+                    ...(req.user.outletId ? { inventory: { some: { outletId: req.user.outletId } } } : {}),
                     OR: [
                         { updatedAt: { gt: sinceDate } },
-                        { inventory: { some: { updatedAt: { gt: sinceDate }, outletId: outletId ? String(outletId) : undefined } } }
+                        ...(req.user.outletId ? [{ inventory: { some: { outletId: req.user.outletId, updatedAt: { gt: sinceDate } } } }] : [])
                     ]
                 }
             }),
             prisma.category.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
-            // Inventory is strictly filtered by outlet
             prisma.productInventory.findMany({
                 where: {
-                    updatedAt: { gt: sinceDate },
+                    locationId: locationId ? String(locationId) : undefined,
                     outletId: outletId ? String(outletId) : undefined,
+                    updatedAt: { gt: sinceDate },
                     product: { businessId } // Ensure it belongs to the business
+                },
+                include: { product: true }
+            }),
+            prisma.stockMovement.findMany({
+                where: {
+                    locationId: locationId ? String(locationId) : undefined,
+                    ...(outletId ? { OR: [{ outletId: String(outletId) }, { outletId: null }] } : {}),
+                    updatedAt: { gt: sinceDate },
                 }
             }),
             prisma.customer.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
             prisma.supplier.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
             prisma.business.findUnique({ where: { id: businessId } }),
             prisma.outlet.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
-            prisma.terminal.findMany({ where: { updatedAt: { gt: sinceDate } } })
+            prisma.outlet.findMany({ where: { businessId }, select: { id: true } }).then(outlets => prisma.terminal.findMany({
+                where: { outletId: { in: outlets.map(o => o.id) }, updatedAt: { gt: sinceDate } }
+            }))
         ]);
-        // Map stock into products for legacy compatibility
-        const enrichedProducts = products.map((p) => {
-            const inv = inventory.find((i) => i.productId === p.id);
-            return { ...p, stock: inv ? inv.stock : 0 };
-        });
-        // Format businessSetup for POS client expectations
-        let formattedBusinessSetup = null;
-        if (business && business.updatedAt > sinceDate) {
-            let settings = {};
-            try {
-                settings = JSON.parse(business.settings || '{}');
-            }
-            catch (e) { }
-            formattedBusinessSetup = {
-                businessId: business.id,
-                businessName: business.name,
-                ...(terminalName ? { terminalName } : {}),
-                address: business.address || '',
-                phone: business.contact || '',
-                email: business.email || '',
-                ...settings
-            };
+        console.log(`[SYNC GET] Outlet: ${req.user.outletId}, Since: ${sinceDate}, Products Found: ${products.length}, Inventory Found: ${inventory.length}`);
+        const timestamp = new Date().toISOString();
+        const details = `Pulled ${users.length} users, ${products.length} products, ${categories.length} categories, ${stockMovements.length} stock movements`;
+        try {
+            await prisma.syncLog.create({
+                data: {
+                    businessId,
+                    outletId: req.user.outletId || null,
+                    terminal: 'Unknown',
+                    type: 'PULL',
+                    status: 'SUCCESS',
+                    details,
+                }
+            });
         }
-        const responsePayload = {
+        catch (err) {
+            console.error('Failed to write sync log', err);
+        }
+        res.json({
             success: true,
-            timestamp: new Date().toISOString(),
+            timestamp,
             data: {
                 users,
-                products: enrichedProducts,
+                products,
                 categories,
                 inventory,
+                stockMovements,
                 customers,
                 suppliers,
                 transactions: [], // Intentionally empty: fresh terminals do not download historical ledgers
                 outlets,
                 terminals,
-                businessSetup: formattedBusinessSetup
+                businessSetup: businessData && businessData.updatedAt > sinceDate ? {
+                    ...(typeof businessData.settings === 'string' ? JSON.parse(businessData.settings) : businessData.settings),
+                    businessName: businessData.name
+                } : null
             }
-        };
-        try {
-            await prisma.$executeRaw `
-        INSERT INTO "SyncLog" ("id", "businessId", "outletId", "terminal", "type", "status", "details", "createdAt", "updatedAt") 
-        VALUES (${randomUUID()}, ${businessId}, ${outletId || null}, ${terminalName || 'Unknown Terminal'}, 'PULL', 'SUCCESS', ${`Pulled ${users.length} users, ${enrichedProducts.length} products`}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `;
-        }
-        catch (e) {
-            console.error('Raw log error', e);
-        }
-        res.json(responsePayload);
+        });
     }
     catch (error) {
         console.error('Delta Pull error:', error);
-        try {
-            await prisma.$executeRaw `
-        INSERT INTO "SyncLog" ("id", "businessId", "outletId", "terminal", "type", "status", "details", "createdAt", "updatedAt") 
-        VALUES (${randomUUID()}, ${req.user?.businessId || null}, ${req.user?.outletId || req.query.outletId || null}, ${req.user?.terminalName || 'Unknown Terminal'}, 'PULL', 'FAILED', ${error instanceof Error ? error.message : String(error)}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `;
-        }
-        catch (e) {
-            console.error('Raw log error', e);
-        }
         res.status(500).json({ error: 'Internal server error during pull sync' });
     }
 });
@@ -169,9 +163,10 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const { users, products, customers, suppliers, transactions, inventoryLogs, businessSetup } = req.body;
-        let targetLocationId = undefined;
-        let targetOutletId = undefined;
+        const { users, products, customers, suppliers, transactions, stockMovements, businessSetup } = req.body;
+        let targetLocationId = null;
+        let targetOutletId = null;
+        // Try to resolve from businessSetup in payload
         if (businessSetup?.locationId) {
             const loc = await prisma.storeLocation.findFirst({ where: { id: businessSetup.locationId, businessId } });
             if (loc)
@@ -182,6 +177,28 @@ router.post('/', async (req, res) => {
             if (out)
                 targetOutletId = out.id;
         }
+        // Fallback: resolve from the authenticated user's outlet
+        if (!targetOutletId && req.user.outletId) {
+            const out = await prisma.outlet.findFirst({ where: { id: req.user.outletId, location: { businessId } }, include: { location: true } });
+            if (out) {
+                targetOutletId = out.id;
+                if (!targetLocationId)
+                    targetLocationId = out.locationId;
+            }
+        }
+        // Fallback: resolve from the business's first location
+        if (!targetLocationId) {
+            const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+            if (loc)
+                targetLocationId = loc.id;
+        }
+        // Fallback: resolve from the business's first outlet
+        if (!targetOutletId && targetLocationId) {
+            const out = await prisma.outlet.findFirst({ where: { locationId: targetLocationId } });
+            if (out)
+                targetOutletId = out.id;
+        }
+        console.log(`[SYNC PUSH] businessId=${businessId}, targetLocationId=${targetLocationId}, targetOutletId=${targetOutletId}, user.outletId=${req.user.outletId}`);
         const results = {
             users: 0,
             products: 0,
@@ -265,34 +282,64 @@ router.post('/', async (req, res) => {
                 else {
                     results.skipped++;
                 }
-                // Handle Inventory Stock
-                if (targetLocationId && typeof p.stock !== 'undefined') {
-                    const finalProduct = await prisma.product.findFirst({ where: { businessId, sku } });
-                    if (finalProduct) {
-                        const existingInventory = await prisma.productInventory.findFirst({
-                            where: { productId: finalProduct.id, locationId: targetLocationId, outletId: targetOutletId || null }
-                        });
-                        if (resolveConflict(p, existingInventory)) {
-                            if (existingInventory) {
-                                await prisma.productInventory.update({
-                                    where: { id: existingInventory.id },
-                                    data: { stock: Number(p.stock) || 0, updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date() }
-                                });
-                            }
-                            else {
-                                await prisma.productInventory.create({
-                                    data: {
-                                        productId: finalProduct.id, locationId: targetLocationId, outletId: targetOutletId || null,
-                                        stock: Number(p.stock) || 0, updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date()
-                                    }
-                                });
-                            }
+            }
+        }
+        // 3. Stock Movements
+        if (stockMovements && Array.isArray(stockMovements)) {
+            for (const m of stockMovements) {
+                const existing = await prisma.stockMovement.findUnique({ where: { id: m.id } });
+                if (!existing) {
+                    const resolvedLocationId = targetLocationId || m.locationId || null;
+                    const resolvedOutletId = targetOutletId || m.outletId || null;
+                    await prisma.stockMovement.create({
+                        data: {
+                            id: m.id,
+                            businessId,
+                            productId: m.productId,
+                            locationId: resolvedLocationId,
+                            outletId: resolvedOutletId,
+                            type: m.type,
+                            quantity: Number(m.quantity),
+                            reference: m.reference ? String(m.reference) : null,
+                            sourceTerminal: m.sourceTerminal ? String(m.sourceTerminal) : 'POS',
+                            timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+                            updatedAt: m.updatedAt ? new Date(m.updatedAt) : new Date()
                         }
+                    });
+                    // Update inventory based on movement type
+                    const invExisting = await prisma.productInventory.findFirst({
+                        where: { productId: m.productId, locationId: resolvedLocationId, outletId: resolvedOutletId }
+                    });
+                    let stockChange = Number(m.quantity);
+                    if (m.type === 'SALE' || m.type === 'TRANSFER_OUT' || m.type === 'ADJUSTMENT_DOWN' || m.type === 'subtract')
+                        stockChange = -Math.abs(stockChange);
+                    else if (m.type === 'TRANSFER_IN' || m.type === 'PO' || m.type === 'INITIAL' || m.type === 'RETURN' || m.type === 'ADJUSTMENT_UP' || m.type === 'add')
+                        stockChange = Math.abs(stockChange);
+                    if (invExisting) {
+                        await prisma.productInventory.update({
+                            where: { id: invExisting.id },
+                            data: { stock: { increment: stockChange }, updatedAt: new Date() }
+                        });
                     }
+                    else {
+                        await prisma.productInventory.create({
+                            data: {
+                                productId: m.productId,
+                                locationId: resolvedLocationId,
+                                outletId: resolvedOutletId,
+                                stock: stockChange,
+                                updatedAt: new Date()
+                            }
+                        });
+                    }
+                    results.inventory++;
+                }
+                else {
+                    results.skipped++;
                 }
             }
         }
-        // 3. Transactions (Sales)
+        // 4. Transactions (Sales)
         if (transactions && Array.isArray(transactions)) {
             for (const t of transactions) {
                 const existing = await prisma.receipt.findFirst({ where: { businessId, receiptNumber: String(t.id) } });
@@ -309,7 +356,7 @@ router.post('/', async (req, res) => {
                             });
                         }
                         else {
-                            await prisma.receipt.create({
+                            const createdReceipt = await prisma.receipt.create({
                                 data: {
                                     businessId, locationId: targetLocationId, outletId: targetOutletId || null,
                                     receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
@@ -319,6 +366,21 @@ router.post('/', async (req, res) => {
                                     updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date()
                                 }
                             });
+                            if (t.items && Array.isArray(t.items)) {
+                                for (const item of t.items) {
+                                    if (!item.product)
+                                        continue;
+                                    await prisma.receiptItem.create({
+                                        data: {
+                                            receiptId: createdReceipt.id,
+                                            productName: item.product.name || 'Unknown Item',
+                                            quantity: Number(item.quantity) || 1,
+                                            unitPrice: Number(item.product.price) || 0,
+                                            totalPrice: (Number(item.quantity) || 1) * (Number(item.product.price) || 0)
+                                        }
+                                    });
+                                }
+                            }
                         }
                         results.transactions++;
                     }
@@ -338,12 +400,35 @@ router.post('/', async (req, res) => {
                     if (existing) {
                         await prisma.customer.update({
                             where: { id: existing.id },
-                            data: { phone: c.phone ? String(c.phone) : null, email: c.email ? String(c.email) : null, updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date() }
+                            data: {
+                                phone: c.phone ? String(c.phone) : null,
+                                email: c.email ? String(c.email) : null,
+                                company: c.company ? String(c.company) : null,
+                                address: c.address ? String(c.address) : null,
+                                taxId: c.taxId ? String(c.taxId) : null,
+                                balance: c.balance != null ? Number(c.balance) : undefined,
+                                totalCredit: c.totalCredit != null ? Number(c.totalCredit) : undefined,
+                                paidAmount: c.paidAmount != null ? Number(c.paidAmount) : undefined,
+                                updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date()
+                            }
                         });
                     }
                     else {
                         await prisma.customer.create({
-                            data: { businessId, name: String(c.name), phone: c.phone ? String(c.phone) : null, email: c.email ? String(c.email) : null, updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date() }
+                            data: {
+                                businessId,
+                                name: String(c.name),
+                                phone: c.phone ? String(c.phone) : null,
+                                email: c.email ? String(c.email) : null,
+                                company: c.company ? String(c.company) : null,
+                                address: c.address ? String(c.address) : null,
+                                taxId: c.taxId ? String(c.taxId) : null,
+                                balance: c.balance != null ? Number(c.balance) : 0,
+                                totalCredit: c.totalCredit != null ? Number(c.totalCredit) : 0,
+                                paidAmount: c.paidAmount != null ? Number(c.paidAmount) : 0,
+                                isCredit: true,
+                                updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date()
+                            }
                         });
                     }
                     results.customers++;
@@ -353,74 +438,54 @@ router.post('/', async (req, res) => {
                 }
             }
         }
-        // Update business settings if sent and newer
+        // Update business settings safely by merging
         if (businessSetup) {
             const b = await prisma.business.findUnique({ where: { id: businessId } });
-            if (resolveConflict(businessSetup, b)) {
-                // We stringify businessSetup because settings in Prisma is a String type
-                const settingsString = typeof businessSetup === 'string' ? businessSetup : JSON.stringify(businessSetup);
+            if (b) {
+                let currentSettings = {};
+                if (b.settings) {
+                    try {
+                        currentSettings = typeof b.settings === 'string' ? JSON.parse(b.settings) : b.settings;
+                    }
+                    catch (e) { }
+                }
+                // Ensure businessSetup is an object
+                const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : businessSetup;
+                const mergedSettings = { ...currentSettings, ...incomingSetup };
                 await prisma.business.update({
                     where: { id: businessId },
-                    data: { settings: settingsString, updatedAt: businessSetup.updatedAt ? new Date(businessSetup.updatedAt) : new Date() }
+                    data: {
+                        settings: JSON.stringify(mergedSettings),
+                        updatedAt: new Date()
+                    }
                 });
             }
         }
-        const responsePayload = {
+        try {
+            await prisma.syncLog.create({
+                data: {
+                    businessId,
+                    outletId: targetOutletId || null,
+                    terminal: 'Unknown',
+                    type: 'PUSH',
+                    status: 'SUCCESS',
+                    details: `Pushed ${results.users} users, ${results.products} products, ${results.inventory} stock movements, ${results.transactions} transactions`,
+                }
+            });
+        }
+        catch (err) {
+            console.error('Failed to write sync log', err);
+        }
+        res.json({
             success: true,
             timestamp: new Date().toISOString(),
             message: 'Delta sync processed successfully',
             results
-        };
-        try {
-            await prisma.$executeRaw `
-        INSERT INTO "SyncLog" ("id", "businessId", "outletId", "terminal", "type", "status", "details", "createdAt", "updatedAt") 
-        VALUES (${randomUUID()}, ${businessId}, ${targetOutletId || req.user?.outletId || req.query.outletId || null}, ${req.user?.terminalName || businessSetup?.terminalName || 'Unknown Terminal'}, 'PUSH', 'SUCCESS', ${`Pushed ${results.users} users, ${results.products} products, ${results.transactions} txns`}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `;
-        }
-        catch (e) {
-            console.error('Raw log error', e);
-        }
-        res.json(responsePayload);
+        });
     }
     catch (error) {
         console.error('Delta Push error:', error);
-        try {
-            await prisma.$executeRaw `
-        INSERT INTO "SyncLog" ("id", "businessId", "outletId", "terminal", "type", "status", "details", "createdAt", "updatedAt") 
-        VALUES (${randomUUID()}, ${req.user?.businessId || null}, ${req.user?.outletId || req.query.outletId || null}, ${req.user?.terminalName || req.body?.businessSetup?.terminalName || 'Unknown Terminal'}, 'PUSH', 'FAILED', ${error instanceof Error ? error.message : String(error)}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `;
-        }
-        catch (e) {
-            console.error('Raw log error', e);
-        }
         res.status(500).json({ error: 'Internal server error during push sync' });
-    }
-});
-// 3. GET /api/sync/logs (Fetch sync logs)
-router.get('/logs', async (req, res) => {
-    try {
-        const { businessId } = req.user;
-        // Fetch logs using raw SQL to bypass Prisma Client types missing the new model
-        const logs = await prisma.$queryRaw `
-      SELECT * FROM "SyncLog" 
-      WHERE "businessId" = ${businessId} 
-      ORDER BY "createdAt" DESC 
-      LIMIT 200
-    `;
-        // Optionally fetch outlets to enrich the logs with outlet names
-        const outlets = await prisma.outlet.findMany({ where: { businessId } });
-        const enrichedLogs = logs.map((log) => {
-            const outlet = outlets.find(o => o.id === log.outletId);
-            return {
-                ...log,
-                outletName: outlet ? outlet.name : (log.outletId ? 'Unknown Outlet' : 'Global / Unassigned')
-            };
-        });
-        res.json({ success: true, logs: enrichedLogs });
-    }
-    catch (error) {
-        console.error('Fetch sync logs error:', error);
-        res.status(500).json({ error: 'Failed to fetch sync logs' });
     }
 });
 export default router;

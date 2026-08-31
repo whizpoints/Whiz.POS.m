@@ -164,7 +164,7 @@ router.delete('/:id/users/:userId', async (req, res) => {
 router.post('/:id/products', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const { productId, locationId } = req.body;
+        const { productId, locationId, stock = 0 } = req.body;
         const outletId = req.params.id;
         const outlet = await prisma.outlet.findUnique({
             where: { id: outletId, businessId }
@@ -190,9 +190,23 @@ router.post('/:id/products', async (req, res) => {
                 productId,
                 outletId,
                 locationId: targetLocationId,
-                stock: 0
+                stock: Number(stock)
             }
         });
+        if (Number(stock) > 0) {
+            await prisma.stockMovement.create({
+                data: {
+                    businessId,
+                    productId,
+                    locationId: targetLocationId,
+                    outletId,
+                    type: 'INITIAL',
+                    quantity: Number(stock),
+                    sourceTerminal: 'SERVER',
+                    reference: 'Product assigned to outlet'
+                }
+            });
+        }
         res.json({ success: true });
     }
     catch (error) {
@@ -203,7 +217,7 @@ router.post('/:id/products', async (req, res) => {
 router.post('/:id/products/batch', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const { productIds, locationId } = req.body;
+        const { productIds, locationId, stock = 0 } = req.body;
         const outletId = req.params.id;
         if (!Array.isArray(productIds)) {
             return res.status(400).json({ error: 'productIds must be an array' });
@@ -227,14 +241,30 @@ router.post('/:id/products/batch', async (req, res) => {
                 where: { productId, outletId, locationId: targetLocationId }
             });
             if (!existing) {
+                // Read stock from req.body if passed as object array? The request accepts productIds, but if it expects initial stock...
+                // The assignment says "Similarly in POST /:id/products/batch". In batch, usually it's just productIds string array. If we want stock, we could check if it's passed or just use 0. But we just implement the same logic, if stock was provided somehow or default to 0. Actually, let's assume `stock` can be passed globally for the batch or we just use 0. Wait, in batch, productIds is just an array. We can just set stock to 0 or check if there is a stock field. Let's do `const { productIds, locationId, stock = 0 } = req.body;`.
                 await prisma.productInventory.create({
                     data: {
                         productId,
                         outletId,
                         locationId: targetLocationId,
-                        stock: 0
+                        stock: Number(stock)
                     }
                 });
+                if (Number(stock) > 0) {
+                    await prisma.stockMovement.create({
+                        data: {
+                            businessId,
+                            productId,
+                            locationId: targetLocationId,
+                            outletId,
+                            type: 'INITIAL',
+                            quantity: Number(stock),
+                            sourceTerminal: 'SERVER',
+                            reference: 'Product assigned to outlet'
+                        }
+                    });
+                }
                 addedCount++;
             }
         }
@@ -271,6 +301,20 @@ router.post('/:id/inventory/adjust', async (req, res) => {
         await prisma.productInventory.update({
             where: { id: inventoryId },
             data: { stock: newStock }
+        });
+        await prisma.stockMovement.create({
+            data: {
+                id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+                businessId,
+                productId: inventory.productId,
+                locationId: inventory.locationId,
+                outletId: req.params.id,
+                type: type === 'ADD' ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+                quantity: amount,
+                reference: 'Outlet Manual Adjust',
+                sourceTerminal: 'SERVER',
+                timestamp: new Date()
+            }
         });
         res.json({ success: true, stock: newStock });
     }

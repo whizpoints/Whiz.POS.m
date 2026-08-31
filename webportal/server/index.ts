@@ -20,6 +20,9 @@ import outletsRoutes from './routes/outlets.js';
 import ledgerRoutes from './routes/ledger.js';
 import setupRoutes from './routes/setup.js';
 import documentsRoutes from './routes/documents.js';
+import clientsRoutes from './routes/clients.js';
+import savedDocsRoutes from './routes/saved-documents.js';
+import downloadsRoutes from './routes/downloads.js';
 
 dotenv.config();
 
@@ -54,6 +57,9 @@ app.use('/api/outlets', outletsRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/setup', setupRoutes);
 app.use('/api/documents', documentsRoutes);
+app.use('/api/clients', clientsRoutes);
+app.use('/api/saved-documents', savedDocsRoutes);
+app.use('/api/downloads', downloadsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -90,7 +96,9 @@ setInterval(async () => {
 app.listen(PORT, () => {
   if (PORT == 3000) {
     console.log(`🚀 Cloud Web App (Back Office) running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    console.log(`🚀 Cloud Web App (Back Office) Dev Url: https://api.whizpoint.app`);
   } else {
     console.log(`🖥️  Local Admin Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   }
 });
+

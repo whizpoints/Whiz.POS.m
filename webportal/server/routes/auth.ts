@@ -74,7 +74,7 @@ router.post('/register', async (req, res) => {
     });
 
     const user = business.users[0];
-    const token = jwt.sign({ userId: user.id, businessId: business.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, businessId: business.id, role: user.role }, JWT_SECRET, { expiresIn: '3h' });
 
     // Send verification email
     const frontendUrl = process.env.CORS_ORIGINS?.split(',')[0] || 'http://localhost:5173';
@@ -132,7 +132,11 @@ router.get('/verify-email', async (req, res) => {
     });
 
     // Redirect user back to the onboarding page
-    const frontendUrl = process.env.CORS_ORIGINS?.split(',')[0] || 'http://localhost:5173';
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:3000';
+    const isDev = host.includes('localhost');
+    const frontendUrl = isDev ? 'http://localhost:5173' : `${protocol}://${host}`;
+    
     res.redirect(`${frontendUrl}/onboarding`);
   } catch (error) {
     console.error('Verify error:', error);
@@ -242,7 +246,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role }, JWT_SECRET, { expiresIn: '3h' });
 
     res.json({ token, user: { id: user.id, name: user.name, role: user.role, businessId: user.businessId }, business: user.business });
   } catch (error) {
@@ -255,41 +259,39 @@ router.post('/login', async (req, res) => {
 router.post('/verify-api-key', async (req, res) => {
   try {
     const { apiKey } = req.body;
-    if (!apiKey) {
-      return res.status(400).json({ error: 'API Key is required' });
-    }
+    if (!apiKey) return res.status(400).json({ error: 'API Key is required' });
 
-    const business = await prisma.business.findFirst({
+    // Look for StoreLocation with this API Key
+    const location = await prisma.storeLocation.findUnique({
       where: { apiKey },
       include: {
-        users: {
-          where: { role: 'ADMIN' },
-          take: 1
+        business: {
+          include: { users: { where: { role: 'ADMIN' }, take: 1 } }
         }
       }
     });
 
-    if (!business) {
-      return res.status(401).json({ error: 'Invalid API Key' });
+    if (!location) {
+      return res.status(401).json({ error: 'Invalid Location API Key' });
     }
 
-    // Return the business context so the POS can auto-configure
     res.json({
       success: true,
       business: {
-        id: business.id,
-        name: business.name,
-        kraPin: business.kraPin,
-        adminEmail: business.users[0]?.email
+        id: location.business.id,
+        name: location.business.name,
+        locationName: location.name,
+        adminEmail: location.business.users[0]?.email,
+        lastLogin: location.business.users[0]?.updatedAt
       }
     });
   } catch (error) {
-    console.error('Verify API Key error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error(error);
+    res.status(500).json({ error: 'Failed to verify API key' });
   }
 });
 
-  // Generate 2FA Pairing Code
+  // Generate 2FA Pairing Code for a Specific Location
   router.post('/generate-pairing-code', async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
@@ -297,48 +299,85 @@ router.post('/verify-api-key', async (req, res) => {
       
       const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const { locationId } = req.body;
+      if (!locationId) return res.status(400).json({ error: 'Location ID required' });
   
       const pairingCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit code
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
       
-      await prisma.business.update({
-        where: { id: decoded.businessId },
-        data: { pairingCode }
-      });
+      const existing = await prisma.storeLocation.findUnique({ where: { id: locationId } });
+    if (!existing || existing.businessId !== decoded.businessId) return res.status(403).json({ error: 'Forbidden' });
+    
+    const loc = await prisma.storeLocation.update({
+      where: { id: locationId },
+      data: { 
+        pairingCode,
+        pairingCodeExpiresAt: expiresAt,
+        apiKey: existing.apiKey || crypto.randomBytes(32).toString('hex')
+      }
+    });
   
-      res.json({ success: true, pairingCode });
+      res.json({ success: true, pairingCode, apiKey: loc.apiKey });
     } catch (error) {
-      console.error('Generate pairing code error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error('generate-pairing-code error:', error); res.status(500).json({ error: 'Failed to generate pairing code: ' + (error.message || String(error)) });
     }
   });
 
-  // Confirm Pairing Code
+  // Validate Pairing Code (Unauthenticated - from Local Server)
+  router.post('/validate-pairing', async (req, res) => {
+    try {
+      const { apiKey, pairingCode } = req.body;
+      if (!apiKey || !pairingCode) return res.status(400).json({ error: 'Missing credentials' });
+
+      const location = await prisma.storeLocation.findUnique({ 
+        where: { apiKey },
+        include: { business: true }
+      });
+
+      if (!location || location.pairingCode !== pairingCode) {
+        return res.status(401).json({ error: 'Invalid API Key or Pairing Code' });
+      }
+
+      if (location.pairingCodeExpiresAt && new Date() > location.pairingCodeExpiresAt) {
+        return res.status(401).json({ error: 'Pairing Code has expired' });
+      }
+
+      res.json({ 
+        success: true, 
+        businessId: location.businessId,
+        locationId: location.id,
+        businessName: location.business.name,
+        locationName: location.name,
+        email: location.business.email
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Validation failed' });
+    }
+  });
+
+  // Confirm and Burn Pairing Code (Unauthenticated - from Local Server)
   router.post('/confirm-pairing', async (req, res) => {
     try {
       const { apiKey, pairingCode } = req.body;
-      if (!apiKey || !pairingCode) {
-        return res.status(400).json({ error: 'API Key and Pairing Code are required' });
+      
+      const location = await prisma.storeLocation.findUnique({ where: { apiKey } });
+      if (!location || location.pairingCode !== pairingCode) {
+        return res.status(401).json({ error: 'Invalid handshake' });
       }
 
-      const business = await prisma.business.findFirst({
-        where: { apiKey, pairingCode }
+      // Burn the pairing code
+      await prisma.storeLocation.update({
+        where: { apiKey },
+        data: { pairingCode: null, pairingCodeExpiresAt: null }
       });
 
-      if (!business) {
-        return res.status(401).json({ error: 'Invalid pairing code or API key' });
-      }
-
-      // Optionally wipe the pairing code so it's one-time use
-      await prisma.business.update({
-        where: { id: business.id },
-        data: { pairingCode: null }
-      });
-
-      res.json({ success: true, businessId: business.id });
+      res.json({ success: true, message: 'Handshake complete' });
     } catch (error) {
-      console.error('Confirm pairing error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: 'Confirmation failed' });
     }
   });
 
 export default router;
+
+
+

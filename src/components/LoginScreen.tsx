@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { usePosStore } from '../store/posStore';
 import { cn } from '../lib/utils';
 import { Shield, ArrowRight, Delete, X, Fingerprint, Monitor } from 'lucide-react';
@@ -133,12 +133,11 @@ const LoginScreen = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center relative overflow-hidden font-sans select-none">
 
-      {/* Background Image with Overlay */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
-        style={{ backgroundImage: `url('assets/login-bg.png')` }}
-      >
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+            {/* Background Mesh Gradient */}
+      <div className="absolute inset-0 bg-slate-950">
+        <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_0%,_var(--tw-gradient-stops))] from-cyan-900 via-slate-950 to-slate-950" />
+        <div className="absolute bottom-0 left-[-20%] w-[800px] h-[800px] bg-blue-900/30 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
+        <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-cyan-800/20 rounded-full blur-[100px] mix-blend-screen pointer-events-none" />
       </div>
 
       {/* Main Container */}
@@ -281,3 +280,4 @@ const LoginScreen = () => {
 };
 
 export default LoginScreen;
+

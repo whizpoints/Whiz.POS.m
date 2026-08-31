@@ -19,7 +19,7 @@ export default function AuthPage() {
   
   // Wizard State
   const [setupStep, setSetupStep] = useState(1);
-  const totalSteps = 5;
+  const totalSteps = 4;
   const [showSetupPw, setShowSetupPw] = useState(false);
   
   // Step 1: Cloud
@@ -307,26 +307,8 @@ export default function AuthPage() {
                 ))}
               </div>
 
-              {/* Step 1: Cloud Sync */}
-              {setupStep === 1 && (
-                <div className="space-y-4 animate-in fade-in duration-300">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400"><Cloud className="w-5 h-5" /></div>
-                    <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Cloud Connection</h3>
-                  </div>
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Enter the Permanent API Key shown in your Web Portal Dashboard to automatically sync your data.</p>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>API Key</label>
-                    <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors"><Key className="w-5 h-5" /></div>
-                      <input type="text" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="e.g. 64-character-api-key..." />
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Step 2: Business Profile */}
-              {setupStep === 2 && (
+              {setupStep === 1 && (
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400"><Building2 className="w-5 h-5" /></div>
@@ -354,7 +336,7 @@ export default function AuthPage() {
               )}
 
               {/* Step 3: POS Configurations */}
-              {setupStep === 3 && (
+              {setupStep === 2 && (
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-pink-100 dark:bg-pink-900/30 rounded-lg text-pink-600 dark:text-pink-400"><Printer className="w-5 h-5" /></div>
@@ -379,7 +361,7 @@ export default function AuthPage() {
               )}
 
               {/* Step 4: M-Pesa Setup */}
-              {setupStep === 4 && (
+              {setupStep === 3 && (
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400"><CreditCard className="w-5 h-5" /></div>
@@ -404,7 +386,7 @@ export default function AuthPage() {
               )}
 
               {/* Step 5: Security & Finish */}
-              {setupStep === 5 && (
+              {setupStep === 4 && (
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg text-cyan-600 dark:text-cyan-400"><Lock className="w-5 h-5" /></div>
@@ -447,7 +429,7 @@ export default function AuthPage() {
                     type="button"
                     onClick={handleNextStep}
                     disabled={
-                      (setupStep === 2 && (!businessName || !phone || !address))
+                      (setupStep === 1 && (!businessName || !phone || !address))
                     }
                     className="px-6 py-2.5 font-bold rounded-lg flex items-center gap-2 transition-all shadow-md text-white disabled:opacity-50"
                     style={{ background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)' }}

@@ -1,0 +1,21 @@
+# npm shortcuts
+function a {  npm run electron:dev }
+function d { npm run dev }
+function r { npm run reset }
+function s { npm start }
+function i { npm install --legacy-peer-deps }
+function ni { npm install }
+function b { npm run build }
+function id { npm install --save-dev }
+function ig { npm install -g }
+function un { npm uninstall }
+function up { npm update }
+function ls { npm list --depth=0 }
+function nv { npm --version }
+function out { npm outdated }
+function k {Stop-Process -Name "node" -Force}
+function f {taskkill /F /IM Mpos.Desktop.exe /T}
+function dr { dotnet run }
+function db { dotnet build }
+function dc { dotnet clean }
+function dn { dotnet new }

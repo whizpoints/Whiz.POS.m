@@ -1,0 +1,211 @@
+import type { ColumnType } from "kysely";
+export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
+  ? ColumnType<S, I | undefined, U>
+  : ColumnType<T, T | undefined, T>;
+export type Timestamp = ColumnType<Date, Date | string, Date | string>;
+
+export type Business = {
+    id: string;
+    name: string;
+    email: string;
+    kraPin: string | null;
+    logoUrl: string | null;
+    settings: Generated<string | null>;
+    emailVerified: Generated<number>;
+    setupComplete: Generated<number>;
+    verificationToken: string | null;
+    pairingCode: string | null;
+    apiKey: string | null;
+    createdAt: Generated<string>;
+    updatedAt: string;
+};
+export type Category = {
+    id: string;
+    businessId: string;
+    name: string;
+    createdAt: Generated<string>;
+    updatedAt: string;
+};
+export type Customer = {
+    id: string;
+    businessId: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    loyaltyPoints: Generated<number>;
+    totalSpent: Generated<number>;
+    createdAt: Generated<string>;
+    updatedAt: string;
+};
+export type MpesaConfig = {
+    id: string;
+    businessId: string;
+    locationId: string | null;
+    merchantType: Generated<string>;
+    tillNumber: string | null;
+    paybillNumber: string | null;
+    accountReference: string | null;
+    environment: Generated<string>;
+    consumerKey: string;
+    consumerSecret: string;
+    passkey: string;
+    shortcode: string;
+    initiatorName: string | null;
+    initiatorPassword: string | null;
+    stkEnabled: Generated<number>;
+    c2bEnabled: Generated<number>;
+    createdAt: Generated<string>;
+    updatedAt: string;
+    outletId: string | null;
+};
+export type MpesaTransaction = {
+    id: string;
+    businessId: string;
+    locationId: string | null;
+    transactionId: string;
+    amount: number;
+    phoneNumber: string;
+    customerName: string | null;
+    status: Generated<string>;
+    isEnriched: Generated<number>;
+    timestamp: Generated<string>;
+    updatedAt: Generated<string>;
+    outletId: string | null;
+};
+export type Outlet = {
+    id: string;
+    businessId: string;
+    locationId: string;
+    name: string;
+    createdAt: Generated<string>;
+    updatedAt: Generated<string>;
+};
+export type Product = {
+    id: string;
+    businessId: string;
+    sku: string;
+    barcode: string | null;
+    name: string;
+    category: string | null;
+    price: number;
+    costPrice: number | null;
+    taxRate: Generated<number>;
+    reorderLevel: Generated<number>;
+    createdAt: Generated<string>;
+    updatedAt: string;
+};
+export type ProductInventory = {
+    id: string;
+    productId: string;
+    locationId: string;
+    outletId: string | null;
+    stock: Generated<number>;
+    reorderLevel: Generated<number>;
+    updatedAt: string;
+};
+export type Receipt = {
+    id: string;
+    businessId: string;
+    locationId: string | null;
+    receiptNumber: string;
+    totalAmount: number;
+    paymentMethod: string;
+    customerPhone: string | null;
+    mpesaCode: string | null;
+    status: Generated<string>;
+    createdAt: Generated<string>;
+    updatedAt: Generated<string>;
+    cashierName: string | null;
+    outletId: string | null;
+};
+export type ReceiptItem = {
+    id: string;
+    receiptId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+};
+export type StockMovement = {
+    id: string;
+    businessId: string;
+    productId: string;
+    locationId: string;
+    outletId: string | null;
+    type: string;
+    quantity: number;
+    reference: string | null;
+    sourceTerminal: string | null;
+    timestamp: Generated<string>;
+    updatedAt: Generated<string>;
+};
+export type StoreLocation = {
+    id: string;
+    businessId: string;
+    name: string;
+    address: string | null;
+    createdAt: Generated<string>;
+    updatedAt: Generated<string>;
+};
+export type Supplier = {
+    id: string;
+    businessId: string;
+    name: string;
+    contact: string | null;
+    email: string | null;
+    address: string | null;
+    createdAt: Generated<string>;
+    updatedAt: Generated<string>;
+};
+export type SyncLog = {
+    id: string;
+    businessId: string;
+    outletId: string | null;
+    terminal: string;
+    type: string;
+    status: string;
+    details: string | null;
+    createdAt: Generated<string>;
+    updatedAt: string;
+};
+export type Terminal = {
+    id: string;
+    macAddress: string;
+    name: string;
+    status: Generated<string>;
+    apiKey: string | null;
+    outletId: string | null;
+    createdAt: Generated<string>;
+    updatedAt: Generated<string>;
+};
+export type User = {
+    id: string;
+    businessId: string;
+    locationId: string | null;
+    email: string;
+    password: string;
+    pin: string | null;
+    name: string;
+    role: Generated<string>;
+    createdAt: Generated<string>;
+    updatedAt: Generated<string>;
+    outletId: string | null;
+};
+export type DB = {
+    Business: Business;
+    Category: Category;
+    Customer: Customer;
+    MpesaConfig: MpesaConfig;
+    MpesaTransaction: MpesaTransaction;
+    Outlet: Outlet;
+    Product: Product;
+    ProductInventory: ProductInventory;
+    Receipt: Receipt;
+    ReceiptItem: ReceiptItem;
+    StockMovement: StockMovement;
+    StoreLocation: StoreLocation;
+    Supplier: Supplier;
+    SyncLog: SyncLog;
+    Terminal: Terminal;
+    User: User;
+};

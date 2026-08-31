@@ -190,6 +190,10 @@ export interface CreditCustomer {
   id: string;
   name: string;
   phone: string;
+  email?: string;
+  company?: string;
+  address?: string;
+  taxId?: string;
   totalCredit: number;
   paidAmount: number;
   balance: number;
@@ -213,6 +217,9 @@ export interface LoyaltyCustomer {
   name: string;
   phone: string;
   email?: string;
+  company?: string;
+  address?: string;
+  taxId?: string;
   points: number;
   tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
   totalSpent: number;

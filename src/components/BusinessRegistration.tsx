@@ -3,6 +3,8 @@ import { usePosStore } from '../store/posStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Server, HardDrive, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import Swal from 'sweetalert2';
+import Swal from 'sweetalert2';
+import Swal from 'sweetalert2';
 import { soundManager } from '../lib/soundUtils';
 import setupBg from '../assets/setup_install_bg.png';
 import toast from 'react-hot-toast';

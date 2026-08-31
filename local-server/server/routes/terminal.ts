@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 
 const router = Router();
 // const prisma = new PrismaClient();
@@ -48,4 +48,5 @@ router.post('/push-payment', async (req, res) => {
 });
 
 export default router;
+
 

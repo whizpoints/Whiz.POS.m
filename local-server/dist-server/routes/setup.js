@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 const router = Router();
 // const prisma = new PrismaClient();

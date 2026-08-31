@@ -1,0 +1,1 @@
+const fs = require('fs'); let code = fs.readFileSync('server/routes/syncDelta.ts', 'utf8'); code = code.replace('const enrichedProducts = products.map', 'console.log([SYNC GET] Outlet: \, Since: \, Products Found: \, Inventory Found: \);\n      const enrichedProducts = products.map'); fs.writeFileSync('server/routes/syncDelta.ts', code);

@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
@@ -131,12 +132,159 @@ router.post('/logo', upload.single('logo'), async (req: any, res: any) => {
       select: { id: true, name: true, logoUrl: true }
     });
 
-    res.json({ success: true, business: updatedBusiness });
+    res.json({ success: true, business: updatedBusiness, logoUrl });
   } catch (error) {
     console.error('Logo upload error:', error);
     res.status(500).json({ error: 'Failed to upload logo' });
   }
 });
+
+// Upload generic document asset (watermark, etc)
+router.post('/document-asset', upload.single('file'), async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const { assetType } = req.body; // e.g., 'watermark', 'headerImage'
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const fileExtension = file.originalname.split('.').pop();
+    const fileName = `document-assets/${businessId}-${assetType}-${Date.now()}.${fileExtension}`;
+
+    // Upload to R2/S3
+    const fileUrl = await uploadAsset(file.buffer, fileName, file.mimetype);
+
+    res.json({ success: true, fileUrl });
+  } catch (error) {
+    console.error('Asset upload error:', error);
+    res.status(500).json({ error: 'Failed to upload asset' });
+  }
+});
+
+  // Export Data Backup
+  router.get('/backup', async (req: any, res: any) => {
+    try {
+      const { businessId } = req.user;
+      
+      const business = await prisma.business.findUnique({ where: { id: businessId } });
+      if (!business) return res.status(404).json({ error: 'Business not found' });
+      
+      const categories = await prisma.category.findMany({ where: { businessId } });
+      const products = await prisma.product.findMany({ where: { businessId } });
+      const users = await prisma.user.findMany({ where: { businessId } });
+      const customers = await prisma.customer.findMany({ where: { businessId } });
+      
+      // Clean up sensitive/irrelevant data for export
+      const cleanUsers = users.map(u => ({ ...u, id: undefined, businessId: undefined, locationId: null, outletId: null, createdAt: undefined, updatedAt: undefined }));
+      const cleanCategories = categories.map(c => ({ id: c.id, name: c.name }));
+      const cleanProducts = products.map(p => ({ id: p.id, sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel }));
+      const cleanCustomers = customers.map(c => ({ id: c.id, name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent }));
+
+      const backupData = {
+        version: "1.0",
+        type: "whiz-local-backup",
+        timestamp: new Date().toISOString(),
+        data: {
+          settings: business.settings,
+          categories: cleanCategories,
+          products: cleanProducts,
+          users: cleanUsers,
+          customers: cleanCustomers
+        }
+      };
+
+      res.json(backupData);
+    } catch (error) {
+      console.error('Backup error:', error);
+      res.status(500).json({ error: 'Failed to generate backup' });
+    }
+  });
+
+  // Restore Data Backup
+  router.post('/restore', async (req: any, res: any) => {
+    try {
+      const { businessId } = req.user;
+      const { backup } = req.body;
+      
+      if (!backup || backup.type !== 'whiz-local-backup' || !backup.data) {
+        return res.status(400).json({ error: 'Invalid backup file format' });
+      }
+
+      const { settings, categories, products, users, customers } = backup.data;
+
+      // 1. Restore Settings
+      if (settings) {
+        let currentBusiness = await prisma.business.findUnique({ where: { id: businessId } });
+        let currentSettings = typeof currentBusiness?.settings === 'string' ? JSON.parse(currentBusiness.settings) : (currentBusiness?.settings || {});
+        let newSettings = typeof settings === 'string' ? JSON.parse(settings) : settings;
+        
+        // Preserve API keys when merging settings
+        const mergedSettings = { ...newSettings, backOfficeApiKey: currentSettings.backOfficeApiKey, backOfficeUrl: currentSettings.backOfficeUrl, cloudBusinessId: currentSettings.cloudBusinessId, locationId: currentSettings.locationId };
+        
+        await prisma.business.update({
+          where: { id: businessId },
+          data: { settings: JSON.stringify(mergedSettings) }
+        });
+      }
+
+      // 2. Restore Categories
+      if (categories && categories.length > 0) {
+        for (const cat of categories) {
+          await prisma.category.upsert({
+            where: { id: cat.id },
+            update: { name: cat.name, businessId },
+            create: { id: cat.id, name: cat.name, businessId }
+          });
+        }
+      }
+
+      // 3. Restore Products
+      if (products && products.length > 0) {
+        for (const p of products) {
+          await prisma.product.upsert({
+            where: { id: p.id },
+            update: { sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel, businessId },
+            create: { id: p.id, sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel, businessId }
+          });
+        }
+      }
+
+      // 4. Restore Users (match by email to avoid unique constraint errors, don't update password if exists)
+      if (users && users.length > 0) {
+        for (const u of users) {
+          const existing = await prisma.user.findUnique({ where: { email: u.email } });
+          if (existing) {
+            await prisma.user.update({
+              where: { email: u.email },
+              data: { name: u.name, role: u.role, pin: u.pin, businessId }
+            });
+          } else {
+            await prisma.user.create({
+              data: { email: u.email, name: u.name, role: u.role, pin: u.pin, password: u.password, businessId }
+            });
+          }
+        }
+      }
+
+      // 5. Restore Customers
+      if (customers && customers.length > 0) {
+        for (const c of customers) {
+          await prisma.customer.upsert({
+            where: { id: c.id },
+            update: { name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent, businessId },
+            create: { id: c.id, name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent, businessId }
+          });
+        }
+      }
+
+      res.json({ success: true, message: 'Backup restored successfully' });
+    } catch (error) {
+      console.error('Restore error:', error);
+      res.status(500).json({ error: 'Failed to restore backup' });
+    }
+  });
 
 // Get Business Locations
 router.get('/locations', async (req: any, res: any) => {
@@ -154,4 +302,7 @@ router.get('/locations', async (req: any, res: any) => {
 });
 
 export default router;
+
+
+
 

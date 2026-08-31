@@ -43,7 +43,6 @@ router.post('/:id/approve', async (req, res) => {
             where: { name: terminalRequest.name, businessId: business.id }
         });
         if (!outlet) {
-            // Create the Outlet only if it doesn't exist
             outlet = await prisma.outlet.create({
                 data: {
                     name: terminalRequest.name,
@@ -52,11 +51,11 @@ router.post('/:id/approve', async (req, res) => {
                 }
             });
         }
-        const terminal = await prisma.terminal.update({
+        const updatedTerminal = await prisma.terminal.update({
             where: { id },
-            data: { status: 'APPROVED', apiKey }
+            data: { status: 'APPROVED', apiKey, outletId: outlet.id }
         });
-        res.json({ success: true, terminal, outlet });
+        res.json({ success: true, terminal: updatedTerminal, outlet });
     }
     catch (error) {
         console.error('Approve error:', error);

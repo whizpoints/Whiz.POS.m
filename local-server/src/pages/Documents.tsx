@@ -8,7 +8,7 @@ import {
   Printer, Eye, FileOutput, FileInput, AlertTriangle, Scale, CheckCircle,
   Save, FolderOpen, X
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, getApiBaseUrl } from '../lib/utils';
 import { DocumentModal } from '../components/invoice/DocumentModal';
 import { DOCUMENT_TEMPLATES } from '../components/invoice/documentData';
 import type { DocumentType } from '../components/invoice/DocumentPreview';
@@ -45,6 +45,31 @@ import toast from 'react-hot-toast';
 
 export default function InvoiceGenerator() {
   const { businessSetup, transactions, currentCashier, documentSettings, saveDocumentSettings, creditCustomers, saveCreditCustomer, documents, saveDocument, deleteDocument } = usePosStore();
+  
+  // Real business state for back office
+  const [loadedBusinessSetup, setLoadedBusinessSetup] = useState<any>(businessSetup);
+
+  useEffect(() => {
+    const fetchBusiness = async () => {
+      try {
+        const API_BASE_URL = getApiBaseUrl();
+        const res = await fetch(`${API_BASE_URL}/api/business/profile`, {
+           headers: { 'Authorization': `Bearer ${localStorage.getItem('whiz-token')}` }
+        });
+        if (res.ok) {
+           const data = await res.json();
+           try {
+             if (typeof data.settings === 'string') data.settings = JSON.parse(data.settings);
+             if (typeof data.settings === 'string') data.settings = JSON.parse(data.settings);
+           } catch(e) {}
+           setLoadedBusinessSetup(data);
+        }
+      } catch (err) {
+         console.error('Failed to load business profile', err);
+      }
+    };
+    fetchBusiness();
+  }, [businessSetup]);
 
   // Document State
   const [docType, setDocType] = useState<DocumentType>('INVOICE');
@@ -59,6 +84,9 @@ export default function InvoiceGenerator() {
   // Saved Docs State
   const [showSavedDocs, setShowSavedDocs] = useState(false);
   const [currentDocId, setCurrentDocId] = useState<string | null>(null);
+
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
 
   // Letter State
   const [subject, setSubject] = useState('');
@@ -117,7 +145,7 @@ export default function InvoiceGenerator() {
 
   useEffect(() => {
     if (documentSettings && !currentDocId) {
-      setLogoImage(documentSettings.logoImage || null);
+      setLogoImage(documentSettings.logoImage || loadedBusinessSetup?.logoUrl || null);
       setHeaderImage(documentSettings.headerImage || null);
       setUseCustomHeader(documentSettings.useCustomHeader || false);
       setShowWatermark(documentSettings.showWatermark ?? true);
@@ -126,9 +154,10 @@ export default function InvoiceGenerator() {
       setNotes(documentSettings.defaultNotes || "This is a computer generated document and doesn't need a stamp or signature for receiving.");
       setPaymentInfo(documentSettings.defaultPaymentInfo || '');
     } else if (!documentSettings && !currentDocId) {
+      setLogoImage(loadedBusinessSetup?.logoUrl || null);
       setNotes("This is a computer generated document and doesn't need a stamp or signature for receiving.");
     }
-  }, [documentSettings, currentDocId, docType]);
+  }, [documentSettings, currentDocId, docType, loadedBusinessSetup]);
 
   const handleSaveDocument = () => {
     const docData = {
@@ -172,7 +201,6 @@ export default function InvoiceGenerator() {
     saveDocument(newDoc);
     setCurrentDocId(newDoc.id);
     toast.success('Document saved successfully!');
-    setShowSavedDocs(true);
   };
 
   const handleSaveClient = () => {
@@ -308,14 +336,61 @@ export default function InvoiceGenerator() {
     setSearchTerm('');
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void) => {
+  const [watermarkWarning, setWatermarkWarning] = useState<string | null>(null);
+  const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+
+  const uploadAssetToServer = async (file: File, assetType: string) => {
+    try {
+      setIsUploadingAsset(true);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('assetType', assetType);
+      
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/business/document-asset`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('whiz-token')}` },
+        body: fd
+      });
+      const data = await res.json();
+      if (res.ok && data.fileUrl) {
+        return data.fileUrl;
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to upload ' + assetType);
+    } finally {
+      setIsUploadingAsset(false);
+    }
+    return null;
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void, assetType: string) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setter(reader.result as string);
+      const url = await uploadAssetToServer(file, assetType);
+      if (url) setter(url);
+    }
+  };
+
+  const handleWatermarkUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const objUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = objUrl;
+      img.onload = async () => {
+        const targetWidth = 794;
+        const targetHeight = 1123;
+        if (img.width !== targetWidth || img.height !== targetHeight) {
+          setWatermarkWarning(`Your image is ${img.width}x${img.height}. For a perfect A4 fit, the resolution should be exactly ${targetWidth}x${targetHeight} pixels. Please resize it.`);
+        } else {
+          setWatermarkWarning(null);
+        }
+        URL.revokeObjectURL(objUrl);
+        const url = await uploadAssetToServer(file, 'watermark');
+        if (url) setter(url);
       };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -449,16 +524,23 @@ export default function InvoiceGenerator() {
                       >
                          {tempSettings.logoImage ? <img src={tempSettings.logoImage} className="w-full h-20 object-contain mb-2" /> : <Upload className="w-6 h-6 text-slate-400 mb-2" />}
                          <div className="text-xs font-medium text-slate-700">Logo Image</div>
-                         <input ref={fileInputLogoRef} type="file" className="hidden" onChange={(e) => handleImageUpload(e, (img) => setTempSettings({...tempSettings, logoImage: img}))} />
+                         <input ref={fileInputLogoRef} accept=".png, .jpg, .jpeg, .bmp" type="file" className="hidden" onChange={(e) => handleImageUpload(e, (img) => setTempSettings({...tempSettings, logoImage: img}), 'logo')} />
                       </div>
                       
-                      <div
-                        onClick={() => fileInputBgRef.current?.click()}
-                        className="flex flex-col items-center justify-center p-4 border border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors h-32"
-                      >
-                         {tempSettings.backgroundImage ? <img src={tempSettings.backgroundImage} className="w-full h-20 object-cover mb-2" /> : <ImageIcon className="w-6 h-6 text-slate-400 mb-2" />}
-                         <div className="text-xs font-medium text-slate-700">Watermark / Background</div>
-                         <input ref={fileInputBgRef} type="file" className="hidden" onChange={(e) => handleImageUpload(e, (img) => setTempSettings({...tempSettings, backgroundImage: img}))} />
+                      <div>
+                        <div
+                          onClick={() => fileInputBgRef.current?.click()}
+                          className="flex flex-col items-center justify-center p-4 border border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors h-32"
+                        >
+                           {tempSettings.backgroundImage ? <img src={tempSettings.backgroundImage} className="w-full h-20 object-cover mb-2" /> : <ImageIcon className="w-6 h-6 text-slate-400 mb-2" />}
+                           <div className="text-xs font-medium text-slate-700">Watermark / Background</div>
+                           <input ref={fileInputBgRef} accept=".png, .jpg, .jpeg, .bmp" type="file" className="hidden" onChange={(e) => handleWatermarkUpload(e, (img) => setTempSettings({...tempSettings, backgroundImage: img}))} />
+                        </div>
+                        {watermarkWarning && (
+                           <div className="mt-2 p-2 bg-amber-50 text-amber-700 text-[10px] rounded border border-amber-200 select-all cursor-text">
+                              {watermarkWarning}
+                           </div>
+                        )}
                       </div>
                     </div>
                     <label className="flex items-center gap-2 mt-2 cursor-pointer">
@@ -659,26 +741,13 @@ export default function InvoiceGenerator() {
                      <Save className="w-3 h-3" /> Save Client
                    </button>
                    <div className="relative">
-                   <select
-                     className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-sky-500 text-slate-600 appearance-none pr-8 cursor-pointer"
-                     onChange={(e) => {
-                       if (e.target.value) {
-                         const client = creditCustomers.find(c => c.id === e.target.value);
-                         if (client) {
-                           setClientName(client.name);
-                           setClientCompany(client.name); // Using name for company as fallback
-                           setClientEmail(client.email || '');
-                           setClientAddress(client.phone || ''); // Using phone as fallback address
-                         }
-                       }
-                     }}
-                   >
-                     <option value="">Select Saved Client...</option>
-                     {creditCustomers.map(c => (
-                       <option key={c.id} value={c.id}>{c.name}</option>
-                     ))}
-                   </select>
-                  </div>
+                     <button
+                       onClick={() => setShowClientModal(true)}
+                       className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 transition-colors"
+                     >
+                       Select Saved Client...
+                     </button>
+                    </div>
                  </div>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -863,6 +932,76 @@ export default function InvoiceGenerator() {
         </div>
       </div>
 
+      {/* Client Search Modal */}
+      {showClientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                   <User className="w-5 h-5 text-sky-600" /> Select Client
+                 </h2>
+                 <button onClick={() => setShowClientModal(false)} className="text-slate-400 hover:text-slate-600">
+                   <X className="w-5 h-5" />
+                 </button>
+              </div>
+              
+              <div className="p-4 border-b border-slate-100">
+                 <div className="relative">
+                   <input
+                     type="text"
+                     placeholder="Search by name, phone, or email..."
+                     value={clientSearchTerm}
+                     onChange={(e) => setClientSearchTerm(e.target.value)}
+                     className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                     autoFocus
+                   />
+                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                 </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                 {creditCustomers
+                   .filter(c => 
+                     c.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) || 
+                     (c.email && c.email.toLowerCase().includes(clientSearchTerm.toLowerCase())) ||
+                     (c.phone && c.phone.toLowerCase().includes(clientSearchTerm.toLowerCase()))
+                   )
+                   .map(client => (
+                     <div 
+                        key={client.id} 
+                        onClick={() => {
+                           setClientName(client.name);
+                           setClientCompany(client.name);
+                           setClientEmail(client.email || '');
+                           setClientAddress(client.phone || '');
+                           setShowClientModal(false);
+                           setClientSearchTerm('');
+                        }} 
+                        className="flex flex-col p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+                     >
+                        <div className="font-medium text-slate-800">{client.name}</div>
+                        <div className="text-xs text-slate-500 mt-1 flex gap-3">
+                           {client.phone && <span>📞 {client.phone}</span>}
+                           {client.email && <span>✉️ {client.email}</span>}
+                        </div>
+                     </div>
+                 ))}
+                 
+                 {creditCustomers.filter(c => 
+                     c.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) || 
+                     (c.email && c.email.toLowerCase().includes(clientSearchTerm.toLowerCase())) ||
+                     (c.phone && c.phone.toLowerCase().includes(clientSearchTerm.toLowerCase()))
+                   ).length === 0 && (
+                    <div className="text-center py-10 text-slate-400">
+                       <User className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                       <p>No clients found matching "{clientSearchTerm}"</p>
+                    </div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
       <DocumentModal
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
@@ -873,10 +1012,10 @@ export default function InvoiceGenerator() {
           headerImage,
           backgroundImage,
           useCustomHeader,
-          businessName: businessSetup?.businessName || 'Your Business',
-          address: businessSetup?.address || '',
-          phone: businessSetup?.phone || '',
-          email: businessSetup?.email || ''
+          businessName: loadedBusinessSetup?.name || loadedBusinessSetup?.businessName || 'Your Business',
+          address: loadedBusinessSetup?.settings?.address || loadedBusinessSetup?.address || '',
+          phone: loadedBusinessSetup?.settings?.phone || loadedBusinessSetup?.phone || '',
+          email: loadedBusinessSetup?.settings?.email || loadedBusinessSetup?.email || ''
         }}
         signatory={currentCashier}
         data={{
@@ -906,4 +1045,5 @@ export default function InvoiceGenerator() {
     </div>
   );
 }
+
 

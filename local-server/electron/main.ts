@@ -1,12 +1,26 @@
 // Suppress annoying Content Security Policy warnings in development console
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, utilityProcess } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import Bonjour from 'bonjour-service';
 import os from 'os';
+import { dialog } from 'electron';
+import * as fs from 'fs';
+
+process.on('uncaughtException', (error) => {
+  const logPath = path.join(app.getPath('userData'), 'crash.log');
+  fs.writeFileSync(logPath, error?.stack || error?.message || String(error));
+  dialog.showErrorBox('Uncaught Exception', error?.stack || error?.message || String(error));
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  const logPath = path.join(app.getPath('userData'), 'crash.log');
+  fs.writeFileSync(logPath, reason?.stack || reason?.message || String(reason));
+  dialog.showErrorBox('Unhandled Rejection', reason?.stack || reason?.message || String(reason));
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,7 +56,6 @@ function startBackendServer() {
     });
   } else {
     // In prod, setup database in AppData
-    const fs = require('fs');
     const userDataPath = app.getPath('userData');
     const dbPath = path.join(userDataPath, 'local.db');
     
@@ -56,11 +69,11 @@ function startBackendServer() {
       }
     }
 
-    serverProcess = spawn('node', [path.join(__dirname, '../dist-server/index.js')], {
-      cwd: path.join(__dirname, '..'),
-      stdio: 'inherit',
-      windowsHide: true,
-      env: { ...process.env, PORT: '5050', DATABASE_URL: `file:${dbPath.replace(/\\/g, '/')}` }
+    process.env.PORT = '5050';
+    process.env.DATABASE_URL = `file:${dbPath.replace(/\\/g, '/')}`;
+
+    import('../dist-server/index.js').catch(err => {
+      dialog.showErrorBox('Backend Crash', err?.stack || String(err));
     });
   }
 }
@@ -73,8 +86,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
     },
-    autoHideMenuBar: true,
-    icon: path.join(__dirname, '../../assets/logo.ico')
+    autoHideMenuBar: true
   });
 
   const isDev = !app.isPackaged;
@@ -84,8 +96,14 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5175');
     mainWindow.webContents.openDevTools();
   } else {
-    // In prod, serve the static files via the express server or load file directly
-    mainWindow.loadURL(`http://localhost:${PORT}`);
+    // In prod, serve the static files via the express server
+    const tryLoad = (retries = 30) => {
+      mainWindow?.loadURL(`http://localhost:${PORT}`).catch(() => {
+        if (retries > 0) setTimeout(() => tryLoad(retries - 1), 500);
+      });
+    };
+    tryLoad();
+    mainWindow.webContents.openDevTools();
   }
 
   // Always launch on whole screen not restore
@@ -101,15 +119,19 @@ app.whenReady().then(() => {
   startBackendServer();
 
   // Publish the mDNS service for POS Terminals to auto-discover
-  const ipAddress = getLocalIpAddress();
-  bonjour.publish({
-    name: 'WhizPOS Local Server',
-    type: 'http',
-    port: PORT,
-    host: ipAddress,
-    txt: { version: '1.0.0', type: 'whizpos-admin' }
-  });
-  console.log(`[mDNS] Published service WhizPOS Local Server on ${ipAddress}:${PORT}`);
+  try {
+    const ipAddress = getLocalIpAddress();
+    bonjour.publish({
+      name: 'WhizPOS Local Server',
+      type: 'http',
+      port: PORT,
+      host: ipAddress,
+      txt: { version: '1.0.0', type: 'whizpos-admin' }
+    });
+    console.log(`[mDNS] Published service WhizPOS Local Server on ${ipAddress}:${PORT}`);
+  } catch (err) {
+    console.error('Failed to publish mDNS service:', err);
+  }
 
   createWindow();
 

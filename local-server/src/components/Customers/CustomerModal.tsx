@@ -17,6 +17,9 @@ export default function CustomerModal({ isOpen, onClose, customer, onComplete }:
     name: '',
     email: '',
     phone: '',
+    company: '',
+    address: '',
+    taxId: '',
     loyaltyPoints: 0,
     totalSpent: 0
   });
@@ -28,12 +31,15 @@ export default function CustomerModal({ isOpen, onClose, customer, onComplete }:
         name: customer.name || '',
         email: customer.email || '',
         phone: customer.phone || '',
+        company: customer.company || '',
+        address: customer.address || '',
+        taxId: customer.taxId || '',
         loyaltyPoints: customer.loyaltyPoints || 0,
         totalSpent: customer.totalSpent || 0
       });
     } else {
       setFormData({
-        name: '', email: '', phone: '', loyaltyPoints: 0, totalSpent: 0
+        name: '', email: '', phone: '', company: '', address: '', taxId: '', loyaltyPoints: 0, totalSpent: 0
       });
     }
   }, [customer, isOpen]);
@@ -98,6 +104,18 @@ export default function CustomerModal({ isOpen, onClose, customer, onComplete }:
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
               <input type="text" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company / Organization</label>
+              <input type="text" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.company} onChange={e => setFormData({ ...formData, company: e.target.value })} />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Physical Address</label>
+              <input type="text" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">KRA PIN / Tax ID</label>
+              <input type="text" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.taxId} onChange={e => setFormData({ ...formData, taxId: e.target.value })} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Loyalty Points</label>

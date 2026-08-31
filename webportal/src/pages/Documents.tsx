@@ -449,7 +449,7 @@ export default function InvoiceGenerator() {
                       >
                          {tempSettings.logoImage ? <img src={tempSettings.logoImage} className="w-full h-20 object-contain mb-2" /> : <Upload className="w-6 h-6 text-slate-400 mb-2" />}
                          <div className="text-xs font-medium text-slate-700">Logo Image</div>
-                         <input ref={fileInputLogoRef} type="file" className="hidden" onChange={(e) => handleImageUpload(e, (img) => setTempSettings({...tempSettings, logoImage: img}))} />
+                         <input ref={fileInputLogoRef} type="file" className="hidden" onChange={(e) => handleImageUpload(e, (img) => setTempSettings({...tempSettings, logoImage: img}), 'logo')} />
                       </div>
                       
                       <div
@@ -906,4 +906,8 @@ export default function InvoiceGenerator() {
     </div>
   );
 }
+
+
+
+
 

@@ -4,7 +4,7 @@ import { X, Download, Printer, ZoomIn, ZoomOut } from 'lucide-react';
 import { DocumentPreview } from './DocumentPreview';
 import type { DocumentType } from './DocumentPreview';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { usePosStore } from '../../store/posStore';
 import toast from 'react-hot-toast';
 
@@ -72,8 +72,8 @@ export function DocumentModal({ isOpen, onClose, type, data, branding, signatory
           htmlContent,
           paperSize,
           defaultFileName: `${type.toLowerCase()}-${data?.docNumber || 'document'}.pdf`,
-          author: businessSetup?.businessName || 'Whizpoint Solutions',
-          applicationName: 'Whizpoint Solutions'
+          author: branding?.businessName || 'Your Business',
+          applicationName: branding?.businessName || 'Your Business'
         });
 
         if (!response.success && !response.canceled) {
@@ -98,14 +98,11 @@ export function DocumentModal({ isOpen, onClose, type, data, branding, signatory
       const orientation = isA5 ? 'portrait' : 'portrait';
 
       // Use high scale/resolution for crisp output
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
+      const imgData = await toPng(element, {
+        pixelRatio: 2,
         backgroundColor: '#FFFFFF',
-        logging: false,
       });
 
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: orientation as any,
         unit: 'mm',
@@ -219,5 +216,6 @@ export function DocumentModal({ isOpen, onClose, type, data, branding, signatory
     </div>
   );
 }
+
 
 

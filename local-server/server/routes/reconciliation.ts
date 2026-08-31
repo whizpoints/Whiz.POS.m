@@ -1,7 +1,8 @@
 import express from 'express';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 
 const router = express.Router();

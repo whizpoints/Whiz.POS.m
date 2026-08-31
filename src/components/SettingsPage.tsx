@@ -81,26 +81,9 @@ export default function SettingsPage() {
 
   const handleLinkCloud = async () => {
     if (!cloudApiKey || !cloudUrl) return;
-    setIsVerifyingCloud(true);
-    try {
-      const baseUrl = cloudUrl.trim().replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/api/auth/verify-api-key`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: cloudApiKey })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-         setPairingBusinessData(data.business);
-         setPairingModalOpen(true);
-      } else {
-         toast.error('Invalid API Key: ' + (data.error || 'Unknown error'));
-      }
-    } catch (e) {
-      toast.error('Connection error while linking account.');
-    } finally {
-      setIsVerifyingCloud(false);
-    }
+    // We just open the pairing modal, the actual verification happens in confirm
+    setPairingBusinessData({ name: "Cloud Verification" });
+    setPairingModalOpen(true);
   };
 
   const handleConfirmPairing = async () => {
@@ -115,7 +98,7 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-         saveBusinessSetup({ ...businessSetup, backOfficeApiKey: cloudApiKey, backOfficeUrl: baseUrl, businessId: data.businessId, cloudBusinessId: data.businessId, isSetup: true } as any);
+         saveBusinessSetup({ ...businessSetup, backOfficeApiKey: cloudApiKey, backOfficeUrl: baseUrl, businessId: data.businessId, cloudBusinessId: data.businessId, locationId: data.locationId, locationName: data.locationName, isSetup: true } as any);
          setPairingModalOpen(false);
          setCloudApiKey('');
          setPairingCodeInput('');
@@ -720,3 +703,6 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+
+

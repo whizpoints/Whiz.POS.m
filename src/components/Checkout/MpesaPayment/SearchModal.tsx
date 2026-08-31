@@ -31,10 +31,8 @@ export default function SearchModal({ isOpen, onClose, targetAmount }: Props) {
         return;
       }
 
-      const rawUrl = (businessSetup as any)?.backOfficeUrl || (businessSetup as any)?.apiUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-      const baseUrl = rawUrl.replace(/\/$/, '').replace(/\/api$/, '');
-      
-      const res = await fetch(`${baseUrl}/api/mpesa/payments/search?businessId=${businessId}&q=${encodeURIComponent(query)}`);
+      const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+      const res = await fetch(`${cloudUrl}/api/mpesa/payments/search?businessId=${businessId}&q=${encodeURIComponent(query)}`);
       
       if (res.ok) {
         const txns = await res.json();

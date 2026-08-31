@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { Router } from 'express';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 import jwt from 'jsonwebtoken';
 const router = Router();

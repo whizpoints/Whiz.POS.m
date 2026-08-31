@@ -1,8 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { X, Download, Printer, ZoomIn, ZoomOut } from 'lucide-react';
 import { DocumentPreview, DocumentType } from './DocumentPreview';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { usePosStore } from '../../store/posStore';
 import toast from 'react-hot-toast';
 
@@ -48,6 +46,10 @@ export function DocumentModal({ isOpen, onClose, type, data, branding, signatory
             ${styles}
             <style>
               @page { margin: 0; }
+              * {
+                 font-family: Arial, Helvetica, sans-serif !important;
+                 letter-spacing: normal !important;
+              }
               body { margin: 0; padding: 0; background-color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; display: flex; justify-content: center; align-items: flex-start; }
               .preview-container-wrapper { width: 100%; height: 100%; display: flex; justify-content: center; }
             </style>
@@ -60,14 +62,14 @@ export function DocumentModal({ isOpen, onClose, type, data, branding, signatory
         </html>
       `;
 
-      // @ts-ignore
-      const response = await window.electron.generatePdf({
-        htmlContent,
-        paperSize,
-        defaultFileName: `${type.toLowerCase()}-${data?.docNumber || 'document'}.pdf`,
-        author: businessSetup?.businessName || 'Whizpoint Solutions',
-        applicationName: 'Whizpoint Solutions'
-      });
+        // @ts-ignore
+        const response = await window.electron.generatePdf({
+          htmlContent,
+          paperSize,
+          defaultFileName: `${type.toLowerCase()}-${data?.docNumber || 'document'}.pdf`,
+          author: branding?.businessName || 'Your Business',
+          applicationName: branding?.businessName || 'Your Business'
+        });
 
       if (!response.success && !response.canceled) {
          throw new Error(response.error || 'Unknown error');

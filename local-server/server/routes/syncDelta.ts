@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import prisma from '../prisma.js';
 import * as jwt from 'jsonwebtoken';
 
@@ -426,11 +425,34 @@ router.post('/', async (req: any, res: any) => {
               if (existing) {
                  await prisma.customer.update({
                     where: { id: existing.id },
-                    data: { phone: c.phone ? String(c.phone) : null, email: c.email ? String(c.email) : null, updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date() }
+                    data: { 
+                        phone: c.phone ? String(c.phone) : null, 
+                        email: c.email ? String(c.email) : null, 
+                        company: c.company ? String(c.company) : null,
+                        address: c.address ? String(c.address) : null,
+                        taxId: c.taxId ? String(c.taxId) : null,
+                        balance: c.balance != null ? Number(c.balance) : undefined,
+                        totalCredit: c.totalCredit != null ? Number(c.totalCredit) : undefined,
+                        paidAmount: c.paidAmount != null ? Number(c.paidAmount) : undefined,
+                        updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date() 
+                    }
                  });
               } else {
                  await prisma.customer.create({
-                    data: { businessId, name: String(c.name), phone: c.phone ? String(c.phone) : null, email: c.email ? String(c.email) : null, updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date() }
+                    data: { 
+                        businessId, 
+                        name: String(c.name), 
+                        phone: c.phone ? String(c.phone) : null, 
+                        email: c.email ? String(c.email) : null,
+                        company: c.company ? String(c.company) : null,
+                        address: c.address ? String(c.address) : null,
+                        taxId: c.taxId ? String(c.taxId) : null,
+                        balance: c.balance != null ? Number(c.balance) : 0,
+                        totalCredit: c.totalCredit != null ? Number(c.totalCredit) : 0,
+                        paidAmount: c.paidAmount != null ? Number(c.paidAmount) : 0,
+                        isCredit: true,
+                        updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date() 
+                    }
                  });
               }
               results.customers++;
@@ -492,4 +514,5 @@ router.post('/', async (req: any, res: any) => {
 });
 
 export default router;
+
 

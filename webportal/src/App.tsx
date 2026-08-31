@@ -115,9 +115,31 @@ import { Navigate } from 'react-router-dom';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem('whiz-token');
+  
   if (!token) {
     return <Navigate to="/auth" replace />;
   }
+
+  try {
+    // Simple JWT decode to check expiry
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      // Token is expired
+      console.warn("JWT token expired. Logging out.");
+      localStorage.removeItem('whiz-token');
+      localStorage.removeItem('whiz-user');
+      localStorage.removeItem('whiz-business');
+      return <Navigate to="/auth" replace />;
+    }
+  } catch (e) {
+    // Invalid token structure
+    console.error("Invalid JWT token format. Logging out.");
+    localStorage.removeItem('whiz-token');
+    localStorage.removeItem('whiz-user');
+    localStorage.removeItem('whiz-business');
+    return <Navigate to="/auth" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -249,7 +271,7 @@ function PublicLayout({ children }: { children: ReactNode }) {
               <Link to="/dashboard" className="hover:text-[var(--accent-primary)] transition-colors">Dashboard</Link>
             </div>
             <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-              © 2026 Whiz POS. All rights reserved.
+              Â© 2026 Whiz POS. All rights reserved.
             </div>
           </div>
         </div>
@@ -458,6 +480,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
 }
 
 export default App;
+
 
 
 

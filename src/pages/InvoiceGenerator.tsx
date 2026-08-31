@@ -181,14 +181,16 @@ export default function InvoiceGenerator() {
     const newCustomer = {
       id: Date.now().toString(),
       name: clientCompany || clientName,
-      phone: clientAddress,
+      company: clientCompany,
+      phone: '', 
       email: clientEmail,
       address: clientAddress,
-      creditLimit: 0,
+      taxId: '', 
       totalCredit: 0,
       paidAmount: 0,
       balance: 0,
-      notes: clientName !== clientCompany ? `Contact: ${clientName}` : '',
+      transactions: [],
+      createdAt: new Date().toISOString(),
       lastUpdated: new Date().toISOString()
     };
     saveCreditCustomer(newCustomer);
@@ -662,9 +664,9 @@ export default function InvoiceGenerator() {
                          const client = creditCustomers.find(c => c.id === e.target.value);
                          if (client) {
                            setClientName(client.name);
-                           setClientCompany(client.name); // Using name for company as fallback
+                           setClientCompany(client.company || client.name); // Using name for company as fallback
                            setClientEmail(client.email || '');
-                           setClientAddress(client.phone || ''); // Using phone as fallback address
+                           setClientAddress(client.address || ''); // Using phone as fallback address
                          }
                        }
                      }}
@@ -869,7 +871,7 @@ export default function InvoiceGenerator() {
           headerImage,
           backgroundImage,
           useCustomHeader,
-          businessName: businessSetup?.businessName || 'Your Business',
+          businessName: businessSetup?.name || businessSetup?.businessName || 'Your Business',
           address: businessSetup?.address || '',
           phone: businessSetup?.phone || '',
           email: businessSetup?.email || ''

@@ -31,9 +31,8 @@ export default function TillMonitor({ totalAmount }: Props) {
         const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId;
         if (!businessId) return;
 
-        const rawUrl = (businessSetup as any)?.backOfficeUrl || (businessSetup as any)?.apiUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-        const baseUrl = rawUrl.replace(/\/$/, '').replace(/\/api$/, '');
-        const res = await fetch(`${baseUrl}/api/mpesa/payments/search?businessId=${businessId}`);
+        const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+        const res = await fetch(`${cloudUrl}/api/mpesa/payments/search?businessId=${businessId}`);
         if (res.ok) {
           const txns = await res.json();
           const localUsedCodes = usePosStore.getState().transactions.map(t => t.mpesaCode).filter(Boolean);

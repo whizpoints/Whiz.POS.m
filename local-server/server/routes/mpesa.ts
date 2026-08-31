@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import prisma from '../prisma.js';
 import { MpesaCallbackUrlService } from '../services/mpesaUrls.js';
 import { generateSecurityCredential } from '../utils/crypto.js';

@@ -1,0 +1,1 @@
+import { PrismaClient } from '@prisma/client'; const prisma = new PrismaClient(); async function run() { console.log(await prisma.terminal.findMany()); console.log(JSON.stringify(await prisma.product.findMany({include: {inventory: true}}), null, 2)); prisma.$disconnect(); } run();
