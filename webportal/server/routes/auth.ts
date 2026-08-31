@@ -137,7 +137,7 @@ router.get('/verify-email', async (req, res) => {
     const isDev = host.includes('localhost');
     const frontendUrl = isDev ? 'http://localhost:5173' : `${protocol}://${host}`;
     
-    res.redirect(`${frontendUrl}/onboarding`);
+    res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
     console.error('Verify error:', error);
     res.status(500).send('Internal server error');
