@@ -148,7 +148,7 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
       >
         {branding.backgroundImage && (
           <div className="absolute inset-0 pointer-events-none opacity-10 flex items-center justify-center overflow-hidden z-0">
-            <img crossOrigin="anonymous" src={branding.backgroundImage} className="w-full h-full object-cover" alt="bg" />
+            <img crossOrigin="anonymous" src={branding.backgroundImage.startsWith("http") ? `/api/business/proxy-image?url=${encodeURIComponent(branding.backgroundImage)}` : branding.backgroundImage} className="w-full h-full object-cover" alt="bg" />
           </div>
         )}
 
@@ -159,10 +159,10 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
              <div className="flex justify-between items-start">
                 <div className="w-7/12">
                    {branding.useCustomHeader && branding.headerImage ? (
-                     <img crossOrigin="anonymous" src={branding.headerImage} alt="Header" className="max-w-full max-h-28 object-contain" />
+                     <img crossOrigin="anonymous" src={branding.headerImage.startsWith("http") ? `/api/business/proxy-image?url=${encodeURIComponent(branding.headerImage)}` : branding.headerImage} alt="Header" className="max-w-full max-h-28 object-contain" />
                    ) : (
                      <div className="space-y-2">
-                        {branding.logoImage && <img crossOrigin="anonymous" src={branding.logoImage} alt="Logo" className="h-20 object-contain mb-4" />}
+                        {branding.logoImage && <img crossOrigin="anonymous" src={branding.logoImage.startsWith("http") ? `/api/business/proxy-image?url=${encodeURIComponent(branding.logoImage)}` : branding.logoImage} alt="Logo" className="h-20 object-contain mb-4" />}
                         <div>
                            <h1 className="text-2xl font-bold text-sky-900">{branding.businessName}</h1>
                            <p className="text-slate-600 text-xs whitespace-pre-line mt-1">
@@ -349,5 +349,6 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
 );
 
 DocumentPreview.displayName = 'DocumentPreview';
+
 
 

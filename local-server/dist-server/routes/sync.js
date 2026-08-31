@@ -341,7 +341,7 @@ router.post('/full', (req, res) => {
                             type: log.type || log.reason || 'SALE',
                             quantity: Math.abs(Number(log.variance) || 0),
                             reference: String(log.reference || log.id),
-                            timestamp: new Date(log.timestamp || Date.now())
+                            timestamp: new Date(log.timestamp || Date.now()).toISOString().toISOString()
                         }).returningAll().executeTakeFirstOrThrow();
                         // Also deduct from absolute stock in ProductInventory
                         let inventory = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', String(log.productId)).where('locationId', '=', targetLocationId).where('outletId', targetOutletId ? '=' : 'is', targetOutletId ? targetOutletId : null).executeTakeFirst();

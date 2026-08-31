@@ -373,7 +373,7 @@ router.post('/full', (req: any, res: any) => {
                 type: log.type || log.reason || 'SALE',
                 quantity: Math.abs(Number(log.variance) || 0),
                 reference: String(log.reference || log.id),
-                timestamp: new Date(log.timestamp || Date.now())
+                timestamp: new Date(log.timestamp || Date.now()).toISOString().toISOString()
               }).returningAll().executeTakeFirstOrThrow();
 
             // Also deduct from absolute stock in ProductInventory
@@ -399,4 +399,6 @@ router.post('/full', (req: any, res: any) => {
 });
 
 export default router;
+
+
 

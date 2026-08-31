@@ -302,9 +302,9 @@ router.get('/payments/search', async (req, res) => {
             .limit(20);
         if (q) {
             query = query.where((eb) => eb.or([
-                eb('transactionId', 'like', `%\${q}%`),
-                eb('customerName', 'like', `%\${q}%`),
-                eb('phoneNumber', 'like', `%\${q}%`)
+                eb('transactionId', 'like', `%${q}%`),
+                eb('customerName', 'like', `%${q}%`),
+                eb('phoneNumber', 'like', `%${q}%`)
             ]));
         }
         const txns = await query.execute();
