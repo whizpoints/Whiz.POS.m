@@ -121,11 +121,11 @@ export default function InvoiceGenerator() {
 
   useEffect(() => {
     if (documentSettings && !currentDocId) {
-      setLogoImage(documentSettings.logoImage || null);
+      setLogoImage(businessSetup?.documentLogoUrl || documentSettings.logoImage || null);
       setHeaderImage(documentSettings.headerImage || null);
       setUseCustomHeader(documentSettings.useCustomHeader || false);
       setShowWatermark(documentSettings.showWatermark ?? true);
-      setBackgroundImage(documentSettings.backgroundImage || null);
+      setBackgroundImage(businessSetup?.watermarkUrl || documentSettings.backgroundImage || null);
       
       setNotes(documentSettings.defaultNotes || "This is a computer generated document and doesn't need a stamp or signature for receiving.");
       setPaymentInfo(documentSettings.defaultPaymentInfo || '');
@@ -572,15 +572,27 @@ export default function InvoiceGenerator() {
                  <button onClick={() => setShowSettingsModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
                     Cancel
                  </button>
-                 <button onClick={() => {
-                    saveDocumentSettings(tempSettings);
-                    setLogoImage(tempSettings.logoImage || null);
-                    setBackgroundImage(tempSettings.backgroundImage || null);
-                    setShowWatermark(tempSettings.showWatermark ?? true);
-                    setNotes(tempSettings.defaultNotes || "This is a computer generated document and doesn't need a stamp or signature for receiving.");
-                    setPaymentInfo(tempSettings.defaultPaymentInfo || '');
-                    setShowSettingsModal(false);
-                 }} className="px-4 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors flex items-center gap-2">
+                 <button onClick={async () => {
+                      saveDocumentSettings(tempSettings);
+                      
+                      try {
+                        const token = localStorage.getItem('whiz-token');
+                        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+                        await fetch(`${API_BASE_URL}/api/business/profile`, {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                           body: JSON.stringify({ settings: JSON.stringify({ documentDefaults: tempSettings }) })
+                        });
+                        toast.success('Defaults saved permanently to Cloud!');
+                      } catch(e) {}
+
+                      setLogoImage(tempSettings.logoImage || null);
+                      setBackgroundImage(tempSettings.backgroundImage || null);
+                      setShowWatermark(tempSettings.showWatermark ?? true);
+                      setNotes(tempSettings.defaultNotes || "This is a computer generated document and doesn't need a stamp or signature for receiving.");
+                      setPaymentInfo(tempSettings.defaultPaymentInfo || '');
+                      setShowSettingsModal(false);
+                   }} className="px-4 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors flex items-center gap-2">
                     <Save className="w-4 h-4" /> Save Defaults
                  </button>
               </div>
@@ -626,11 +638,11 @@ export default function InvoiceGenerator() {
                  <button
                    onClick={() => {
                      setTempSettings({
-    ...(documentSettings || {}),
-    logoImage: businessSetup?.documentLogoUrl || documentSettings?.logoImage || null,
-    backgroundImage: businessSetup?.watermarkUrl || documentSettings?.backgroundImage || null
-});
-setShowSettingsModal(true);
+                         ...(documentSettings || {}),
+                         logoImage: businessSetup?.documentLogoUrl || documentSettings?.logoImage || null,
+                         backgroundImage: businessSetup?.watermarkUrl || documentSettings?.backgroundImage || null
+                     });
+                     setShowSettingsModal(true);
                    }}
                    className="text-xs text-sky-600 hover:text-sky-700 font-medium"
                  >

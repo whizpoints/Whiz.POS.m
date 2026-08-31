@@ -44,7 +44,7 @@ router.get('/profile', async (req: any, res: any) => {
     const { businessId } = req.user;
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, name: true, email: true, logoUrl: true, createdAt: true, settings: true, apiKey: true }
+      select: { id: true, name: true, email: true, logoUrl: true, documentLogoUrl: true, watermarkUrl: true, createdAt: true, settings: true, apiKey: true }
     });
     if (!business) return res.status(404).json({ error: 'Business not found' });
     res.json(business);
