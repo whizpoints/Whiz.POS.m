@@ -77,7 +77,7 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign({ userId: user.id, businessId: business.id, role: user.role }, JWT_SECRET, { expiresIn: '3h' });
 
     // Send verification email
-    const frontendUrl = process.env.CORS_ORIGINS?.split(',')[0] || 'http://localhost:5173';
+    const frontendUrl = req.headers.origin || process.env.CORS_ORIGINS?.split(',')[0] || 'https://backoffice.whizpoint.app';
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
     const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5050';
     const verifyLink = `${protocol}://${host}/api/auth/verify-email?token=${verificationToken}`;
@@ -151,7 +151,7 @@ router.get('/verify-status', async (req, res) => {
     if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
     
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    let decoded: any; try { decoded = jwt.verify(token, JWT_SECRET); } catch (err) { return res.status(401).json({ error: "Invalid token" }); }
 
     const business = await prisma.business.findUnique({ where: { id: decoded.businessId } });
     if (!business) return res.status(404).json({ error: 'Business not found' });
@@ -170,7 +170,7 @@ router.post('/resend-verification', async (req, res) => {
     if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
     
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    let decoded: any; try { decoded = jwt.verify(token, JWT_SECRET); } catch (err) { return res.status(401).json({ error: "Invalid token" }); }
 
     const business = await prisma.business.findUnique({ where: { id: decoded.businessId } });
     if (!business) return res.status(404).json({ error: 'Business not found' });
@@ -184,7 +184,7 @@ router.post('/resend-verification', async (req, res) => {
 
     const fromName = process.env.BREVO_FROM_NAME || 'Whiz POS';
     const fromEmail = process.env.BREVO_FROM_EMAIL || 'support@whizpoint.app';
-    const baseUrl = process.env.VITE_API_BASE_URL || 'https://api.whizpoint.app';
+    const baseUrl = process.env.VITE_API_BASE_URL || (req.headers.origin || 'https://backoffice.whizpoint.app');
 
     await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
@@ -209,7 +209,7 @@ router.post('/setup', async (req, res) => {
     if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
     
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    let decoded: any; try { decoded = jwt.verify(token, JWT_SECRET); } catch (err) { return res.status(401).json({ error: "Invalid token" }); }
 
     const { businessName, kraPin } = req.body;
     const apiKey = crypto.randomBytes(32).toString('hex');
@@ -298,7 +298,12 @@ router.post('/verify-api-key', async (req, res) => {
       if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
       
       const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      let decoded: any;
+      try {
+        decoded = jwt.verify(token, JWT_SECRET);
+      } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
       const { locationId } = req.body;
       if (!locationId) return res.status(400).json({ error: 'Location ID required' });
   

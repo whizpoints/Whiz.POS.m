@@ -8,7 +8,7 @@ export default function VerifyEmailPage() {
   const [checking, setChecking] = useState(true);
   const navigate = useNavigate();
   const token = localStorage.getItem('whiz-token');
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.whizpoint.app';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
   // Automatically check verification status periodically
   useEffect(() => {
@@ -128,3 +128,4 @@ export default function VerifyEmailPage() {
     </div>
   );
 }
+

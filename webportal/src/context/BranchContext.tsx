@@ -30,7 +30,7 @@ export const BranchProvider = ({ children }: { children: ReactNode }) => {
            return;
         }
 
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.whizpoint.app';
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
         const res = await fetch(`${API_BASE_URL}/api/business/locations`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -67,3 +67,4 @@ export const useBranchContext = () => {
   }
   return context;
 };
+

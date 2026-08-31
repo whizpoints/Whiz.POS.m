@@ -16,7 +16,7 @@ export default function Suppliers() {
       try {
         setLoading(true);
         const token = localStorage.getItem('whiz-token');
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.whizpoint.app';
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
         const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
         const response = await fetch(`${API_BASE_URL}/api/dashboard/suppliers${query}`, {
           headers: {
@@ -178,3 +178,4 @@ export default function Suppliers() {
     </div>
   );
 }
+
