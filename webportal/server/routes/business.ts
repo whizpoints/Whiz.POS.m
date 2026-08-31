@@ -36,6 +36,28 @@ const authenticate = async (req: any, res: any, next: any) => {
   }
 };
 
+// Proxy image to bypass R2 CORS on frontend canvas (PUBLIC)
+router.get('/proxy-image', async (req: any, res: any) => {
+  try {
+    const imageUrl = req.query.url;
+    if (!imageUrl) return res.status(400).send('URL required');
+    
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error('Failed to fetch image');
+    
+    const contentType = response.headers.get('content-type') || 'image/png';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('Image proxy error:', err);
+    res.status(500).send('Error proxying image');
+  }
+});
+
 router.use(authenticate);
 
 // Get Business Profile
@@ -119,28 +141,6 @@ router.post('/logo', upload.single('logo'), async (req: any, res: any) => {
   }
 });
 
-  // Proxy image to bypass R2 CORS on frontend canvas
-  router.get('/proxy-image', async (req: any, res: any) => {
-    try {
-      const imageUrl = req.query.url;
-      if (!imageUrl) return res.status(400).send('URL required');
-      
-      const response = await fetch(imageUrl);
-      if (!response.ok) throw new Error('Failed to fetch image');
-      
-      const contentType = response.headers.get('content-type') || 'image/png';
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Cache-Control', 'public, max-age=31536000');
-      
-      const buffer = await response.arrayBuffer();
-      res.send(Buffer.from(buffer));
-    } catch (err) {
-      console.error('Image proxy error:', err);
-      res.status(500).send('Error proxying image');
-    }
-  });
-
 // Upload generic document asset (watermark, etc)
 router.post('/document-asset', upload.single('file'), async (req: any, res: any) => {
   try {
@@ -181,4 +181,5 @@ router.get('/locations', async (req: any, res: any) => {
 });
 
 export default router;
+
 
