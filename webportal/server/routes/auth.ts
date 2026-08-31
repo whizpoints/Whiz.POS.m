@@ -9,9 +9,11 @@ const router = Router();
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
+const smtpPort = parseInt(process.env.BREVO_SMTP_PORT || '465');
 const transporter = nodemailer.createTransport({
   host: process.env.BREVO_SMTP_SERVER || 'smtp-relay.brevo.com',
-  port: parseInt(process.env.BREVO_SMTP_PORT || '587'),
+  port: smtpPort,
+  secure: smtpPort === 465, // Use true for 465 (SSL/TLS), false for 587/2525 (STARTTLS)
   auth: {
     user: process.env.BREVO_SMTP_LOGIN,
     pass: process.env.BREVO_SMTP_KEY,
