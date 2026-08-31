@@ -60,6 +60,8 @@ export default function InvoiceGenerator() {
   const [showClientModal, setShowClientModal] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [showSavedDocs, setShowSavedDocs] = useState(false);
+  const [isSavingDoc, setIsSavingDoc] = useState(false);
+  const [isSavingClient, setIsSavingClient] = useState(false);
   const [currentDocId, setCurrentDocId] = useState<string | null>(null);
 
   // Letter State
@@ -176,6 +178,7 @@ export default function InvoiceGenerator() {
   }, []);
 
   const handleSaveDocument = async () => {
+    setIsSavingDoc(true);
     const docData = { docNumber, date, dueDate, clientName, clientCompany, clientAddress, clientEmail, items, subtotal, taxAmount, total, taxRate, notes, paymentInfo, subject, bodyText: templateString, partialAmount, settlementDate, daysNotice, paymentMode, projectReference, branding: { logoImage, headerImage, backgroundImage: showWatermark ? backgroundImage : null, useCustomHeader } };
     const newDocId = currentDocId || `DOC${Date.now()}`;
     const apiDoc = { id: newDocId, type: docType, date: new Date().toISOString(), customerName: clientCompany || clientName || 'Unknown', customerEmail: clientEmail, customerPhone: clientAddress, customerAddress: clientAddress, items: items, subtotal: subtotal, tax: taxAmount, total: total, notes: notes, status: 'DRAFT', metadata: docData };
@@ -195,11 +198,16 @@ export default function InvoiceGenerator() {
             setCurrentDocId(savedDoc.id);
             toast.success('Document saved permanently to Neon Database!');
         } else { toast.error('Failed to save document to cloud.'); }
-    } catch (e) { toast.error('Network error saving document.'); }
+    } catch (e) { toast.error('Network error saving document.'); } finally { setIsSavingDoc(false); }
   };
 
   const handleSaveClient = async () => {
-    if (!clientName && !clientCompany) return toast.error('Please enter a Client Name or Company Name first.');
+    setIsSavingClient(true);
+    if (!clientName && !clientCompany) {
+      toast.error('Please enter a Client Name or Company Name first.');
+      setIsSavingClient(false);
+      return;
+    }
     const newCustomer = { id: Date.now().toString(), name: clientCompany || clientName, phone: clientAddress, email: clientEmail, address: clientAddress };
     try {
         const token = localStorage.getItem('whiz-token');
@@ -214,7 +222,7 @@ export default function InvoiceGenerator() {
             usePosStore.setState((s: any) => ({ creditCustomers: [...s.creditCustomers, savedClient] }));
             toast.success('Client permanently saved to Neon Database!');
         } else { toast.error('Failed to save client to cloud.'); }
-    } catch (e) { toast.error('Network error saving client.'); }
+    } catch (e) { toast.error('Network error saving client.'); } finally { setIsSavingClient(false); }
   };
 
   const handleLoadDocument = (doc: SavedDocument) => {
@@ -385,9 +393,10 @@ export default function InvoiceGenerator() {
            </button>
            <button
              onClick={handleSaveDocument}
-             className="flex items-center gap-2 bg-sky-600 text-white hover:bg-sky-700 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm z-10"
+             disabled={isSavingDoc}
+             className="flex items-center gap-2 bg-sky-600 text-white hover:bg-sky-700 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm z-10 disabled:opacity-50 disabled:cursor-not-allowed"
            >
-             <Save className="w-4 h-4" /> {currentDocId ? 'Update' : 'Save'}
+             <Save className="w-4 h-4" /> {isSavingDoc ? 'Saving...' : currentDocId ? 'Update' : 'Save'}
            </button>
            <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1"></div>
            <button
@@ -616,8 +625,12 @@ export default function InvoiceGenerator() {
                  </h3>
                  <button
                    onClick={() => {
-                     setTempSettings(documentSettings || {});
-                     setShowSettingsModal(true);
+                     setTempSettings({
+    ...(documentSettings || {}),
+    logoImage: businessSetup?.documentLogoUrl || documentSettings?.logoImage || null,
+    backgroundImage: businessSetup?.watermarkUrl || documentSettings?.backgroundImage || null
+});
+setShowSettingsModal(true);
                    }}
                    className="text-xs text-sky-600 hover:text-sky-700 font-medium"
                  >
@@ -720,32 +733,17 @@ export default function InvoiceGenerator() {
                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                    <User className="w-4 h-4" /> Recipient Details
                  </h3>
-                 <div className="flex items-center gap-2">
-                   <button onClick={handleSaveClient} title="Save to Address Book" className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors">
-                     <Save className="w-3 h-3" /> Save Client
-                   </button>
-                   <div className="relative">
-                   <select
-                     className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-sky-500 text-slate-600 appearance-none pr-8 cursor-pointer"
-                     onChange={(e) => {
-                       if (e.target.value) {
-                         const client = creditCustomers.find(c => c.id === e.target.value);
-                         if (client) {
-                           setClientName(client.name);
-                           setClientCompany(client.name); // Using name for company as fallback
-                           setClientEmail(client.email || '');
-                           setClientAddress(client.phone || ''); // Using phone as fallback address
-                         }
-                       }
-                     }}
-                   >
-                     <option value="">Select Saved Client...</option>
-                     {creditCustomers.map(c => (
-                       <option key={c.id} value={c.id}>{c.name}</option>
-                     ))}
-                   </select>
+                                   <div className="flex items-center gap-2">
+                    <button onClick={handleSaveClient} disabled={isSavingClient} title="Save to Address Book" className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      <Save className="w-3 h-3" /> {isSavingClient ? 'Saving...' : 'Save Client'}
+                    </button>
+                    <button
+                      onClick={() => setShowClientModal(true)}
+                      className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 transition-colors"
+                    >
+                      Select Saved Client...
+                    </button>
                   </div>
-                 </div>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <input type="text" placeholder="Company Name" value={clientCompany} onChange={(e) => setClientCompany(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500" />
@@ -939,10 +937,10 @@ export default function InvoiceGenerator() {
           headerImage,
           backgroundImage,
           useCustomHeader,
-          businessName: businessSetup?.businessName || 'Your Business',
-          address: businessSetup?.address || '',
-          phone: businessSetup?.phone || '',
-          email: businessSetup?.email || ''
+                    businessName: businessSetup?.settings?.legalName || businessSetup?.name || 'Your Business',
+          address: businessSetup?.settings?.address || businessSetup?.address || '',
+          phone: businessSetup?.settings?.phone || businessSetup?.phone || '',
+          email: businessSetup?.settings?.email || businessSetup?.email || ''
         }}
         signatory={currentCashier}
         data={{
@@ -972,6 +970,9 @@ export default function InvoiceGenerator() {
     </div>
   );
 }
+
+
+
 
 
 
