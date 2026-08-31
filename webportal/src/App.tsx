@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Link, NavLink, useLocation, use
 import { FileText,
   ShieldCheck, BarChart3, Menu, X, LogIn,
   Package, Users, UserCog, FileBarChart,
-  Search, Bell, Sun, Moon, ChevronDown, Receipt, Warehouse, PieChart,
+  Search, Sun, Moon, ChevronDown, Receipt, Warehouse, PieChart,
   Sliders, Building2
 } from 'lucide-react';
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react';
@@ -285,6 +285,7 @@ function PublicLayout({ children }: { children: ReactNode }) {
 ============================================================ */
 function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { locations, activeLocationId, setActiveLocationId, isLoading } = useBranchContext();
@@ -408,11 +409,11 @@ function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="app-content flex-1 flex flex-col">
           <header className="topbar">
             <div className="page-title-wrap min-w-0">
-              <button className="btn btn-icon btn-secondary sidebar-toggle" onClick={() => setMobileOpen(true)} aria-label="Menu">
+              <button className="btn btn-icon btn-secondary sidebar-toggle shrink-0" onClick={() => setMobileOpen(true)} aria-label="Menu">
                 <Menu />
               </button>
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                <div className="hidden md:flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
                   {breadcrumb.map((c, i) => (
                     <span key={i} className="flex items-center gap-1.5">
                       {c.to ? <Link to={c.to} className="hover:text-[var(--accent-primary)] transition-colors">{c.label}</Link> : <span style={{ color: 'var(--text-secondary)' }}>{c.label}</span>}
@@ -424,13 +425,13 @@ function DashboardLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <div className="topbar-actions">
+            <div className="topbar-actions ml-auto flex shrink-0">
               <div className="flex items-center gap-2 mr-2">
                 {!isLoading && (
                   <select
                     value={activeLocationId}
                     onChange={(e) => setActiveLocationId(e.target.value)}
-                    className="border rounded-lg bg-gray-50 p-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
+                    className="border rounded-lg bg-gray-50 p-1 md:p-2 text-[11px] md:text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 max-w-[90px] md:max-w-none truncate"
                   >
                     <option value="ALL">All Branches</option>
                     {locations.map(loc => (
@@ -439,38 +440,52 @@ function DashboardLayout({ children }: { children: ReactNode }) {
                   </select>
                 )}
               </div>
-              <div className="search-box hidden md:flex">
-                <Search />
-                <input placeholder="Search sales, products..." />
+              <div className="search-box hidden md:flex items-center">
+                <Search className="w-4 h-4 shrink-0" />
+                <input placeholder="Search sales, products..." className="w-full bg-transparent border-none outline-none text-sm" />
               </div>
-              <ThemeToggle />
-              <button 
-                onClick={() => navigate('/dashboard/settings')}
-                className="btn btn-icon btn-secondary relative" 
-                title="Notifications"
-                aria-label="Notifications"
-              >
-                <Bell />
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full" style={{ background: 'var(--accent-error)', boxShadow: '0 0 0 2px var(--bg-secondary)' }}></span>
-              </button>
-              <button 
-                onClick={() => navigate('/dashboard/settings')}
-                className="user-avatar hidden sm:flex border-0 cursor-pointer hover:opacity-80 transition-opacity" 
-                title="Account Settings"
-              >
-                {user?.name ? user.name.slice(0,2).toUpperCase() : 'AD'}
-              </button>
-              <button 
-                className="btn btn-icon btn-ghost hidden sm:flex text-[color:var(--text-muted)] hover:text-red-500" 
-                title="Logout" 
-                onClick={handleLogout}
-              >
-                <LogIn className="rotate-180 w-5 h-5" />
-              </button>
+              <div className="hidden md:block">
+                <ThemeToggle />
+              </div>
+              
+              <div className="relative">
+                <button 
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="user-avatar border-0 cursor-pointer hover:opacity-80 transition-opacity w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm flex" 
+                  title="Account Settings"
+                >
+                  {user?.name ? user.name.slice(0,2).toUpperCase() : 'AD'}
+                </button>
+                
+                {userMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)}></div>
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 animate-in fade-in slide-in-from-top-2">
+                      <div className="px-4 py-2 border-b border-slate-100 mb-1">
+                        <div className="font-medium text-slate-800 text-sm truncate">{user?.name || 'Admin'}</div>
+                        <div className="text-xs text-slate-500 truncate">{user?.email || 'admin@business.com'}</div>
+                      </div>
+                      <button 
+                        onClick={() => { setUserMenuOpen(false); navigate('/dashboard/settings'); }}
+                        className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                      >
+                        <Sliders className="w-4 h-4" /> Settings
+                      </button>
+                      <button 
+                        onClick={() => { setUserMenuOpen(false); handleLogout(); }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                      >
+                        <LogIn className="rotate-180 w-4 h-4" /> Logout
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              
             </div>
           </header>
 
-          <main className="flex-1 no-pad-x">
+          <main className="flex-1 no-pad-x px-4 py-4 md:px-0 md:py-0">
             {children}
           </main>
         </div>

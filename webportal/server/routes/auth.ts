@@ -125,7 +125,11 @@ router.get('/verify-email', async (req, res) => {
 
     const business = await prisma.business.findFirst({ where: { verificationToken: token } });
     if (!business) {
-      return res.status(400).send('Invalid or expired token');
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+      const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:3000';
+      const isDev = host.includes('localhost');
+      const frontendUrl = isDev ? 'http://localhost:5173' : `${protocol}://${host}`;
+      return res.redirect(`${frontendUrl}/verify-email?status=used`);
     }
 
     await prisma.business.update({

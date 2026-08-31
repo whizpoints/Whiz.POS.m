@@ -1,17 +1,40 @@
 import { useState, useEffect } from 'react';
-import { Mail, RefreshCw, LogOut, CheckCircle2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Mail, RefreshCw, LogOut, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export default function VerifyEmailPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [countdown, setCountdown] = useState(3);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const status = searchParams.get('status');
   const token = localStorage.getItem('whiz-token');
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
+  // Handle 'already used' status
+  useEffect(() => {
+    if (status === 'used') {
+      setChecking(false);
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            navigate('/auth');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [status, navigate]);
+
   // Automatically check verification status periodically
   useEffect(() => {
+    if (status === 'used') return; // Don't poll if we're just showing the error
+
     let interval: ReturnType<typeof setInterval>;
     
     const checkStatus = async () => {
@@ -50,7 +73,7 @@ export default function VerifyEmailPage() {
     interval = setInterval(checkStatus, 5000);
 
     return () => clearInterval(interval);
-  }, [token, navigate, API_BASE_URL]);
+  }, [token, navigate, API_BASE_URL, status]);
 
   const handleResend = async () => {
     setLoading(true);
@@ -77,6 +100,33 @@ export default function VerifyEmailPage() {
     localStorage.removeItem('whiz-user');
     navigate('/auth');
   };
+
+  if (status === 'used') {
+    return (
+      <div className="min-h-screen relative flex items-center justify-center p-4 bg-gray-50 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-[120px]" />
+
+        <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl relative z-10 border border-gray-100 text-center animate-in fade-in zoom-in duration-500">
+          <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-10 h-10 text-red-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Expired</h1>
+          <p className="text-gray-600 mb-8 leading-relaxed">
+            This verification token has already been used or has expired.
+          </p>
+          <div className="bg-orange-50 rounded-xl p-4 flex items-center justify-center gap-3 border border-orange-100">
+            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center font-bold text-orange-600 shadow-sm">
+              {countdown}
+            </div>
+            <p className="text-sm text-orange-800 font-medium">
+              Redirecting to login...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 bg-gray-50 overflow-hidden">
@@ -128,4 +178,3 @@ export default function VerifyEmailPage() {
     </div>
   );
 }
-

@@ -82,17 +82,17 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="space-y-6 md:space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header row */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 -mx-0.5">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 -mx-0.5">
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-muted)] mb-1">
             Configuration
           </div>
-          <h1 className="font-heading text-2xl sm:text-[1.7rem] font-black tracking-tight text-[color:var(--text-primary)] truncate">
+          <h1 className="font-heading text-2xl md:text-[1.7rem] font-black tracking-tight text-[color:var(--text-primary)] truncate">
             System Settings
           </h1>
-          <p className="text-sm text-[color:var(--text-secondary)] mt-0.5">
+          <p className="text-sm text-[color:var(--text-secondary)] mt-1 md:mt-0.5">
             Manage API keys, payment integrations, compliance, and business identity.
           </p>
         </div>
@@ -107,7 +107,7 @@ export default function Settings() {
               downloadAnchorNode.click();
               downloadAnchorNode.remove();
             }}
-            className="btn btn-secondary !px-3 inline-flex items-center gap-1.5 text-sm"
+            className="btn btn-secondary !px-4 md:!px-3 py-2.5 md:py-2 w-full md:w-auto inline-flex items-center justify-center gap-2 text-sm"
           >
             <Download className="w-4 h-4" />
             Export Config
@@ -116,27 +116,34 @@ export default function Settings() {
       </div>
 
       {/* Tabs */}
-      <div className="glass-strong rounded-2xl p-1.5 flex gap-1 overflow-x-auto -mx-0.5">
-        {tabs.map(t => {
-          const active = t.id === tab;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`relative inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
-                active ? 'text-white shadow-md' : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)]'
-              }`}
-              style={active ? { background: 'var(--accent-gradient)', boxShadow: '0 8px 24px -10px color-mix(in oklab, var(--accent) 60%, transparent)' } : {}}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          );
-        })}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex items-center gap-1.5 md:gap-2 p-1.5 md:p-1.5 bg-slate-100/80 md:bg-[color:var(--bg-glass)] md:glass-strong rounded-2xl md:rounded-2xl border border-slate-200/60 md:border-transparent min-w-max">
+          {tabs.map(t => {
+            const active = t.id === tab;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`relative inline-flex items-center gap-2 px-4 py-2.5 md:px-3.5 md:py-2 rounded-xl text-[13px] font-semibold transition-all whitespace-nowrap ${
+                  active 
+                  ? 'bg-white text-slate-900 shadow-[0_2px_10px_rgba(0,0,0,0.06)] md:text-white md:shadow-md' 
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'
+                }`}
+                style={active ? { 
+                  background: 'var(--mobile-active-bg, white)',
+                  ...(window.innerWidth >= 768 ? { background: 'var(--accent-gradient)', boxShadow: '0 8px 24px -10px color-mix(in oklab, var(--accent) 60%, transparent)' } : {})
+                } : {}}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Panels */}
-      <div className="space-y-4">
+      <div className="space-y-6 md:space-y-4">
         {tab === 'security' && <SecurityPanel profile={profile} fetchProfile={fetchProfile} />}
         {tab === 'payments' && <PaymentsPanel />}
         {tab === 'etims' && <ETimsPanel profile={profile} onSave={updateProfileSettings} />}
@@ -149,59 +156,73 @@ export default function Settings() {
 
 /* --------------------------- Security --------------------------- */
 
-function CopyField({ value, mono = true }: { value: string; mono?: boolean }) {
+function CopyField({ value, mono = true, isSecret = false }: { value: string; mono?: boolean; isSecret?: boolean }) {
   const [copied, setCopied] = useState(false);
+  const [show, setShow] = useState(!isSecret);
   const copy = () => {
     navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   };
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
       <div
-        className={`input flex-1 h-10 !pr-2.5 items-center inline-flex overflow-hidden ${mono ? 'font-mono text-[13px]' : 'text-sm'}`}
+        className={`input flex-1 min-h-[44px] h-auto !pr-3 py-2.5 items-center inline-flex overflow-hidden ${mono ? 'font-mono text-[13px]' : 'text-sm'}`}
         style={mono ? { letterSpacing: '0.2px' } : {}}
       >
-        <span className="truncate text-[color:var(--text-primary)]">{value}</span>
+        <span className="break-all text-[color:var(--text-primary)]">
+          {show ? value : '••••••••••••••••••••••••'}
+        </span>
       </div>
-      <button
-        onClick={copy}
-        className="btn btn-secondary !w-10 !h-10 !px-0 inline-flex items-center justify-center shrink-0"
-        aria-label="Copy value"
-      >
-        {copied
-          ? <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500" />
-          : <Copy className="w-4 h-4" />}
-      </button>
+      <div className="flex gap-2">
+        {isSecret && (
+          <button
+            onClick={() => setShow(!show)}
+            className="btn btn-secondary flex-1 md:!w-11 md:!h-11 inline-flex items-center justify-center shrink-0"
+            aria-label="Toggle visibility"
+          >
+            {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        )}
+        <button
+          onClick={copy}
+          className="btn btn-secondary flex-1 md:!w-11 md:!h-11 inline-flex items-center justify-center shrink-0"
+          aria-label="Copy value"
+        >
+          {copied
+            ? <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500" />
+            : <Copy className="w-4 h-4" />}
+        </button>
+      </div>
     </div>
   );
 }
 
 function ApiKeyRow({ label, keyStr, status, badge }: { label: string; keyStr: string; status: 'live' | 'test' | 'revoked'; badge: string }) {
   return (
-    <div className="glass-subtle rounded-xl p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+    <div className="glass-subtle rounded-xl p-4 md:p-6 space-y-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center"
+          <div className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center"
                style={{ background: 'linear-gradient(135deg, color-mix(in oklab, var(--accent) 25%, transparent), color-mix(in oklab, var(--accent-secondary) 22%, transparent))' }}>
-            <Key className="w-4.5 h-4.5 text-[color:var(--accent)]" />
+            <Key className="w-5 h-5 text-[color:var(--accent)]" />
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-[color:var(--text-primary)] truncate">{label}</div>
-            <div className="text-[11px] text-[color:var(--text-muted)] font-mono">Created Mar 12, 2025 • Last used 2h ago</div>
+            <div className="text-[15px] font-semibold text-[color:var(--text-primary)] truncate">{label}</div>
+            <div className="text-xs text-[color:var(--text-muted)] font-mono mt-0.5">Created Mar 12, 2025 • Last used 2h ago</div>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <span className={`badge badge-${status === 'live' ? 'success' : status === 'test' ? 'info' : 'error'}`}>{badge}</span>
-          <button className="btn btn-ghost !w-9 !h-9 !p-0 inline-flex items-center justify-center text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]" title="Rotate">
-            <RefreshCw className="w-4 h-4" />
+          <button className="btn btn-ghost !w-10 !h-10 !p-0 inline-flex items-center justify-center text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]" title="Rotate">
+            <RefreshCw className="w-4.5 h-4.5" />
           </button>
-          <button className="btn btn-ghost !w-9 !h-9 !p-0 inline-flex items-center justify-center text-[color:var(--text-muted)] hover:text-red-500" title="Revoke">
-            <Trash2 className="w-4 h-4" />
+          <button className="btn btn-ghost !w-10 !h-10 !p-0 inline-flex items-center justify-center text-[color:var(--text-muted)] hover:text-red-500" title="Revoke">
+            <Trash2 className="w-4.5 h-4.5" />
           </button>
         </div>
       </div>
-      <CopyField value={keyStr} />
+      <CopyField value={keyStr} isSecret={true} />
     </div>
   );
 }
@@ -270,9 +291,9 @@ function SecurityPanel({ profile, fetchProfile }: any) {
         {profile?.apiKey ? (
           <ApiKeyRow label="Live Production Key" keyStr={profile.apiKey} status="live" badge="LIVE" />
         ) : (
-          <div className="glass-subtle rounded-xl p-4 space-y-3 flex flex-col items-center justify-center">
+          <div className="glass-subtle rounded-xl p-5 md:p-6 space-y-4 flex flex-col items-center justify-center">
              <p className="text-sm text-[color:var(--text-secondary)]">No API key generated yet.</p>
-             <button onClick={handleGenerateKey} className="btn btn-primary text-sm inline-flex items-center gap-1.5">
+             <button onClick={handleGenerateKey} className="btn btn-primary w-full md:w-auto text-sm inline-flex justify-center items-center gap-1.5">
                <Key className="w-4 h-4" />
                Generate Live Key
              </button>
@@ -281,7 +302,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
       </div>
 
       {profile?.apiKey && (
-        <div className="mt-8 border-t border-[color:var(--border-default)] pt-8">
+        <div className="mt-8 border-t border-[color:var(--border-default)] pt-8 space-y-6">
           <SectionHeader
             eyebrow="Device Pairing"
             title="POS 2FA Authentication"
@@ -290,11 +311,11 @@ function SecurityPanel({ profile, fetchProfile }: any) {
             gradient="linear-gradient(135deg, rgba(16,185,129,0.25), rgba(5,150,105,0.18))"
           />
           
-          <div className="glass-subtle rounded-xl p-6 flex flex-col items-center justify-center space-y-4">
+          <div className="glass-subtle rounded-xl p-5 md:p-6 flex flex-col items-center justify-center space-y-5">
             {pairingCode ? (
-              <div className="text-center space-y-2">
+              <div className="text-center space-y-3 w-full">
                 <p className="text-sm text-[color:var(--text-secondary)]">Your one-time pairing code is:</p>
-                <div className="text-4xl font-mono font-bold tracking-widest text-[color:var(--text-primary)] bg-[color:var(--bg-default)] py-3 px-6 rounded-lg shadow-inner">
+                <div className="text-5xl md:text-4xl font-mono font-bold tracking-widest text-[color:var(--text-primary)] bg-[color:var(--bg-default)] py-4 md:py-3 px-6 rounded-xl shadow-inner break-all">
                   {pairingCode}
                 </div>
                 <p className="text-xs text-amber-600 mt-2">Enter this on the POS along with your API key.</p>
@@ -303,7 +324,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
               <button 
                 onClick={generatePairingCode} 
                 disabled={isGeneratingPairing}
-                className="btn btn-primary"
+                className="btn btn-primary w-full md:w-auto justify-center"
               >
                 {isGeneratingPairing ? 'Generating...' : 'Generate 2FA Pairing Code'}
               </button>
@@ -312,18 +333,18 @@ function SecurityPanel({ profile, fetchProfile }: any) {
         </div>
       )}
 
-      <div className="glass-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-start gap-3.5">
+      <div className="glass-card rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 mt-6">
+        <div className="flex items-start gap-4">
           <div className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center"
                style={{ background: 'color-mix(in oklab, var(--accent) 15%, transparent)' }}>
             <User2 className="w-5 h-5 text-[color:var(--accent)]" />
           </div>
           <div>
-            <h3 className="font-semibold text-[0.95rem] text-[color:var(--text-primary)] mb-0.5">Webhook Endpoints</h3>
+            <h3 className="font-semibold text-[0.95rem] text-[color:var(--text-primary)] mb-1">Webhook Endpoints</h3>
             <p className="text-sm text-[color:var(--text-secondary)]">Subscribe to payment confirmations, stock alerts, and eTIMS events.</p>
           </div>
         </div>
-        <button className="btn btn-secondary inline-flex items-center gap-1.5 self-start sm:self-center text-sm">
+        <button className="btn btn-secondary w-full md:w-auto inline-flex justify-center items-center gap-1.5 text-sm">
           <ChevronRight className="w-4 h-4" />
           Manage Webhooks
         </button>
@@ -462,13 +483,13 @@ function PaymentsPanel() {
         gradient="linear-gradient(135deg, rgba(16,185,129,0.25), rgba(5,150,105,0.16))"
       />
 
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
+      <div className="glass-panel rounded-2xl p-4 md:p-6 space-y-5 md:space-y-6">
         {isLoading ? (
           <div className="flex justify-center p-8"><div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div></div>
         ) : (
           <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
                 <label className="label">Merchant Type</label>
                 <div className="relative">
                   <select name="merchantType" value={config.merchantType} onChange={handleChange} className="input appearance-none">
@@ -479,7 +500,7 @@ function PaymentsPanel() {
               </div>
 
               {config.merchantType === 'BUY_GOODS' && (
-                <div className="sm:col-span-2">
+                <div className="md:col-span-2">
                   <label className="label">Till Number</label>
                   <div className="relative">
                     <Building2 className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]" />
@@ -506,7 +527,7 @@ function PaymentsPanel() {
                 </>
               )}
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-2">
                 <label className="label">M-Pesa Shortcode (Daraja Identifier)</label>
                 <div className="relative">
                   <input type="text" name="shortcode" value={config.shortcode} onChange={handleChange} className="input font-mono tabular-nums" placeholder="Enter shortcode (Till or Paybill)" />
@@ -525,7 +546,7 @@ function PaymentsPanel() {
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-2">
                 <label className="label">Consumer Key</label>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
@@ -541,7 +562,7 @@ function PaymentsPanel() {
                     <button
                       type="button"
                       onClick={() => setShowConsumer(v => !v)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)] transition-colors"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)] transition-colors"
                     >
                       {showConsumer ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -549,7 +570,7 @@ function PaymentsPanel() {
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-2">
                 <label className="label">Consumer Secret</label>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
@@ -565,7 +586,7 @@ function PaymentsPanel() {
                     <button
                       type="button"
                       onClick={() => setShowSecret(v => !v)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)] transition-colors"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)] transition-colors"
                     >
                       {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -573,7 +594,7 @@ function PaymentsPanel() {
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
+              <div className="md:col-span-2">
                 <label className="label">Passkey (For STK Push)</label>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
@@ -589,7 +610,7 @@ function PaymentsPanel() {
                     <button
                       type="button"
                       onClick={() => setShowPasskey(v => !v)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)] transition-colors"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)] transition-colors"
                     >
                       {showPasskey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -597,51 +618,49 @@ function PaymentsPanel() {
                 </div>
               </div>
 
-              <div className="sm:col-span-2 mt-4">
-                <h3 className="font-medium text-sm text-[color:var(--text-primary)] mb-2">Features</h3>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" name="stkEnabled" checked={config.stkEnabled} onChange={handleChange} className="w-4 h-4 text-green-500 rounded focus:ring-green-500" />
+              <div className="md:col-span-2 mt-2">
+                <h3 className="font-medium text-sm text-[color:var(--text-primary)] mb-3">Features</h3>
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-[color:var(--bg-subtle)] transition-colors">
+                  <input type="checkbox" name="stkEnabled" checked={config.stkEnabled} onChange={handleChange} className="w-4.5 h-4.5 text-green-500 rounded focus:ring-green-500" />
                   <span className="text-sm text-[color:var(--text-primary)]">STK Push Enabled</span>
                 </label>
-                <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                  <input type="checkbox" name="c2bEnabled" checked={config.c2bEnabled} onChange={handleChange} className="w-4 h-4 text-green-500 rounded focus:ring-green-500" />
+                <label className="flex items-center gap-3 mt-1 cursor-pointer p-3 rounded-xl hover:bg-[color:var(--bg-subtle)] transition-colors">
+                  <input type="checkbox" name="c2bEnabled" checked={config.c2bEnabled} onChange={handleChange} className="w-4.5 h-4.5 text-green-500 rounded focus:ring-green-500" />
                   <span className="text-sm text-[color:var(--text-primary)]">C2B Callbacks Enabled</span>
                 </label>
               </div>
 
-              <div className="sm:col-span-2 mt-6 pt-6 border-t border-[color:var(--border-subtle)]">
+              <div className="md:col-span-2 mt-6 pt-6 border-t border-[color:var(--border-subtle)]">
                 <h3 className="font-medium text-sm text-[color:var(--text-primary)] mb-4">Callback Configuration (Dynamic)</h3>
                 
                 <label className="label">STK Callback</label>
                 <CopyField value={`${baseUrl}/api/callbacks/payments/callback/stk/${businessId}`} />
                 
-                <label className="label mt-4">C2B Confirmation</label>
+                <label className="label mt-5">C2B Confirmation</label>
                 <CopyField value={`${baseUrl}/api/callbacks/payments/callback/c2b/confirmation/${businessId}`} />
                 
-                <label className="label mt-4">C2B Validation</label>
+                <label className="label mt-5">C2B Validation</label>
                 <CopyField value={`${baseUrl}/api/callbacks/payments/callback/c2b/validation/${businessId}`} />
                 
-                <p className="mt-2 text-[11.5px] text-[color:var(--text-muted)] leading-relaxed">
+                <p className="mt-4 text-[11.5px] text-[color:var(--text-muted)] leading-relaxed">
                   These URLs are uniquely generated for your business tenant.
                 </p>
                 <button 
                   onClick={handleRegisterC2b} 
                   disabled={isRegistering || !config.c2bEnabled} 
-                  className="mt-3 btn btn-secondary text-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+                  className="mt-4 w-full md:w-auto btn btn-secondary text-sm inline-flex justify-center items-center gap-1.5 disabled:opacity-50"
                 >
-                  <RefreshCw className="w-3 h-3" />
-                  {isRegistering ? 'Registering...' : 'Register C2B URLs with Safaricom'}
+                  <RefreshCw className="w-4 h-4" />
+                  {isRegistering ? 'Registering...' : 'Register C2B URLs'}
                 </button>
               </div>
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
-              <div className="flex gap-2 justify-end ml-auto">
-                <button disabled={isSaving} onClick={handleSave} className="btn btn-primary text-sm inline-flex items-center gap-1.5 disabled:opacity-50">
-                  <Save className="w-4 h-4" />
-                  {isSaving ? 'Saving...' : 'Save Configuration'}
-                </button>
-              </div>
+            <div className="flex flex-col-reverse md:flex-row md:items-center justify-end gap-3 pt-4 border-t border-[color:var(--border-subtle)] mt-6">
+              <button disabled={isSaving} onClick={handleSave} className="btn btn-primary w-full md:w-auto text-sm inline-flex justify-center items-center gap-2 disabled:opacity-50">
+                <Save className="w-4.5 h-4.5" />
+                {isSaving ? 'Saving...' : 'Save Configuration'}
+              </button>
             </div>
           </>
         )}
@@ -653,6 +672,7 @@ function PaymentsPanel() {
 /* --------------------------- eTIMS --------------------------- */
 
 function ETimsPanel({ profile, onSave }: any) {
+  const [showToken, setShowToken] = useState(false);
   const [formData, setFormData] = useState({
     etimsPin: profile?.settings?.etimsPin || '',
     etimsBranch: profile?.settings?.etimsBranchId || profile?.settings?.etimsBranch || '',
@@ -678,8 +698,8 @@ function ETimsPanel({ profile, onSave }: any) {
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4 lg:col-span-2">
-          <div className="grid gap-4 sm:grid-cols-2">
+        <div className="glass-panel rounded-2xl p-4 md:p-6 space-y-5 md:space-y-6 lg:col-span-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="label">Business KRA PIN</label>
               <input type="text" name="etimsPin" value={formData.etimsPin} onChange={handleChange} className="input font-mono uppercase" placeholder="A000000000X" />
@@ -696,26 +716,40 @@ function ETimsPanel({ profile, onSave }: any) {
               <label className="label">Control Unit URL</label>
               <input type="url" name="etimsUrl" value={formData.etimsUrl} onChange={handleChange} className="input text-[13px]" placeholder="https://cu.etims.go.ke/..." />
             </div>
-            <div className="sm:col-span-2">
+            <div className="md:col-span-2">
               <label className="label">VSDC Auth Token</label>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]" />
-                <input type="password" name="etimsToken" value={formData.etimsToken} onChange={handleChange} className="input !pl-10 font-mono" placeholder="••••••••••••••••" />
+                <input 
+                  type={showToken ? 'text' : 'password'} 
+                  name="etimsToken" 
+                  value={formData.etimsToken} 
+                  onChange={handleChange} 
+                  className="input !pl-10 !pr-10 font-mono text-[13px]" 
+                  placeholder="••••••••••••••••" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)] transition-colors"
+                >
+                  {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
-            <label className="inline-flex items-center gap-2 text-sm text-[color:var(--text-secondary)] select-none cursor-pointer">
-              <input type="checkbox" name="etimsAutoRetry" checked={formData.etimsAutoRetry} onChange={handleChange} className="w-4 h-4 rounded border-[color:var(--border-default)] text-[color:var(--accent)] focus:ring-[color:var(--accent)]" />
+          <div className="flex flex-col-reverse md:flex-row md:items-center md:justify-between gap-4 pt-2 border-t border-[color:var(--border-subtle)] mt-4">
+            <label className="inline-flex items-start md:items-center gap-3 text-sm text-[color:var(--text-secondary)] select-none cursor-pointer p-2 md:p-0">
+              <input type="checkbox" name="etimsAutoRetry" checked={formData.etimsAutoRetry} onChange={handleChange} className="mt-0.5 md:mt-0 w-4.5 h-4.5 rounded border-[color:var(--border-default)] text-[color:var(--accent)] focus:ring-[color:var(--accent)]" />
               Auto-retry failed signings (max 3 attempts)
             </label>
-            <div className="flex gap-2 justify-end">
-              <button className="btn btn-secondary text-sm inline-flex items-center gap-1.5">
+            <div className="flex flex-col md:flex-row gap-2">
+              <button className="btn btn-secondary w-full md:w-auto text-sm inline-flex justify-center items-center gap-1.5">
                 <RefreshCw className="w-4 h-4" />
                 Ping Control Unit
               </button>
-              <button onClick={() => onSave(formData)} className="btn btn-primary text-sm inline-flex items-center gap-1.5">
+              <button onClick={() => onSave(formData)} className="btn btn-primary w-full md:w-auto text-sm inline-flex justify-center items-center gap-1.5">
                 <Save className="w-4 h-4" />
                 Activate eTIMS
               </button>
@@ -723,19 +757,19 @@ function ETimsPanel({ profile, onSave }: any) {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="glass-card rounded-2xl p-4">
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+        <div className="space-y-4">
+          <div className="glass-card rounded-2xl p-4 md:p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
                    style={{ background: 'rgba(16,185,129,0.16)' }}>
-                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               </div>
               <div>
                 <div className="text-[11px] uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400">Active</div>
-                <div className="text-sm font-semibold text-[color:var(--text-primary)]">Signing online</div>
+                <div className="text-[15px] font-semibold text-[color:var(--text-primary)]">Signing online</div>
               </div>
             </div>
-            <div className="space-y-2 text-xs">
+            <div className="space-y-3 text-[13px]">
               <StatRow label="Signed today" value="184" accent />
               <StatRow label="Failed (retrying)" value="2" />
               <StatRow label="Last CU ping" value="68 ms" />
@@ -743,9 +777,9 @@ function ETimsPanel({ profile, onSave }: any) {
             </div>
           </div>
 
-          <div className="glass-subtle rounded-2xl p-4 text-[12.5px] leading-relaxed text-[color:var(--text-secondary)]">
-            <div className="flex items-center gap-1.5 mb-1.5 font-semibold text-[color:var(--text-primary)]">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+          <div className="glass-subtle rounded-2xl p-4 md:p-5 text-[13px] leading-relaxed text-[color:var(--text-secondary)]">
+            <div className="flex items-center gap-2 mb-2 font-semibold text-[color:var(--text-primary)]">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
               Reminder
             </div>
             KRA requires signed copies of every receipt available for 7 years. Whiz POS archives them to encrypted object storage automatically.
@@ -834,9 +868,9 @@ function ProfilePanel({ profile, onSave }: any) {
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4 lg:col-span-2">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
+        <div className="glass-panel rounded-2xl p-4 md:p-6 space-y-5 md:space-y-6 lg:col-span-2">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
               <label className="label">Legal Business Name</label>
               <input type="text" name="legalName" value={formData.legalName} onChange={handleChange} className="input" />
             </div>
@@ -848,11 +882,11 @@ function ProfilePanel({ profile, onSave }: any) {
               <label className="label">Phone Number</label>
               <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="input font-mono tabular-nums" />
             </div>
-            <div className="sm:col-span-2">
+            <div className="md:col-span-2">
               <label className="label">Email Address</label>
               <input type="email" name="email" value={formData.email} onChange={handleChange} className="input" />
             </div>
-            <div className="sm:col-span-2">
+            <div className="md:col-span-2">
               <label className="label">Physical Address</label>
               <textarea name="address" value={formData.address} onChange={handleChange} className="textarea min-h-[80px]" />
             </div>
@@ -875,41 +909,43 @@ function ProfilePanel({ profile, onSave }: any) {
             </div>
           </div>
 
-          <div className="flex justify-end pt-1">
-            <button onClick={() => onSave(formData)} className="btn btn-primary text-sm inline-flex items-center gap-1.5">
+          <div className="flex justify-end pt-2 border-t border-[color:var(--border-subtle)] mt-4">
+            <button onClick={() => onSave(formData)} className="btn btn-primary w-full md:w-auto text-sm inline-flex justify-center items-center gap-2">
               <Save className="w-4 h-4" />
               Save Profile
             </button>
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="glass-card rounded-2xl p-4">
-            <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-2.5">Receipt Branding</div>
-            <div className="flex items-center gap-3 mb-3.5">
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-black text-xl shrink-0 overflow-hidden"
-                   style={{ background: 'var(--accent-gradient)' }}>
-                {logoUrl ? <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" /> : 'WS'}
+        <div className="space-y-4">
+          <div className="glass-card rounded-2xl p-4 md:p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)] mb-3">Receipt Branding</div>
+            <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-black text-xl shrink-0 overflow-hidden shadow-sm"
+                     style={{ background: 'var(--accent-gradient)' }}>
+                  {logoUrl ? <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" /> : 'WS'}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[15px] font-semibold text-[color:var(--text-primary)] truncate">Logo Preview</div>
+                  <div className="text-[11.5px] text-[color:var(--text-muted)] mt-0.5">PNG or JPG, max 512×512px</div>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-[color:var(--text-primary)] truncate">Logo Preview</div>
-                <div className="text-[11px] text-[color:var(--text-muted)]">PNG or JPG, max 512×512px</div>
-              </div>
-              <label className="btn btn-secondary text-xs !px-3 cursor-pointer">
+              <label className="btn btn-secondary text-sm !px-4 md:!px-3 py-2.5 md:py-2 cursor-pointer text-center">
                 {uploading ? 'Uploading...' : 'Upload'}
                 <input type="file" className="hidden" accept="image/png, image/jpeg" onChange={handleLogoUpload} disabled={uploading} />
               </label>
             </div>
-            <label className="label !text-[11px] !mb-1.5">Receipt Footer Note</label>
-            <textarea name="receiptFooterNote" value={formData.receiptFooterNote} onChange={handleChange} className="textarea min-h-[64px] !text-xs" />
+            <label className="label !text-xs !mb-2">Receipt Footer Note</label>
+            <textarea name="receiptFooterNote" value={formData.receiptFooterNote} onChange={handleChange} className="textarea min-h-[80px] !text-[13px]" />
           </div>
 
-          <div className="glass-subtle rounded-2xl p-4">
-            <div className="flex items-center gap-2.5 mb-2">
-              <Palette className="w-4 h-4 text-[color:var(--accent)]" />
+          <div className="glass-subtle rounded-2xl p-4 md:p-5">
+            <div className="flex items-center gap-2 mb-2.5">
+              <Palette className="w-4.5 h-4.5 text-[color:var(--accent)]" />
               <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">Theme hint</div>
             </div>
-            <p className="text-[12.5px] text-[color:var(--text-secondary)] leading-relaxed">
+            <p className="text-[13px] text-[color:var(--text-secondary)] leading-relaxed">
               The portal already adapts to your system light/dark preference. Override it anytime from the sun/moon toggle in the topbar.
             </p>
           </div>
@@ -955,31 +991,33 @@ function NotificationsPanel({ profile, onSave }: any) {
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="glass-panel rounded-2xl p-2.5 divide-y divide-[color:var(--border-subtle)] lg:col-span-2">
+        <div className="glass-panel rounded-2xl p-3 md:p-4 divide-y divide-[color:var(--border-subtle)] lg:col-span-2">
           {rows.map((r) => (
-            <label key={r.key} className="flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-colors hover:bg-[color:var(--bg-subtle)]">
-              <input
-                type="checkbox"
-                checked={(formData as any)[r.key]}
-                onChange={(e) => handleToggle(r.key, e.target.checked)}
-                className="mt-0.5 w-4.5 h-4.5 rounded border-[color:var(--border-default)] text-[color:var(--accent)] focus:ring-[color:var(--accent)] shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-[color:var(--text-primary)]">{r.label}</div>
-                <div className="text-xs text-[color:var(--text-secondary)] leading-relaxed mt-0.5">{r.hint}</div>
+            <label key={r.key} className="flex flex-col md:flex-row md:items-start gap-4 p-4 md:p-4 rounded-xl cursor-pointer transition-colors hover:bg-[color:var(--bg-subtle)]">
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                <input
+                  type="checkbox"
+                  checked={(formData as any)[r.key]}
+                  onChange={(e) => handleToggle(r.key, e.target.checked)}
+                  className="mt-0.5 w-5 h-5 md:w-4.5 md:h-4.5 rounded border-[color:var(--border-default)] text-[color:var(--accent)] focus:ring-[color:var(--accent)] shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] md:text-sm font-semibold text-[color:var(--text-primary)]">{r.label}</div>
+                  <div className="text-[13px] md:text-xs text-[color:var(--text-secondary)] leading-relaxed mt-1 md:mt-0.5">{r.hint}</div>
+                </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <ChannelChip icon={<Mail className="w-3.5 h-3.5"/>} active={(formData as any)[r.key]} />
-                <ChannelChip icon={<MonitorSmartphone className="w-3.5 h-3.5"/>} active={(formData as any)[r.key]} />
-                <ChannelChip icon={<MessageSquare className="w-3.5 h-3.5"/>} active={false} />
+              <div className="flex items-center gap-1.5 shrink-0 pl-8 md:pl-0">
+                <ChannelChip icon={<Mail className="w-4 h-4 md:w-3.5 md:h-3.5"/>} active={(formData as any)[r.key]} />
+                <ChannelChip icon={<MonitorSmartphone className="w-4 h-4 md:w-3.5 md:h-3.5"/>} active={(formData as any)[r.key]} />
+                <ChannelChip icon={<MessageSquare className="w-4 h-4 md:w-3.5 md:h-3.5"/>} active={false} />
               </div>
             </label>
           ))}
         </div>
 
-        <div className="space-y-3">
-          <div className="glass-card rounded-2xl p-4 space-y-2.5">
-            <div className="flex items-center gap-2 mb-1">
+        <div className="space-y-4">
+          <div className="glass-card rounded-2xl p-4 md:p-5 space-y-3">
+            <div className="flex items-center gap-2 mb-2">
               <Database className="w-4 h-4 text-[color:var(--accent)]" />
               <div className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">Channels</div>
             </div>
@@ -988,9 +1026,9 @@ function NotificationsPanel({ profile, onSave }: any) {
               <ChannelRow icon={<MonitorSmartphone className="w-4 h-4" />} name="In-app" value="All staff with Admin role" />
           </div>
 
-          <div className="flex justify-end pt-1">
-            <button onClick={() => onSave(formData)} className="btn btn-primary text-sm inline-flex items-center gap-1.5">
-              <Save className="w-4 h-4" />
+          <div className="flex justify-end pt-2">
+            <button onClick={() => onSave(formData)} className="btn btn-primary w-full md:w-auto text-sm inline-flex justify-center items-center gap-2">
+              <Save className="w-4.5 h-4.5" />
               Save Preferences
             </button>
           </div>

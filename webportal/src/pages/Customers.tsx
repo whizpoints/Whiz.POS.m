@@ -60,7 +60,7 @@ export default function Customers() {
   };
 
   return (
-    <div className="space-y-4 animate-in p-6">
+    <div className="space-y-4 animate-in px-4 py-4 md:p-6">
       <section className="section">
         <div className="section-header">
           <div>
@@ -86,8 +86,9 @@ export default function Customers() {
               ))}
             </div>
           </div>
-          <div className="table-scroll">
-            <table className="data-table">
+          
+          <div className="hidden md:block table-scroll">
+            <table className="data-table w-full">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -99,7 +100,7 @@ export default function Customers() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={5} className="text-center py-4">Loading...</td></tr>
+                  <tr><td colSpan={5} className="text-center py-8 text-[color:var(--text-muted)]">Loading...</td></tr>
                 ) : customers.length > 0 ? (
                   customers.map(c => (
                     <tr key={c.id}>
@@ -124,10 +125,10 @@ export default function Customers() {
                       <td className="font-tabular font-semibold text-right">{c.totalSpent.toLocaleString()}</td>
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => handleEdit(c)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]">
+                          <button onClick={() => handleEdit(c)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-sky-600">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => handleDelete(c.id)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-500">
+                          <button onClick={() => handleDelete(c.id)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-600">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -135,14 +136,51 @@ export default function Customers() {
                     </tr>
                   ))
                 ) : (
-                  <tr>
-                    <td colSpan={5} className="text-center py-8 text-[color:var(--text-muted)]">
-                      No customers found. Add your first customer!
-                    </td>
-                  </tr>
+                  <tr><td colSpan={5} className="text-center py-8 text-[color:var(--text-muted)]">No customers found. Add your first customer.</td></tr>
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-[color:var(--border-glass)]">
+            {loading ? (
+              <div className="p-4 text-center text-[color:var(--text-muted)]">Loading...</div>
+            ) : customers.length > 0 ? (
+              customers.map(c => (
+                <div key={c.id} className="p-4 flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[color:var(--accent-tertiary)]/10 text-[color:var(--accent-tertiary)] font-bold text-xs">
+                        {c.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900">{c.name}</div>
+                        <div className="text-xs text-[color:var(--text-muted)]">{c.phone || 'No phone'} • {c.email || 'No email'}</div>
+                      </div>
+                    </div>
+                    <div className="font-tabular font-semibold text-right">KES {c.totalSpent.toLocaleString()}</div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="inline-flex items-center gap-1 text-[color:var(--accent-warning)] font-semibold bg-[color:var(--accent-warning)]/10 px-2 py-0.5 rounded-full text-xs">
+                      <Star className="w-3 h-3 fill-current" />
+                      {c.loyaltyPoints} PTS
+                    </span>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEdit(c)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] h-8 w-8">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(c.id)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-500 h-8 w-8">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-[color:var(--text-muted)]">No customers found. Add your first customer.</div>
+            )}
           </div>
         </div>
       </section>

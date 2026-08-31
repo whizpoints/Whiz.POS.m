@@ -147,29 +147,52 @@ export default function MpesaReconciliation() {
              <div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-gray-700">
                Verified Sales (Sample)
              </div>
-             <table className="w-full text-left text-sm">
-               <thead className="bg-gray-50/50">
-                 <tr>
-                   <th className="p-4 font-semibold text-gray-600">Receipt No</th>
-                   <th className="p-4 font-semibold text-gray-600">Date</th>
-                   <th className="p-4 font-semibold text-gray-600">Amount</th>
-                   <th className="p-4 font-semibold text-gray-600">Phone</th>
-                 </tr>
-               </thead>
-               <tbody className="divide-y divide-gray-100">
-                 {results.matched.slice(0, 5).map((m: any, i: number) => (
-                   <tr key={i} className="hover:bg-gray-50">
-                     <td className="p-4 text-green-600 font-medium">{m.excel.receiptNo}</td>
-                     <td className="p-4 text-gray-600">{m.excel.date}</td>
-                     <td className="p-4 font-bold">KSh {m.excel.amount}</td>
-                     <td className="p-4 text-gray-600">{m.excel.fullPhone}</td>
-                   </tr>
-                 ))}
-                 {results.matched.length === 0 && (
-                   <tr><td colSpan={4} className="p-8 text-center text-gray-500">No matches found</td></tr>
-                 )}
-               </tbody>
-             </table>
+             
+              <div className="hidden md:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-50/50">
+                    <tr>
+                      <th className="p-4 font-semibold text-gray-600">Receipt No</th>
+                      <th className="p-4 font-semibold text-gray-600">Date</th>
+                      <th className="p-4 font-semibold text-gray-600">Amount</th>
+                      <th className="p-4 font-semibold text-gray-600">Phone</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {results.matched.slice(0, 5).map((m: any, i: number) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="p-4 text-green-600 font-medium">{m.excel.receiptNo}</td>
+                        <td className="p-4 text-gray-600">{m.excel.date}</td>
+                        <td className="p-4 font-bold">KSh {m.excel.amount}</td>
+                        <td className="p-4 text-gray-600">{m.excel.fullPhone}</td>
+                      </tr>
+                    ))}
+                    {results.matched.length === 0 && (
+                      <tr><td colSpan={4} className="p-8 text-center text-gray-500">No matches found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden flex flex-col divide-y divide-gray-100">
+                {results.matched.slice(0, 5).map((m: any, i: number) => (
+                  <div key={i} className="p-4 flex flex-col gap-2 hover:bg-gray-50">
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xs text-green-600 font-semibold">{m.excel.receiptNo}</span>
+                        <span className="text-sm text-gray-500">{m.excel.date}</span>
+                      </div>
+                      <span className="font-bold text-gray-900">KSh {m.excel.amount}</span>
+                    </div>
+                    <div className="text-sm text-gray-600 font-medium">{m.excel.fullPhone}</div>
+                  </div>
+                ))}
+                {results.matched.length === 0 && (
+                  <div className="p-8 text-center text-gray-500 text-sm">No matches found</div>
+                )}
+              </div>
+
           </div>
         </div>
       )}

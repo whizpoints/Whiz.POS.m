@@ -78,7 +78,7 @@ export default function Suppliers() {
   };
 
   return (
-    <div className="space-y-6 p-6 animate-in fade-in">
+    <div className="space-y-6 px-4 py-4 md:p-6 animate-in fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold font-heading text-[color:var(--text-primary)]">Suppliers & Purchase Orders</h1>
@@ -96,7 +96,7 @@ export default function Suppliers() {
             <input type="text" placeholder="Search suppliers..." className="input !pl-9" />
           </div>
         </div>
-        <div className="table-scroll">
+        <div className="hidden md:block table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -158,6 +158,47 @@ export default function Suppliers() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="md:hidden divide-y divide-[color:var(--border-glass)]">
+          {loading ? (
+            <div className="p-4 text-center text-[color:var(--text-muted)]">Loading suppliers...</div>
+          ) : suppliers.length === 0 ? (
+            <div className="p-4 text-center text-[color:var(--text-muted)]">No suppliers found</div>
+          ) : (
+            suppliers.map((supplier) => (
+              <div key={supplier.id} className="p-4 flex flex-col gap-2">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded bg-[color:var(--bg-tertiary)] flex items-center justify-center">
+                      <Building2 className="w-4 h-4 text-[color:var(--text-secondary)]" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">{supplier.name}</div>
+                      <div className="font-mono text-[10px] text-[color:var(--text-muted)]">{supplier.id}</div>
+                    </div>
+                  </div>
+                  <span className={`badge ${supplier.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}`}>
+                    {supplier.status}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center mt-2">
+                  <div className="flex items-center gap-1.5 text-sm text-[color:var(--text-secondary)]">
+                    <Phone className="w-3.5 h-3.5" />
+                    {supplier.phone || supplier.email || supplier.contactPerson || 'N/A'}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleEdit(supplier)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] h-8 w-8">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleDelete(supplier.id)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-500 h-8 w-8">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
       <SupplierModal

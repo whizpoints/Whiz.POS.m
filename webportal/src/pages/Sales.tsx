@@ -51,7 +51,7 @@ export default function Sales() {
   };
 
   return (
-    <div className="space-y-6 p-6 animate-in fade-in">
+    <div className="space-y-6 px-4 py-4 md:p-6 animate-in fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold font-heading text-[color:var(--text-primary)]">Sales & Transactions</h1>
@@ -74,7 +74,7 @@ export default function Sales() {
             <input type="text" placeholder="Search receipt number or customer..." className="input !pl-9" />
           </div>
         </div>
-        <div className="table-scroll">
+        <div className="hidden md:block table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -133,6 +133,51 @@ export default function Sales() {
               )}
             </tbody>
           </table>
+        </div>
+        
+        <div className="md:hidden divide-y divide-[color:var(--border-glass)]">
+          {loading ? (
+            <div className="p-4 text-center text-[color:var(--text-muted)]">Loading sales data...</div>
+          ) : sales.length === 0 ? (
+            <div className="p-4 text-center text-[color:var(--text-muted)]">No sales found</div>
+          ) : (
+            sales.map((sale) => (
+              <div key={sale.id} className="p-4 flex flex-col gap-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-mono font-medium text-[color:var(--accent-primary)]">{sale.receiptNumber}</div>
+                    <div className="text-sm font-medium">{sale.customerPhone || 'Walk-in'}</div>
+                  </div>
+                  <div className="font-tabular font-semibold">{sale.totalAmount}</div>
+                </div>
+                <div className="flex justify-between items-center mt-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`badge ${getStatusBadge(sale.status)}`}>{sale.status}</span>
+                    <div className="text-xs text-[color:var(--text-muted)] flex items-center gap-1">
+                      <ShoppingCart className="w-3 h-3" />
+                      {sale.paymentMethod}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handlePrint('receipt', sale.id)}
+                      className="btn btn-icon btn-ghost btn-sm h-8 w-8" 
+                      title="Print Receipt"
+                    >
+                      <Printer className="w-4 h-4 text-pink-600" />
+                    </button>
+                    <button 
+                      onClick={() => handlePrint('invoice', sale.id)}
+                      className="btn btn-icon btn-ghost btn-sm h-8 w-8" 
+                      title="Print A4 Invoice"
+                    >
+                      <FileText className="w-4 h-4 text-blue-600" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

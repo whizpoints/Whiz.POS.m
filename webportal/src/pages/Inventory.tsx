@@ -162,7 +162,7 @@ export default function Inventory() {
     };
 
   return (
-    <div className="space-y-4 animate-in p-6">
+    <div className="space-y-4 animate-in px-4 py-4 md:p-6">
       <section className="section">
         <div className="section-header">
           <div>
@@ -217,7 +217,7 @@ export default function Inventory() {
               ))}
             </div>
           </div>
-          <div className="table-scroll">
+          <div className="hidden md:block table-scroll">
             <table className="data-table">
               <thead>
                 <tr>
@@ -283,13 +283,77 @@ export default function Inventory() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-[color:var(--text-muted)]">
+                    <td colSpan={7} className="text-center py-8 text-[color:var(--text-muted)]">
                       No products found. Add your first product!
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+          
+          <div className="md:hidden divide-y divide-[color:var(--border-glass)]">
+            {loading ? (
+              <div className="p-4 text-center">Loading...</div>
+            ) : products.length > 0 ? (
+              products
+                .filter(p => selectedCategory === 'All Categories' || (p.category || 'Uncategorized') === selectedCategory)
+                .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map(p => (
+                  <div key={p.id} className="p-4 flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[color:var(--accent-primary-soft)] text-[color:var(--accent-primary)]">
+                          <Package className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="font-semibold">{p.name}</div>
+                          <div className="font-mono text-xs text-[color:var(--text-muted)]">{p.sku}</div>
+                        </div>
+                      </div>
+                      <div className="font-tabular font-semibold text-right">{p.price.toLocaleString()} KES</div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center mt-2">
+                      <div className="text-sm text-[color:var(--text-secondary)]">{p.category || 'Uncategorized'}</div>
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] uppercase tracking-wider text-gray-500">In-Store</span>
+                          <span className={`font-semibold ${p.inStoreStock <= p.reorderLevel ? 'text-red-600' : 'text-gray-900'}`}>
+                            {p.inStoreStock}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] uppercase tracking-wider text-gray-500">Total</span>
+                          <span className={`font-semibold ${p.totalStock <= p.reorderLevel ? 'text-red-600' : 'text-blue-600'}`}>
+                            {p.totalStock}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-[color:var(--border-glass)]">
+                      <button 
+                        onClick={() => handleQuickAdd(p.id)}
+                        className="btn btn-icon btn-ghost btn-sm text-blue-600"
+                        title="Quick Add Stock"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleEdit(p)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(p.id)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-500">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <div className="text-center py-8 text-[color:var(--text-muted)]">
+                No products found. Add your first product!
+              </div>
+            )}
           </div>
         </div>
       </section>

@@ -18,7 +18,7 @@ interface DocumentModalProps {
 
 export function DocumentModal({ isOpen, onClose, type, data, branding, signatory, initialPaperSize = 'a4' }: DocumentModalProps) {
   const [paperSize, setPaperSize] = useState<'a4' | 'a5'>(initialPaperSize);
-  const [scale, setScale] = useState(0.8);
+const [scale, setScale] = useState(0.8);
   const previewRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { businessSetup } = usePosStore();
@@ -27,7 +27,27 @@ export function DocumentModal({ isOpen, onClose, type, data, branding, signatory
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       setPaperSize(initialPaperSize);
-      // Auto-fit scale logic could go here
+      
+      // Auto-fit scale logic
+      const updateScale = () => {
+        const viewportWidth = window.innerWidth;
+        const padding = 32; // 16px on each side
+        const availableWidth = viewportWidth - padding;
+        const documentWidth = initialPaperSize === 'a5' ? 560 : 794; // approx px width for A4/A5 at 96dpi
+        
+        if (availableWidth < documentWidth) {
+          setScale(availableWidth / documentWidth);
+        } else {
+          setScale(1);
+        }
+      };
+      
+      updateScale();
+      window.addEventListener('resize', updateScale);
+      return () => {
+        document.body.style.overflow = 'unset';
+        window.removeEventListener('resize', updateScale);
+      };
     } else {
       document.body.style.overflow = 'unset';
     }

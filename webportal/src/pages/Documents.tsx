@@ -411,10 +411,10 @@ export default function InvoiceGenerator() {
   const isLetter = DOCUMENT_TYPES.find(t => t.id === docType)?.category === 'letter';
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 pb-24">
+    <div className="min-h-screen bg-slate-50 px-4 py-4 md:p-6 pb-24">
 
       {/* Header Area */}
-      <div className="max-w-5xl mx-auto mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="max-w-5xl mx-auto mb-6 md:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
              <LayoutTemplate className="w-6 h-6 text-sky-600" />
@@ -423,32 +423,32 @@ export default function InvoiceGenerator() {
           <p className="text-slate-500 text-sm mt-1">Create Quotes, Invoices, Orders & Legal Notices</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
            <button
              onClick={() => setShowSavedDocs(true)}
-             className="flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
+             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
            >
-             <FolderOpen className="w-4 h-4" /> Open Saved
+             <FolderOpen className="w-4 h-4" /> Open
            </button>
            <button
              onClick={handleSaveDocument}
              disabled={isSavingDoc}
-             className="flex items-center gap-2 bg-sky-600 text-white hover:bg-sky-700 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm z-10 disabled:opacity-50 disabled:cursor-not-allowed"
+             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-sky-600 text-white hover:bg-sky-700 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm z-10 disabled:opacity-50 disabled:cursor-not-allowed"
            >
              <Save className="w-4 h-4" /> {isSavingDoc ? 'Saving...' : currentDocId ? 'Update' : 'Save'}
            </button>
            <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1"></div>
            <button
              onClick={() => openPreview('a4')}
-             className="flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
+             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
            >
-             <Eye className="w-4 h-4" /> Preview A4
+             <Eye className="w-4 h-4" /> A4
            </button>
            <button
              onClick={() => openPreview('a5')}
-             className="flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
+             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
            >
-             <Eye className="w-4 h-4" /> Preview A5
+             <Eye className="w-4 h-4" /> A5
            </button>
         </div>
       </div>
@@ -639,34 +639,57 @@ export default function InvoiceGenerator() {
         </div>
       )}
 
-      <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-5xl mx-auto mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-5">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Document Type</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap gap-2">
+             {DOCUMENT_TYPES.filter(t => ['QUOTATION', 'PURCHASE_ORDER', 'INVOICE', 'DELIVERY_NOTE'].includes(t.id)).map((type) => {
+                const Icon = type.icon;
+                return (
+                <button
+                  key={type.id}
+                  onClick={() => handleTypeChange(type.id)}
+                  className={cn(
+                    "w-full md:flex-1 text-left px-3 py-2.5 md:py-2 rounded-lg text-[11px] md:text-xs font-semibold border transition-all flex items-center justify-center md:justify-start gap-2 shadow-sm",
+                    docType === type.id
+                      ? "bg-sky-50 border-sky-500 text-sky-700 ring-1 ring-sky-500/20"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  )}
+                >
+                   <Icon className={cn("w-3.5 h-3.5", docType === type.id ? "text-sky-500" : "text-slate-400")} />
+                   <span className="truncate">{type.label}</span>
+                </button>
+             )})}
+             
+             {/* More Dropdown */}
+             <div className="col-span-2 sm:col-span-3 md:flex-1 relative">
+               <select
+                 className={cn(
+                   "w-full appearance-none px-3 py-2.5 md:py-2 rounded-lg text-[11px] md:text-xs font-semibold border transition-all outline-none cursor-pointer shadow-sm",
+                   !['QUOTATION', 'PURCHASE_ORDER', 'INVOICE', 'DELIVERY_NOTE'].includes(docType)
+                     ? "bg-sky-50 border-sky-500 text-sky-700 ring-1 ring-sky-500/20"
+                     : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                 )}
+                 value={['QUOTATION', 'PURCHASE_ORDER', 'INVOICE', 'DELIVERY_NOTE'].includes(docType) ? "" : docType}
+                 onChange={(e) => {
+                   if (e.target.value) handleTypeChange(e.target.value as any);
+                 }}
+               >
+                 <option value="" disabled>More Types ▼</option>
+                 {DOCUMENT_TYPES.filter(t => !['QUOTATION', 'PURCHASE_ORDER', 'INVOICE', 'DELIVERY_NOTE'].includes(t.id)).map(type => (
+                   <option key={type.id} value={type.id}>{type.label}</option>
+                 ))}
+               </select>
+               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+               </div>
+             </div>
+          </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto flex flex-col lg:grid lg:grid-cols-3 gap-6 md:gap-8">
 
         {/* LEFT COLUMN: Settings & Branding */}
-        <div className="space-y-6">
-
-           {/* Document Type Selector */}
-           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Document Type</h3>
-              <div className="grid grid-cols-2 gap-2">
-                 {DOCUMENT_TYPES.map((type) => {
-                    const Icon = type.icon;
-                    return (
-                    <button
-                      key={type.id}
-                      onClick={() => handleTypeChange(type.id)}
-                      className={cn(
-                        "text-left px-3 py-2 rounded-lg text-xs font-medium border transition-all flex items-center gap-2",
-                        docType === type.id
-                          ? "bg-sky-50 border-sky-500 text-sky-700 shadow-sm ring-1 ring-sky-500/20"
-                          : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                      )}
-                    >
-                       <Icon className={cn("w-3.5 h-3.5", docType === type.id ? "text-sky-500" : "text-slate-400")} />
-                       {type.label}
-                    </button>
-                 )})}
-              </div>
-           </div>
+        <div className="space-y-6 order-2 lg:order-1">
 
            {/* Settings & Branding */}
            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
@@ -776,7 +799,7 @@ export default function InvoiceGenerator() {
         </div>
 
         {/* CENTER & RIGHT: Main Content */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6 order-1 lg:order-2">
 
             {/* Client Info */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
