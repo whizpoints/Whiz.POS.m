@@ -136,45 +136,48 @@ const [scale, setScale] = useState(0.8);
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
 
       {/* Toolbar */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white rounded-full shadow-lg p-2 px-4 z-50">
-         <div className="flex bg-slate-100 rounded-full p-1">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 md:gap-2 bg-white rounded-full shadow-lg p-1.5 px-3 md:p-2 md:px-4 z-50 w-max max-w-[95vw]">
+         <div className="flex bg-slate-100 rounded-full p-1 shrink-0">
             <button
               onClick={() => setPaperSize('a4')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${paperSize === 'a4' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+              className={`px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold transition-all ${paperSize === 'a4' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
             >
               A4
             </button>
             <button
               onClick={() => setPaperSize('a5')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${paperSize === 'a5' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+              className={`px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-bold transition-all ${paperSize === 'a5' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
             >
               A5
             </button>
          </div>
 
-         <div className="w-px h-6 bg-slate-200 mx-2"></div>
+         <div className="hidden md:block w-px h-6 bg-slate-200 mx-1 md:mx-2 shrink-0"></div>
 
-         <button onClick={() => setScale(s => Math.max(0.4, s - 0.1))} className="p-2 hover:bg-slate-100 rounded-full text-slate-600">
-           <ZoomOut className="w-4 h-4" />
-         </button>
-         <span className="text-xs font-mono w-12 text-center text-slate-500">{Math.round(scale * 100)}%</span>
-         <button onClick={() => setScale(s => Math.min(1.5, s + 0.1))} className="p-2 hover:bg-slate-100 rounded-full text-slate-600">
-           <ZoomIn className="w-4 h-4" />
-         </button>
+         {/* Zoom controls hidden on mobile to save space */}
+         <div className="hidden md:flex items-center">
+           <button onClick={() => setScale(s => Math.max(0.4, s - 0.1))} className="p-1 md:p-2 hover:bg-slate-100 rounded-full text-slate-600">
+             <ZoomOut className="w-4 h-4" />
+           </button>
+           <span className="text-xs font-mono w-10 md:w-12 text-center text-slate-500">{Math.round(scale * 100)}%</span>
+           <button onClick={() => setScale(s => Math.min(1.5, s + 0.1))} className="p-1 md:p-2 hover:bg-slate-100 rounded-full text-slate-600">
+             <ZoomIn className="w-4 h-4" />
+           </button>
+         </div>
 
-         <div className="w-px h-6 bg-slate-200 mx-2"></div>
+         <div className="w-px h-6 bg-slate-200 mx-1 md:mx-2 shrink-0"></div>
 
          <button
             onClick={handleDownload}
-            className="flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white px-4 py-1.5 rounded-full text-xs font-bold transition-colors"
+            className="flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 text-white px-3 md:px-4 py-1.5 rounded-full text-xs font-bold transition-colors shrink-0"
          >
            <Download className="w-4 h-4" />
-           Download PDF
+           <span className="hidden md:inline">Download PDF</span>
          </button>
 
          <button
             onClick={onClose}
-            className="ml-2 p-2 bg-slate-100 hover:bg-red-50 hover:text-red-600 rounded-full text-slate-500 transition-colors"
+            className="ml-1 md:ml-2 p-1.5 md:p-2 bg-slate-100 hover:bg-red-50 hover:text-red-600 rounded-full text-slate-500 transition-colors shrink-0"
          >
            <X className="w-4 h-4" />
          </button>

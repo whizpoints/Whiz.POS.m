@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, Building2, Eye, EyeOff, ArrowRight, ShieldCheck, CloudLightning, Activity, BarChart3, Globe } from 'lucide-react';
+import { Lock, Mail, Building2, Eye, EyeOff, ArrowRight, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeFeature, setActiveFeature] = useState(0);
+  
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -15,19 +15,6 @@ export default function AuthPage() {
     email: '',
     password: ''
   });
-
-  const features = [
-    { icon: <CloudLightning className="w-6 h-6 text-sky-500" />, title: "Instant Edge Sync", desc: "Data synchronizes globally in milliseconds." },
-    { icon: <BarChart3 className="w-6 h-6 text-indigo-500" />, title: "Enterprise Analytics", desc: "Live insights and forecasting for all branches." },
-    { icon: <Globe className="w-6 h-6 text-blue-500" />, title: "Centralized Management", desc: "Control every till and outlet from one dashboard." }
-  ];
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveFeature((prev) => (prev + 1) % features.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,59 +69,8 @@ export default function AuthPage() {
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.04] mix-blend-overlay pointer-events-none"></div>
 
       {/* Main Glass "Combo" Card */}
-      <div className="w-full h-full sm:h-auto sm:max-h-none max-h-[90vh] max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white/80 sm:bg-white/70 backdrop-blur-3xl sm:border border-white shadow-[0_-8px_40px_rgba(0,0,0,0.04)] sm:shadow-[0_8px_40px_rgba(0,0,0,0.06)] rounded-t-[3rem] sm:rounded-[2.5rem] relative z-10 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
+      <div className="w-full h-full sm:h-auto sm:max-h-none max-h-[90vh] max-w-md bg-white/90 sm:bg-white/70 backdrop-blur-3xl sm:border border-white shadow-[0_-8px_40px_rgba(0,0,0,0.04)] sm:shadow-[0_8px_40px_rgba(0,0,0,0.1)] rounded-t-[3rem] sm:rounded-[2.5rem] relative z-10 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 mx-auto">
         
-        {/* LEFT PANEL - Marketing (Light Theme) */}
-        <div className="hidden lg:flex flex-col justify-between p-12 relative bg-gradient-to-br from-sky-500/5 to-blue-600/5 border-r border-white/50">
-          
-          <div className="relative z-10 flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-sky-100">
-               <img src="/logo.png" alt="Whiz POS" className="w-7 h-7" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            </div>
-            <span className="text-2xl font-extrabold text-slate-800 tracking-tight">Whiz<span className="text-sky-500">Cloud</span></span>
-          </div>
-
-          <div className="relative z-10 max-w-md mt-12">
-            <h1 className="text-4xl lg:text-5xl font-extrabold text-slate-900 leading-tight mb-6 tracking-tight drop-shadow-sm">
-              The intelligent <br/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-indigo-500">
-                operating system
-              </span><br/>
-              for modern retail.
-            </h1>
-            <p className="text-slate-600 text-lg leading-relaxed mb-10 font-medium">
-              Seamlessly bridge your physical outlets with powerful cloud analytics. Manage inventory, staff, and multi-branch operations in real-time.
-            </p>
-
-            {/* Interactive Feature Carousel */}
-            <div className="space-y-4">
-              {features.map((feat, idx) => (
-                <div 
-                  key={idx} 
-                  className={`p-4 rounded-3xl border transition-all duration-500 flex items-start gap-4 ${
-                    activeFeature === idx 
-                    ? 'bg-white border-white shadow-lg scale-100 opacity-100' 
-                    : 'bg-white/40 border-transparent scale-95 opacity-60 hover:opacity-100 hover:bg-white/60 cursor-default'
-                  }`}
-                >
-                  <div className="p-3 bg-slate-50 rounded-2xl shadow-sm border border-slate-100">
-                    {feat.icon}
-                  </div>
-                  <div>
-                    <h3 className="text-slate-900 font-bold mb-0.5">{feat.title}</h3>
-                    <p className="text-slate-500 text-sm leading-relaxed font-medium">{feat.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="relative z-10 flex items-center gap-3 text-slate-500 text-sm font-semibold mt-12">
-            <ShieldCheck className="w-5 h-5 text-sky-500" />
-            Bank-grade 256-bit AES encryption
-          </div>
-        </div>
-
         {/* RIGHT PANEL - Authentication Form */}
         <div className="w-full flex flex-col justify-start sm:justify-center px-6 py-10 sm:p-12 relative bg-white/50 sm:bg-white/40">
           
@@ -142,7 +78,7 @@ export default function AuthPage() {
           <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8 sm:hidden"></div>
 
           {/* Mobile Brand Header */}
-          <div className="lg:hidden flex flex-col items-center mb-10">
+          <div className="flex flex-col items-center mb-10">
             <div className="w-20 h-20 bg-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-sky-500/10 border border-sky-100/50 mb-5">
                <img src="/logo.png" alt="Whiz POS" className="w-12 h-12" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             </div>
@@ -151,7 +87,7 @@ export default function AuthPage() {
 
           <div className="w-full max-w-[420px] mx-auto">
             
-            <div className="mb-8 text-center lg:text-left">
+            <div className="mb-8 text-center">
               <h2 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">
                 {isLogin ? 'Welcome back' : 'Create an account'}
               </h2>
