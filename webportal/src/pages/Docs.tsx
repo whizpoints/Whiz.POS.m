@@ -164,7 +164,7 @@ export default function Docs() {
               On your installed Desktop App, click the Settings icon and navigate to the <strong>Cloud Sync</strong> tab.
             </StepTile>
             <StepTile n={3} title="Configure Endpoints">
-              Enter this Web Portal URL (<code className="px-1.5 py-0.5 rounded bg-white/10">{typeof window !== 'undefined' ? window.location.origin : window.location.origin}</code>) as the Back Office URL, and paste the API Key generated in Step 1.
+              Enter this Web Portal URL (<code className="px-1.5 py-0.5 rounded bg-white/10">{typeof window !== 'undefined' ? window.location.origin : 'https://backoffice.whizpoint.app'}</code>) as the Back Office URL, and paste the API Key generated in Step 1.
             </StepTile>
             <StepTile n={4} title="Link & Sync">
               Click "Link to Cloud". The system will verify the credentials and instantly fetch your latest products, users, and business settings.
@@ -406,4 +406,5 @@ export default function Docs() {
     </div>
   );
 }
+
 
