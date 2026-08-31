@@ -347,14 +347,42 @@ export default function InvoiceGenerator() {
     setSearchTerm('');
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void) => {
+  const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void, assetType: string = 'document_asset') => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setter(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    
+    setIsUploadingAsset(true);
+    const toastId = toast.loading(`Uploading ${assetType}...`);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('assetType', assetType);
+
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+      const res = await fetch(`${API_BASE_URL}/api/business/document-asset`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd
+      });
+
+      if (res.ok) {
+         const data = await res.json();
+         if (data.fileUrl) {
+           setter(data.fileUrl);
+           toast.success('Uploaded successfully', { id: toastId });
+         } else {
+           toast.error('Failed to get URL', { id: toastId });
+         }
+      } else {
+         toast.error('Upload failed', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Network error during upload', { id: toastId });
+    } finally {
+      setIsUploadingAsset(false);
     }
   };
 
@@ -544,7 +572,7 @@ export default function InvoiceGenerator() {
                       >
                          {tempSettings.backgroundImage ? <img src={tempSettings.backgroundImage} className="w-full h-20 object-cover mb-2" /> : <ImageIcon className="w-6 h-6 text-slate-400 mb-2" />}
                          <div className="text-xs font-medium text-slate-700">Watermark / Background</div>
-                         <input ref={fileInputBgRef} type="file" className="hidden" onChange={(e) => handleImageUpload(e, (img) => setTempSettings({...tempSettings, backgroundImage: img}))} />
+                         <input ref={fileInputBgRef} type="file" className="hidden" onChange={(e) => handleImageUpload(e, (img) => setTempSettings({...tempSettings, backgroundImage: img}), 'watermark')} />
                       </div>
                     </div>
                     <label className="flex items-center gap-2 mt-2 cursor-pointer">
