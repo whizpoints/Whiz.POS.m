@@ -186,14 +186,19 @@ router.post('/resend-verification', async (req, res) => {
     const fromEmail = process.env.BREVO_FROM_EMAIL || 'support@whizpoint.app';
     const baseUrl = process.env.VITE_API_BASE_URL || (req.headers.origin || 'https://backoffice.whizpoint.app');
 
-    await transporter.sendMail({
-      from: `"${fromName}" <${fromEmail}>`,
-      to: business.email,
-      subject: 'Verify your Whiz POS account',
-      html: `<p>Welcome to Whiz POS!</p>
-             <p>Please verify your email by clicking the link below:</p>
-             <a href="${baseUrl}/api/auth/verify-email?token=${verificationToken}">Verify Email</a>`
-    });
+    try {
+      await transporter.sendMail({
+        from: `"${fromName}" <${fromEmail}>`,
+        to: business.email,
+        subject: 'Verify your Whiz POS account',
+        html: `<p>Welcome to Whiz POS!</p>
+               <p>Please verify your email by clicking the link below:</p>
+               <a href="${baseUrl}/api/auth/verify-email?token=${verificationToken}">Verify Email</a>`
+      });
+    } catch (emailErr) {
+      console.error('SMTP Error:', emailErr);
+      return res.status(500).json({ error: 'Email service not configured correctly. Please check SMTP settings.' });
+    }
 
     res.json({ success: true });
   } catch (error) {
