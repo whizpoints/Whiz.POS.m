@@ -151,13 +151,13 @@ router.get('/', async (req: any, res: any) => {
       : [];
 
 
-    console.log(`[SYNC GET] Outlet: ${req.user.outletId}, Since: ${sinceDate}, Products Found: ${products.length}, Inventory Found: ${inventory.length}`);
+    console.log(\`[SYNC GET] Outlet: \${req.user.outletId}, Since: \${sinceDate}, Products Found: \${products.length}, Inventory Found: \${inventory.length}\`);
 
     const timestamp = new Date().toISOString();
-    const details = `Pulled ${users.length} users, ${products.length} products, ${categories.length} categories, ${stockMovements.length} stock movements`;
+    const details = \`Pulled \${users.length} users, \${products.length} products, \${categories.length} categories, \${stockMovements.length} stock movements\`;
     try {
-      await db.insertInto('SyncLog').values({  
-          id: require('crypto' as any).randomUUID(),
+      await db.insertInto('SyncLog').values({
+          id: require('crypto').randomUUID(),
           businessId,
           outletId: req.user.outletId || null,
           terminal: 'Unknown',
@@ -250,7 +250,7 @@ router.post('/', async (req: any, res: any) => {
       if (out) targetOutletId = out.id;
     }
 
-    console.log(`[SYNC PUSH] businessId=${businessId}, targetLocationId=${targetLocationId}, targetOutletId=${targetOutletId}, user.outletId=${req.user.outletId}`);
+    console.log(\`[SYNC PUSH] businessId=\${businessId}, targetLocationId=\${targetLocationId}, targetOutletId=\${targetOutletId}, user.outletId=\${req.user.outletId}\`);
 
     const results = {
       users: 0,
@@ -273,7 +273,7 @@ router.post('/', async (req: any, res: any) => {
     if (users && Array.isArray(users)) {
       for (const u of users) {
         if (!u.name) continue;
-        const fallbackEmail = u.email || `${u.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${u.id}@pos.local`;
+        const fallbackEmail = u.email || \`\${u.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_\${u.id}@pos.local\`;
         
         const existing = await db.selectFrom('User').selectAll().where('email', '=', fallbackEmail).executeTakeFirst();
         if (resolveConflict(u, existing)) {
@@ -281,8 +281,8 @@ router.post('/', async (req: any, res: any) => {
             if (u.role === 'SYSTEM_ADMIN' || u.role === 'Admin') role = 'ADMIN';
             else if (u.role === 'STORE_MANAGER' || u.role === 'Manager') role = 'MANAGER';
 
-            await db.insertInto('User').values({  
-                id: u.id || require('crypto' as any).randomUUID(),
+            await db.insertInto('User').values({
+                id: u.id || require('crypto').randomUUID(),
                 businessId, locationId: targetLocationId, email: fallbackEmail,
                 password: u.pin || 'pos1234', name: u.name, role: role as any,
                 updatedAt: (u.updatedAt ? new Date(u.updatedAt) : new Date()).toISOString()
@@ -307,13 +307,13 @@ router.post('/', async (req: any, res: any) => {
         if (resolveConflict(p, existing)) {
             if (existing) {
               await db.updateTable('Product').set({
-                  name: String(p.name as any), category: p.category ? String(p.category) : null,
+                  name: String(p.name), category: p.category ? String(p.category) : null,
                   price: Number(p.price) || 0, costPrice: Number(p.costPrice) || 0,
                   barcode: p.barcode ? String(p.barcode) : null,
                   updatedAt: (p.updatedAt ? new Date(p.updatedAt) : new Date()).toISOString()
                 }).where('id', '=', existing.id).execute();
             } else {
-              await db.insertInto('Product').values({  id: require('crypto' as any).randomUUID(),
+              await db.insertInto('Product').values({id: require('crypto').randomUUID(),
                   businessId, sku: String(sku), barcode: p.barcode ? String(p.barcode) : null,
                   name: String(p.name), category: p.category ? String(p.category) : null,
                   price: Number(p.price) || 0, costPrice: Number(p.costPrice) || 0,
@@ -335,14 +335,14 @@ router.post('/', async (req: any, res: any) => {
              const resolvedLocationId = targetLocationId || m.locationId || null;
              const resolvedOutletId = targetOutletId || m.outletId || null;
 
-             await db.insertInto('StockMovement').values({  
+             await db.insertInto('StockMovement').values({
                    id: m.id,
                    businessId,
                    productId: m.productId,
                    locationId: resolvedLocationId,
                    outletId: resolvedOutletId,
                    type: m.type,
-                   quantity: Number(m.quantity as any),
+                   quantity: Number(m.quantity),
                    reference: m.reference ? String(m.reference) : null,
                    sourceTerminal: m.sourceTerminal ? String(m.sourceTerminal) : 'POS',
                    timestamp: (m.timestamp ? new Date(m.timestamp) : new Date()).toISOString(),
@@ -362,9 +362,9 @@ router.post('/', async (req: any, res: any) => {
              else if (m.type === 'TRANSFER_IN' || m.type === 'PO' || m.type === 'INITIAL' || m.type === 'RETURN' || m.type === 'ADJUSTMENT_UP' || m.type === 'add') stockChange = Math.abs(stockChange);
 
              if (invExisting) {
-                await db.updateTable('ProductInventory').set((eb as any) => ({ stock: eb('stock', '+', stockChange), updatedAt: new Date().toISOString().toISOString() })).where('id', '=', invExisting.id).execute();
+                await db.updateTable('ProductInventory').set((eb) => ({ stock: eb('stock', '+', stockChange), updatedAt: new Date().toISOString().toISOString() })).where('id', '=', invExisting.id).execute();
              } else {
-                await db.insertInto('ProductInventory').values({  id: require('crypto' as any).randomUUID(),
+                await db.insertInto('ProductInventory').values({id: require('crypto').randomUUID(),
                       productId: m.productId,
                       locationId: resolvedLocationId,
                       outletId: resolvedOutletId,
@@ -389,14 +389,14 @@ router.post('/', async (req: any, res: any) => {
                   if (rawStatus === 'PENDING' || rawStatus === 'REFUNDED') safeStatus = rawStatus;
 
                   if (existing) {
-                      await db.updateTable('Receipt').set({ status: safeStatus as any, updatedAt: (t.updatedAt ? new Date(t.updatedAt as any) : new Date()).toISOString() }).where('id', '=', existing.id).execute();
+                      await db.updateTable('Receipt').set({ status: safeStatus as any, updatedAt: (t.updatedAt ? new Date(t.updatedAt) : new Date()).toISOString() }).where('id', '=', existing.id).execute();
                   } else {
                       const receiptId = String(t.id);
-                      await db.insertInto('Receipt').values({  
+                      await db.insertInto('Receipt').values({
                         id: receiptId,
 
                             businessId, locationId: targetLocationId, outletId: targetOutletId || null,
-                            receiptNumber: String(t.id as any), totalAmount: Number(t.totalAmount || t.total) || 0,
+                            receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
                             paymentMethod: String(t.paymentMethod || 'CASH'), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
                             mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null, status: safeStatus as any,
                             createdAt: t.timestamp ? new Date(t.timestamp).toISOString() : undefined,
@@ -407,7 +407,7 @@ router.post('/', async (req: any, res: any) => {
                       if (t.items && Array.isArray(t.items)) {
                           for (const item of t.items) {
                               if (!item.product) continue;
-                              await db.insertInto('ReceiptItem').values({  id: require('crypto' as any).randomUUID(),
+                              await db.insertInto('ReceiptItem').values({id: require('crypto').randomUUID(),
                                       receiptId: createdReceipt.id,
                                       productName: item.product.name || 'Unknown Item',
                                       quantity: Number(item.quantity) || 1,
@@ -433,7 +433,7 @@ router.post('/', async (req: any, res: any) => {
           if (resolveConflict(c, existing)) {
               if (existing) {
                  await db.updateTable('Customer').set({ 
-                        phone: c.phone ? String(c.phone as any) : null, 
+                        phone: c.phone ? String(c.phone) : null, 
                         email: c.email ? String(c.email) : null, 
                         company: c.company ? String(c.company) : null,
                         address: c.address ? String(c.address) : null,
@@ -444,7 +444,7 @@ router.post('/', async (req: any, res: any) => {
                         updatedAt: (c.updatedAt ? new Date(c.updatedAt) : new Date()).toISOString() 
                     }).where('id', '=', existing.id).execute();
               } else {
-                 await db.insertInto('Customer').values({  id: require('crypto' as any).randomUUID(), 
+                 await db.insertInto('Customer').values({id: require('crypto').randomUUID(), 
                         businessId, 
                         name: String(c.name), 
                         phone: c.phone ? String(c.phone) : null, 
@@ -480,13 +480,13 @@ router.post('/', async (req: any, res: any) => {
            const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : businessSetup;
            const mergedSettings = { ...currentSettings, ...incomingSetup };
            
-           await db.updateTable('Business').set({ settings: JSON.stringify(mergedSettings as any), updatedAt: new Date().toISOString() }).where('id', '=', businessId).execute();
+           await db.updateTable('Business').set({ settings: JSON.stringify(mergedSettings), updatedAt: new Date().toISOString() }).where('id', '=', businessId).execute();
        }
     }
 
       try {
-        await db.insertInto('SyncLog').values({  
-            id: require('crypto' as any).randomUUID(),
+        await db.insertInto('SyncLog').values({
+            id: require('crypto').randomUUID(),
             businessId,
             outletId: targetOutletId || null,
             terminal: 'Unknown',
@@ -512,7 +512,3 @@ router.post('/', async (req: any, res: any) => {
 });
 
 export default router;
-
-
-
-
