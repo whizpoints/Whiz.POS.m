@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { sendReceiptEmail } from '../services/emailService.js';
 
@@ -15,7 +14,7 @@ const authenticate = async (req: any, res: any, next: any) => {
   const apiKey = req.headers['x-api-key'];
 
   if (apiKey) {
-    const business = await prisma.business.findFirst({ where: { apiKey } });
+    const business = await db.selectFrom('Business').selectAll().where('apiKey', '=', apiKey).executeTakeFirst();
     if (!business) {
       console.log(`[Auth] Invalid API Key provided: ${apiKey}`);
       return res.status(401).json({ error: 'Invalid API Key' });
@@ -52,30 +51,36 @@ router.post('/sales', async (req: any, res: any) => {
 
     for (const receipt of receipts) {
       // Create receipt in DB
-      const dbReceipt = await prisma.receipt.create({
-        data: {
+      const receiptId = randomUUID();
+      const dbReceipt = await db.insertInto('Receipt').values({
+        id: receiptId,
           businessId,
           receiptNumber: receipt.receiptNumber,
           totalAmount: receipt.totalAmount,
           paymentMethod: receipt.paymentMethod,
           customerPhone: receipt.customerPhone,
           status: receipt.status || 'COMPLETED',
-          cashierName: receipt.cashier || null,
-          items: {
-            create: (receipt.items || []).map((item: any) => ({
+          cashierName: receipt.cashier || null
+      }).returningAll().executeTakeFirstOrThrow();
+      
+      const receiptItemsToInsert = (receipt.items || []).map((item: any) => ({
+        id: randomUUID(),
+        receiptId,
+
               productName: item.product?.name || item.productName || 'Unknown',
               quantity: Number(item.quantity) || 1,
               unitPrice: Number(item.product?.price || item.unitPrice || 0),
               totalPrice: Number(item.product?.price || item.unitPrice || 0) * (Number(item.quantity) || 1),
-            }))
-          }
-        }
-      });
+            
+      }));
+      if (receiptItemsToInsert.length > 0) {
+        await db.insertInto('ReceiptItem').values(receiptItemsToInsert).execute();
+      }
       createdReceipts.push(dbReceipt);
 
       // If email provided (or phone logic later), trigger digital receipt
       if (receipt.customerEmail) {
-        const business = await prisma.business.findUnique({ where: { id: businessId } });
+        const business = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
         const receiptUrl = `${process.env.S3_PUBLIC_URL}/receipts/${dbReceipt.id}.pdf`;
         
         await sendReceiptEmail(
@@ -114,20 +119,20 @@ router.post('/full', (req: any, res: any) => {
       let syncedSuppliers = 0;
       let syncedMovements = 0;
     
-    let defaultLocation = await prisma.storeLocation.findFirst({ where: { businessId } });
+    let defaultLocation = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
     if (!defaultLocation) {
-       defaultLocation = await prisma.storeLocation.create({ data: { businessId, name: 'Main Branch' } });
+       defaultLocation = await db.insertInto('StoreLocation').values({ id: randomUUID(), businessId, name: 'Main Branch' }).returningAll().executeTakeFirstOrThrow();
     }
     
     let targetLocationId = defaultLocation.id;
     if (businessSetup?.locationId) {
-      const loc = await prisma.storeLocation.findFirst({ where: { id: businessSetup.locationId, businessId } });
+      const loc = await db.selectFrom('StoreLocation').selectAll().where('id', '=', businessSetup.locationId).where('businessId', '=', businessId).executeTakeFirst();
       if (loc) targetLocationId = loc.id;
     }
 
     let targetOutletId = null;
     if (businessSetup?.outletId) {
-      const out = await prisma.outlet.findFirst({ where: { id: businessSetup.outletId, locationId: targetLocationId } });
+      const out = await db.selectFrom('Outlet').selectAll().where('id', '=', businessSetup.outletId).where('locationId', '=', targetLocationId).executeTakeFirst();
       if (out) targetOutletId = out.id;
     }
 
@@ -142,22 +147,23 @@ router.post('/full', (req: any, res: any) => {
         if (u.role === 'SYSTEM_ADMIN' || u.role === 'Admin') role = 'ADMIN';
         else if (u.role === 'STORE_MANAGER' || u.role === 'Manager') role = 'MANAGER';
 
-        await prisma.user.upsert({
-          where: { email: fallbackEmail },
-          create: {
+        const existingUser = await db.selectFrom('User').selectAll().where('email', '=', fallbackEmail).executeTakeFirst();
+        if (existingUser) {
+          await db.updateTable('User').set({
+            name: u.name,
+            role: role as any,
+            locationId: targetLocationId
+          }).where('email', '=', fallbackEmail).execute();
+        } else {
+          await db.insertInto('User').values({ id: randomUUID(),
             businessId,
             locationId: targetLocationId,
             email: fallbackEmail,
             password: u.pin || 'pos1234',
             name: u.name,
             role: role as any
-          },
-          update: {
-            name: u.name,
-            role: role as any,
-            locationId: targetLocationId
-          }
-        });
+          }).execute();
+        }
         syncedUsers++;
       }
     }
@@ -168,23 +174,17 @@ router.post('/full', (req: any, res: any) => {
         if (!p.name) continue;
         const sku = String(p.sku || p.barcode || p.id);
         
-        const existing = await prisma.product.findFirst({
-          where: { businessId, sku }
-        });
+        const existing = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).where('sku', '=', sku).executeTakeFirst();
         if (existing) {
-          await prisma.product.update({
-            where: { id: existing.id },
-            data: {
+          await db.updateTable('Product').set({
               name: String(p.name),
               category: p.category ? String(p.category) : null,
               price: Number(p.price) || 0,
               costPrice: Number(p.costPrice) || 0,
               barcode: p.barcode ? String(p.barcode) : null
-            }
-          });
+            }).where('id', '=', existing.id).execute();
         } else {
-          await prisma.product.create({
-            data: {
+          await db.insertInto('Product').values({ id: randomUUID(),
               businessId,
               sku: String(sku),
               barcode: p.barcode ? String(p.barcode) : null,
@@ -192,35 +192,23 @@ router.post('/full', (req: any, res: any) => {
               category: p.category ? String(p.category) : null,
               price: Number(p.price) || 0,
               costPrice: Number(p.costPrice) || 0
-            }
-          });
+            }).returningAll().executeTakeFirstOrThrow();
         }
         
         // Find newly inserted or updated product ID
-        const finalProduct = await prisma.product.findFirst({ where: { businessId, sku } });
+        const finalProduct = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).where('sku', '=', sku).executeTakeFirst();
         if (finalProduct) {
-          const existingInventory = await prisma.productInventory.findFirst({
-            where: { 
-              productId: finalProduct.id, 
-              locationId: targetLocationId, 
-              outletId: targetOutletId || null 
-            }
-          });
+          const existingInventory = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', finalProduct.id).where('locationId', '=', targetLocationId).where('outletId', targetOutletId ? '=' : 'is', targetOutletId ? targetOutletId : null).executeTakeFirst();
 
           if (existingInventory) {
-            await prisma.productInventory.update({
-              where: { id: existingInventory.id },
-              data: { stock: Number(p.stock) || 0 }
-            });
+            await db.updateTable('ProductInventory').set({ stock: Number(p.stock) || 0 }).where('id', '=', existingInventory.id).execute();
           } else {
-            await prisma.productInventory.create({
-              data: { 
+            await db.insertInto('ProductInventory').values({ id: randomUUID(), 
                 productId: finalProduct.id, 
                 locationId: targetLocationId, 
                 outletId: targetOutletId || null, 
                 stock: Number(p.stock) || 0 
-              }
-            });
+              }).returningAll().executeTakeFirstOrThrow();
           }
         }
         
@@ -232,15 +220,15 @@ router.post('/full', (req: any, res: any) => {
     if (transactions && Array.isArray(transactions)) {
        for (const t of transactions) {
           // Check if receipt exists
-          const existing = await prisma.receipt.findFirst({ where: { businessId, receiptNumber: String(t.id) } });
+          const existing = await db.selectFrom('Receipt').selectAll().where('businessId', '=', businessId).where('receiptNumber', '=', String(t.id)).executeTakeFirst();
           const rawStatus = (t.status || '').toUpperCase();
           if (!existing && rawStatus !== 'CANCELLED') {
               require('fs').appendFileSync('sync-debug.log', JSON.stringify(t) + '\n');
               let safeStatus = 'COMPLETED';
               if (rawStatus === 'PENDING' || rawStatus === 'REFUNDED') safeStatus = rawStatus;
 
-              await prisma.receipt.create({
-                 data: {
+              const receiptId = randomUUID();
+              await db.insertInto('Receipt').values({ id: receiptId,
                     businessId,
                     locationId: targetLocationId,
                     outletId: targetOutletId || undefined,
@@ -251,17 +239,21 @@ router.post('/full', (req: any, res: any) => {
                     mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null,
                     status: safeStatus as any,
                     createdAt: t.timestamp ? new Date(t.timestamp) : undefined,
-                    cashierName: t.cashier || null,
-                    items: {
-                      create: (t.items || []).map((item: any) => ({
+                    cashierName: t.cashier || null
+              }).returningAll().executeTakeFirstOrThrow();
+              const receiptItemsToInsert = (t.items || []).map((item: any) => ({
+                id: randomUUID(),
+                receiptId,
+
                         productName: item.product?.name || item.productName || 'Unknown',
                         quantity: Number(item.quantity) || 1,
                         unitPrice: Number(item.product?.price || item.unitPrice || 0),
                         totalPrice: Number(item.product?.price || item.unitPrice || 0) * (Number(item.quantity) || 1),
-                      }))
-                    }
-                 }
-              });
+                      
+              }));
+              if (receiptItemsToInsert.length > 0) {
+                await db.insertInto('ReceiptItem').values(receiptItemsToInsert).execute();
+              }
               syncedSales++;
           }
        }
@@ -269,15 +261,12 @@ router.post('/full', (req: any, res: any) => {
 
     // Update settings if provided
     if (businessSetup) {
-       await prisma.business.update({
-          where: { id: businessId },
-          data: { settings: businessSetup }
-       });
+       await db.updateTable('Business').set({ settings: JSON.stringify(businessSetup) }).where('id', '=', businessId).execute();
 
        // Sync M-Pesa config from POS settings
        if (businessSetup.mpesaConfig && businessSetup.mpesaConfig.consumerKey) {
           const mc = businessSetup.mpesaConfig;
-          const existingConfig = await prisma.mpesaConfig.findFirst({ where: { businessId, locationId: targetLocationId } });
+          const existingConfig = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).where('locationId', '=', targetLocationId).executeTakeFirst();
           
           const configData = {
                 businessId,
@@ -296,13 +285,13 @@ router.post('/full', (req: any, res: any) => {
           };
 
           if (existingConfig) {
-             await prisma.mpesaConfig.update({ where: { id: existingConfig.id }, data: configData });
+             await db.updateTable('MpesaConfig').set(configData).where('id', '=', existingConfig.id).execute();
           } else {
-             await prisma.mpesaConfig.create({ data: configData });
+             await db.insertInto('MpesaConfig').values({ id: randomUUID(), ...configData }).returningAll().executeTakeFirstOrThrow();
           }
        } else if (businessSetup.mpesaConsumerKey && businessSetup.mpesaConsumerSecret) {
           // Fallback for legacy POS versions
-          const existingConfig = await prisma.mpesaConfig.findFirst({ where: { businessId, locationId: targetLocationId } });
+          const existingConfig = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).where('locationId', '=', targetLocationId).executeTakeFirst();
           
           const configData = {
                 businessId,
@@ -319,9 +308,9 @@ router.post('/full', (req: any, res: any) => {
           };
 
           if (existingConfig) {
-             await prisma.mpesaConfig.update({ where: { id: existingConfig.id }, data: configData });
+             await db.updateTable('MpesaConfig').set(configData).where('id', '=', existingConfig.id).execute();
           } else {
-             await prisma.mpesaConfig.create({ data: configData });
+             await db.insertInto('MpesaConfig').values({ id: randomUUID(), ...configData }).returningAll().executeTakeFirstOrThrow();
           }
        }
     }
@@ -330,24 +319,19 @@ router.post('/full', (req: any, res: any) => {
     if (customers && Array.isArray(customers)) {
        for (const c of customers) {
           if (!c.name) continue;
-          const existing = await prisma.customer.findFirst({ where: { businessId, name: String(c.name) } });
+          const existing = await db.selectFrom('Customer').selectAll().where('businessId', '=', businessId).where('name', '=', String(c.name)).executeTakeFirst();
           if (existing) {
-             await prisma.customer.update({
-                where: { id: existing.id },
-                data: {
+             await db.updateTable('Customer').set({
                    phone: c.phone ? String(c.phone) : null,
                    email: c.email ? String(c.email) : null
-                }
-             });
+                }).where('id', '=', existing.id).execute();
           } else {
-             await prisma.customer.create({
-                data: {
+             await db.insertInto('Customer').values({ id: randomUUID(),
                    businessId,
                    name: String(c.name),
                    phone: c.phone ? String(c.phone) : null,
                    email: c.email ? String(c.email) : null
-                }
-             });
+                }).returningAll().executeTakeFirstOrThrow();
           }
           syncedCustomers++;
        }
@@ -357,24 +341,19 @@ router.post('/full', (req: any, res: any) => {
     if (suppliers && Array.isArray(suppliers)) {
        for (const s of suppliers) {
           if (!s.name) continue;
-          const existing = await prisma.supplier.findFirst({ where: { businessId, name: String(s.name) } });
+          const existing = await db.selectFrom('Supplier').selectAll().where('businessId', '=', businessId).where('name', '=', String(s.name)).executeTakeFirst();
           if (existing) {
-             await prisma.supplier.update({
-                where: { id: existing.id },
-                data: {
+             await db.updateTable('Supplier').set({
                    contact: s.phone ? String(s.phone) : (s.contactPerson ? String(s.contactPerson) : null),
                    email: s.email ? String(s.email) : null
-                }
-             });
+                }).where('id', '=', existing.id).execute();
           } else {
-             await prisma.supplier.create({
-                data: {
+             await db.insertInto('Supplier').values({ id: randomUUID(),
                    businessId,
                    name: String(s.name),
                    contact: s.phone ? String(s.phone) : (s.contactPerson ? String(s.contactPerson) : null),
                    email: s.email ? String(s.email) : null
-                }
-             });
+                }).returningAll().executeTakeFirstOrThrow();
           }
           syncedSuppliers++;
        }
@@ -383,13 +362,10 @@ router.post('/full', (req: any, res: any) => {
       // Sync Inventory Logs to StockMovements
       if (inventoryLogs && Array.isArray(inventoryLogs)) {
         for (const log of inventoryLogs) {
-          const existingLog = await prisma.stockMovement.findFirst({
-            where: { businessId, reference: String(log.reference || log.id) }
-          });
+          const existingLog = await db.selectFrom('StockMovement').selectAll().where('businessId', '=', businessId).where('reference', '=', String(log.reference || log.id)).executeTakeFirst();
 
           if (!existingLog) {
-            await prisma.stockMovement.create({
-              data: {
+            await db.insertInto('StockMovement').values({ id: randomUUID(),
                 businessId,
                 productId: String(log.productId),
                 locationId: targetLocationId,
@@ -398,33 +374,17 @@ router.post('/full', (req: any, res: any) => {
                 quantity: Math.abs(Number(log.variance) || 0),
                 reference: String(log.reference || log.id),
                 timestamp: new Date(log.timestamp || Date.now())
-              }
-            });
+              }).returningAll().executeTakeFirstOrThrow();
 
             // Also deduct from absolute stock in ProductInventory
-            let inventory = await prisma.productInventory.findFirst({
-              where: { 
-                productId: String(log.productId), 
-                locationId: targetLocationId, 
-                outletId: targetOutletId 
-              }
-            });
+            let inventory = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', String(log.productId)).where('locationId', '=', targetLocationId).where('outletId', targetOutletId ? '=' : 'is', targetOutletId ? targetOutletId : null).executeTakeFirst();
 
             if (!inventory) {
-               inventory = await prisma.productInventory.findFirst({
-                  where: {
-                     productId: String(log.productId),
-                     locationId: targetLocationId,
-                     outletId: null
-                  }
-               });
+               inventory = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', String(log.productId)).where('locationId', '=', targetLocationId).where('outletId', 'is', null).executeTakeFirst();
             }
 
             if (inventory) {
-              await prisma.productInventory.update({
-                where: { id: inventory.id },
-                data: { stock: Math.max(0, inventory.stock + Number(log.variance || 0)) }
-              });
+              await db.updateTable('ProductInventory').set({ stock: Math.max(0, inventory.stock + Number(log.variance || 0)) }).where('id', '=', inventory.id).execute();
             }
             syncedMovements++;
           }

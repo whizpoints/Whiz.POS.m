@@ -42,11 +42,18 @@ router.get('/', async (req: any, res: any) => {
     const { businessId } = req.user;
     const { locationId } = req.query;
     
-    const products = await prisma.product.findMany({
-      where: { businessId },
-      include: { inventory: { include: { location: true } } },
-      orderBy: { name: 'asc' }
-    }).catch(async () => []);
+    const products = (async () => {
+      const prods = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
+      const invs = await db.selectFrom('ProductInventory').selectAll().where('productId', 'in', prods.length > 0 ? prods.map(p => p.id) : ['']).execute();
+      const locs = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).execute();
+      for (const i of invs) {
+        i.location = locs.find(l => l.id === i.locationId);
+      }
+      for (const p of prods) {
+        p.inventory = invs.filter(i => i.productId === p.id);
+      }
+      return prods;
+    })().catch(async () => []);
 
     const formatted = products.map(p => {
        let stock = 0;
@@ -70,7 +77,7 @@ router.get('/', async (req: any, res: any) => {
 async function resolveCategory(businessId: string, categoryId?: string, categoryFallback?: string): Promise<string | null> {
   if (categoryId) {
     try {
-      const cat = await prisma.category.findUnique({ where: { id: categoryId, businessId } });
+      const cat = await db.selectFrom('Category').selectAll().where('id', '=', categoryId).where('businessId', '=', businessId).executeTakeFirst();
       if (cat) return cat.name;
     } catch {}
   }
@@ -99,8 +106,7 @@ router.post('/', async (req: any, res: any) => {
     }
 
     // Create product
-    const product = await prisma.product.create({
-      data: {
+    const product = await db.insertInto('Product').values({ id: randomUUID(), 
         businessId,
         sku,
         barcode: barcode || null,
@@ -110,28 +116,25 @@ router.post('/', async (req: any, res: any) => {
         costPrice: costPrice || 0,
         taxRate,
         reorderLevel
-      }
-    });
+       }).returningAll().executeTakeFirstOrThrow();
 
     // Create inventory
     let targetLocationId = locationId;
     if (!targetLocationId) {
       try {
-        const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+        const loc = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
         if (loc) targetLocationId = loc.id;
       } catch {}
     }
 
     if (targetLocationId) {
        try {
-         await prisma.productInventory.create({
-           data: {
+         await db.insertInto('ProductInventory').values({ id: randomUUID(), 
              productId: product.id,
              locationId: targetLocationId,
              stock: stock || 0,
              reorderLevel: reorderLevel || 5
-           }
-         });
+            }).returningAll().executeTakeFirstOrThrow();
        } catch (invErr: any) {
          console.warn('Inventory record creation skipped:', invErr?.message || invErr);
        }
@@ -171,45 +174,34 @@ router.put('/:id', async (req: any, res: any) => {
     if (barcode !== undefined) updateData.barcode = barcode || null;
     if (resolvedCategory !== undefined) updateData.category = resolvedCategory;
 
-    await prisma.product.update({
-      where: { id, businessId },
-      data: updateData
-    });
+    await db.updateTable('Product').set(updateData).where('id', '=', id).where('businessId', '=', businessId).execute();
 
     // Update inventory if locationId is provided
     let targetLocationId = locationId;
     if (!targetLocationId) {
       try {
-        const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+        const loc = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
         if (loc) targetLocationId = loc.id;
       } catch {}
     }
 
     if (targetLocationId && stock !== undefined) {
       try {
-        const existingInventory = await prisma.productInventory.findFirst({
-          where: { productId: id, locationId: targetLocationId }
-        });
+        const existingInventory = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', id).where('locationId', '=', targetLocationId).executeTakeFirst();
         
         const oldStock = existingInventory ? existingInventory.stock : 0;
         const newStock = stock || 0;
         const variance = newStock - oldStock;
         
         if (existingInventory) {
-          await prisma.productInventory.update({
-            where: { id: existingInventory.id },
-            data: { stock: newStock, reorderLevel: reorderLevel || 5 }
-          });
+          await db.updateTable('ProductInventory').set({ stock: newStock, reorderLevel: reorderLevel || 5 }).where('id', '=', existingInventory.id).execute();
         } else {
-          await prisma.productInventory.create({
-            data: { productId: id, locationId: targetLocationId, stock: newStock, reorderLevel: reorderLevel || 5 }
-          });
+          await db.insertInto('ProductInventory').values({ id: randomUUID(),  productId: id, locationId: targetLocationId, stock: newStock, reorderLevel: reorderLevel || 5  }).returningAll().executeTakeFirstOrThrow();
         }
         
         if (variance !== 0) {
            const outletId = req.query.outletId || req.body.outletId || existingInventory?.outletId || null;
-           await prisma.stockMovement.create({
-             data: {
+           await db.insertInto('StockMovement').values({ id: randomUUID(), 
                id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
                businessId,
                productId: id,
@@ -220,8 +212,7 @@ router.put('/:id', async (req: any, res: any) => {
                reference: 'Server Manual Update',
                sourceTerminal: 'SERVER',
                timestamp: new Date()
-             }
-           });
+              }).execute();
         }
       } catch (invErr: any) {
         console.warn('Inventory update skipped:', invErr?.message || invErr);
@@ -240,9 +231,7 @@ router.delete('/:id', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const { id } = req.params;
-    await prisma.product.deleteMany({
-      where: { id, businessId }
-    });
+    await db.deleteFrom('Product').where('id', '=', id).where('businessId', '=', businessId).execute();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -252,8 +241,8 @@ router.delete('/:id', async (req: any, res: any) => {
 router.get('/template/products', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const categories = await prisma.category.findMany({ where: { businessId } });
-    const products = await prisma.product.findMany({ where: { businessId }, orderBy: { name: 'asc' } });
+    const categories = await db.selectFrom('Category').selectAll().where('businessId', '=', businessId).execute();
+    const products = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Whiz POS Server';
@@ -342,19 +331,12 @@ router.post('/import/products', upload.single('file'), async (req: any, res: any
       const taxRate = Number(row.getCell(7).value) || 16.0;
       const reorderLevel = Number(row.getCell(8).value) || 5;
 
-      const existingProduct = await prisma.product.findFirst({
-        where: { businessId, OR: [{ sku }, { name }] }
-      });
+      const existingProduct = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).where((eb) => eb.or([eb('sku', '=', sku), eb('name', '=', name)])).executeTakeFirst();
 
       if (existingProduct) {
-        await prisma.product.update({
-          where: { id: existingProduct.id },
-          data: { name, barcode, category: categoryName, price, costPrice, taxRate, reorderLevel }
-        });
+        await db.updateTable('Product').set({ name, barcode, category: categoryName, price, costPrice, taxRate, reorderLevel }).where('id', '=', existingProduct.id).execute();
       } else {
-        await prisma.product.create({
-          data: { businessId, sku, barcode, name, category: categoryName, price, costPrice, taxRate, reorderLevel }
-        });
+        await db.insertInto('Product').values({ id: randomUUID(),  businessId, sku, barcode, name, category: categoryName, price, costPrice, taxRate, reorderLevel  }).returningAll().executeTakeFirstOrThrow();
       }
       count++;
     }
@@ -373,15 +355,18 @@ router.get('/template/reconciliation', async (req: any, res: any) => {
 
     let targetLocationId = locationId;
     if (!targetLocationId) {
-      const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+      const loc = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
       if (loc) targetLocationId = loc.id;
     }
 
-    const products = await prisma.product.findMany({
-      where: { businessId },
-      include: { inventory: { where: { locationId: targetLocationId } } },
-      orderBy: { name: 'asc' }
-    });
+    const products = (async () => {
+      const prods = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
+      const invs = await db.selectFrom('ProductInventory').selectAll().where('locationId', '=', targetLocationId).where('productId', 'in', prods.length > 0 ? prods.map(p => p.id) : ['']).execute();
+      for (const p of prods) {
+        p.inventory = invs.filter(i => i.productId === p.id);
+      }
+      return prods;
+    })();
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Stock Audit', { views: [{ state: 'frozen', ySplit: 1 }] });
@@ -433,7 +418,7 @@ router.post('/import/reconciliation', upload.single('file'), async (req: any, re
 
     let targetLocationId = locationId;
     if (!targetLocationId) {
-      const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+      const loc = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
       if (loc) targetLocationId = loc.id;
     }
     if (!targetLocationId) return res.status(400).json({ error: 'No location found' });
@@ -455,25 +440,17 @@ router.post('/import/reconciliation', upload.single('file'), async (req: any, re
       const delta = addAmount - deductAmount;
       if (delta === 0) continue; 
 
-      const inv = await prisma.productInventory.findFirst({
-        where: { productId, locationId: targetLocationId }
-      });
+      const inv = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', productId).where('locationId', '=', targetLocationId).executeTakeFirst();
 
       if (inv) {
-        await prisma.productInventory.update({
-          where: { id: inv.id },
-          data: { stock: { increment: delta } }
-        });
+        await db.updateTable('ProductInventory').set((eb) => ({ stock: eb('stock', '+', delta) })).where('id', '=', inv.id).execute();
       } else {
-        await prisma.productInventory.create({
-          data: { productId, locationId: targetLocationId, stock: delta, reorderLevel: 5 }
-        });
+        await db.insertInto('ProductInventory').values({ id: randomUUID(),  productId, locationId: targetLocationId, stock: delta, reorderLevel: 5  }).returningAll().executeTakeFirstOrThrow();
       }
       
       try {
         const outletId = req.query.outletId || req.body.outletId || inv?.outletId || null;
-        await prisma.stockMovement.create({
-          data: {
+        await db.insertInto('StockMovement').values({ id: randomUUID(), 
             businessId,
             productId,
             locationId: targetLocationId,
@@ -482,8 +459,7 @@ router.post('/import/reconciliation', upload.single('file'), async (req: any, re
             quantity: Math.abs(delta),
             reference: 'Excel Bulk Reconciliation',
             sourceTerminal: 'SERVER'
-          }
-        });
+           }).execute();
       } catch (e) { }
 
       count++;
@@ -503,30 +479,22 @@ router.post('/quick-add', async (req: any, res: any) => {
     
     let targetLocationId = locationId;
     if (!targetLocationId) {
-      const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+      const loc = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
       if (loc) targetLocationId = loc.id;
     }
 
     if (!targetLocationId) return res.status(400).json({ error: 'No location found' });
 
-    const inv = await prisma.productInventory.findFirst({
-      where: { productId, locationId: targetLocationId }
-    });
+    const inv = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', productId).where('locationId', '=', targetLocationId).executeTakeFirst();
 
     if (inv) {
-      await prisma.productInventory.update({
-        where: { id: inv.id },
-        data: { stock: { increment: quantity } }
-      });
+      await db.updateTable('ProductInventory').set((eb) => ({ stock: eb('stock', '+', quantity) })).where('id', '=', inv.id).execute();
     } else {
-      await prisma.productInventory.create({
-        data: { productId, locationId: targetLocationId, stock: quantity, reorderLevel: 5 }
-      });
+      await db.insertInto('ProductInventory').values({ id: randomUUID(),  productId, locationId: targetLocationId, stock: quantity, reorderLevel: 5  }).returningAll().executeTakeFirstOrThrow();
     }
 
     const outletId = req.query.outletId || req.body.outletId || inv?.outletId || null;
-    await prisma.stockMovement.create({
-      data: {
+    await db.insertInto('StockMovement').values({ id: randomUUID(), 
         id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
         businessId,
         productId,
@@ -537,8 +505,7 @@ router.post('/quick-add', async (req: any, res: any) => {
         reference: 'Quick Add from Server',
         sourceTerminal: 'SERVER',
         timestamp: new Date()
-      }
-    });
+       }).execute();
 
     res.json({ success: true, message: 'Stock added successfully' });
   } catch (error) {

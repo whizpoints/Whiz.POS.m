@@ -759,7 +759,7 @@ function ETimsPanel({ profile, onSave }: any) {
 /* --------------------------- Profile --------------------------- */
 
 function ProfilePanel({ profile, onSave }: any) {
-  const [logoUrl, setLogoUrl] = useState<string | null>(profile?.logoUrl || null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(profile?.documentLogoUrl || profile?.logoUrl || null);
   const [uploading, setUploading] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -772,6 +772,22 @@ function ProfilePanel({ profile, onSave }: any) {
     timezone: profile?.settings?.timezone || 'Africa/Nairobi',
     receiptFooterNote: profile?.settings?.receiptFooterNote || ''
   });
+
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        legalName: profile?.settings?.legalName || profile?.name || '',
+        tradeName: profile?.settings?.tradeName || '',
+        phone: profile?.settings?.phone || '',
+        email: profile?.settings?.email || '',
+        address: profile?.settings?.address || '',
+        currency: profile?.settings?.currency || 'KES',
+        timezone: profile?.settings?.timezone || 'Africa/Nairobi',
+        receiptFooterNote: profile?.settings?.receiptFooterNote || ''
+      });
+      setLogoUrl(profile?.documentLogoUrl || profile?.logoUrl || null);
+    }
+  }, [profile]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

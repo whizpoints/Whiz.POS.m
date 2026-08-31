@@ -58,11 +58,24 @@ router.post('/profile', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const { name, settings, apiKey, documentLogoUrl, watermarkUrl } = req.body;
+    
+    let mergedSettings = settings;
+    if (settings) {
+      const existing = await prisma.business.findUnique({ where: { id: businessId }, select: { settings: true } });
+      if (existing && existing.settings) {
+        try {
+          const oldSettings = typeof existing.settings === 'string' ? JSON.parse(existing.settings) : existing.settings;
+          const newSettings = typeof settings === 'string' ? JSON.parse(settings) : settings;
+          mergedSettings = JSON.stringify({ ...oldSettings, ...newSettings });
+        } catch(e) {}
+      }
+    }
+
     const business = await prisma.business.update({
       where: { id: businessId },
       data: {
         ...(name && { name }),
-        ...(settings && { settings }),
+        ...(mergedSettings && { settings: mergedSettings }),
         ...(apiKey !== undefined && { apiKey }),
         ...(documentLogoUrl !== undefined && { documentLogoUrl }),
         ...(watermarkUrl !== undefined && { watermarkUrl })

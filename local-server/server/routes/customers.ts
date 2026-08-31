@@ -1,11 +1,9 @@
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import { randomUUID } from 'crypto';
+import db from '../db.js';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
-// const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 const authenticate = (req: any, res: any, next: any) => {
@@ -28,10 +26,11 @@ router.use(authenticate);
 router.get('/', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const customers = await prisma.customer.findMany({
-      where: { businessId },
-      orderBy: { name: 'asc' }
-    });
+    const customers = await db.selectFrom('Customer')
+      .selectAll()
+      .where('businessId', '=', businessId)
+      .orderBy('name', 'asc')
+      .execute();
     res.json(customers);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -43,11 +42,13 @@ router.post('/', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const { name, phone, email, loyaltyPoints, totalSpent } = req.body;
-    const customer = await prisma.customer.create({
-      data: {
+    const customer = await db.insertInto('Customer')
+      .values({
+        id: randomUUID(),
         businessId, name, phone, email, loyaltyPoints, totalSpent
-      }
-    });
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
     res.json(customer);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -60,10 +61,12 @@ router.put('/:id', async (req: any, res: any) => {
     const { businessId } = req.user;
     const { id } = req.params;
     const { name, phone, email, loyaltyPoints, totalSpent } = req.body;
-    const customer = await prisma.customer.updateMany({
-      where: { id, businessId },
-      data: { name, phone, email, loyaltyPoints, totalSpent }
-    });
+    const customer = await db.updateTable('Customer')
+      .set({ name, phone, email, loyaltyPoints, totalSpent })
+      .where('id', '=', id)
+      .where('businessId', '=', businessId)
+      .returningAll()
+      .executeTakeFirstOrThrow();
     res.json(customer);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -75,9 +78,10 @@ router.delete('/:id', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const { id } = req.params;
-    await prisma.customer.deleteMany({
-      where: { id, businessId }
-    });
+    await db.deleteFrom('Customer')
+      .where('id', '=', id)
+      .where('businessId', '=', businessId)
+      .execute();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -85,4 +89,3 @@ router.delete('/:id', async (req: any, res: any) => {
 });
 
 export default router;
-

@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import prisma from '../prisma.js';
+import db from '../db.js';
+import { randomUUID } from 'crypto';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
@@ -28,7 +27,7 @@ router.post('/register', async (req, res) => {
       apiKey, servedBy, receiptFooter, cloudBusinessId, cloudLocationId, printerType, mpesaPaybill, mpesaTill, mpesaAccount
     } = req.body;
 
-    const existingBusiness = await prisma.business.findUnique({ where: { email } });
+    const existingBusiness = await db.selectFrom('Business').selectAll().where('email', '=', email).executeTakeFirst();
     if (existingBusiness) {
       return res.status(400).json({ error: 'Business email already registered' });
     }
@@ -48,35 +47,38 @@ router.post('/register', async (req, res) => {
       locationId: cloudLocationId
     });
 
-    const business = await prisma.business.create({
-        data: {
-          id: cloudBusinessId || undefined,
-        name: businessName,
-        email,
-        kraPin: kraPin || null,
-        settings,
-        verificationToken: null,
-        emailVerified: true,
-        setupComplete: true,
-        apiKey: apiKey || crypto.randomBytes(32).toString('hex'),
-        users: {
-          create: {
-            email,
-            password: hashedPassword,
-            pin: password.length === 4 && /^\d+$/.test(password) ? password : null,
-            name: 'Admin',
-            role: 'ADMIN'
-          }
-        },
-        locations: {
-          create: {
-            name: 'Main Store',
-            address: address || 'Local Setup'
-          }
-        }
-      },
-      include: { users: true }
-    });
+    const bId = cloudBusinessId || randomUUID();
+    const generatedApiKey = apiKey || crypto.randomBytes(32).toString('hex');
+    const business = await db.insertInto('Business').values({
+      id: bId,
+      name: businessName,
+      email,
+      kraPin: kraPin || null,
+      settings,
+      verificationToken: null,
+      emailVerified: 1,
+      setupComplete: 1,
+      apiKey: generatedApiKey
+    }).returningAll().executeTakeFirstOrThrow();
+
+    const user = await db.insertInto('User').values({
+      id: randomUUID(),
+      businessId: business.id,
+      email,
+      password: hashedPassword,
+      pin: password.length === 4 && /^\d+$/.test(password) ? password : null,
+      name: 'Admin',
+      role: 'ADMIN'
+    }).returningAll().executeTakeFirstOrThrow();
+
+    await db.insertInto('StoreLocation').values({
+      id: randomUUID(),
+      businessId: business.id,
+      name: 'Main Store',
+      address: address || 'Local Setup'
+    }).execute();
+
+    business.users = [user];
 
     const user = business.users[0];
     const token = jwt.sign({ userId: user.id, businessId: business.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
@@ -97,15 +99,12 @@ router.get('/verify-email', async (req, res) => {
       return res.status(400).send('Invalid token');
     }
 
-    const business = await prisma.business.findFirst({ where: { verificationToken: token } });
+    const business = await db.selectFrom('Business').selectAll().where('verificationToken', '=', token).executeTakeFirst();
     if (!business) {
       return res.status(400).send('Invalid or expired token');
     }
 
-    await prisma.business.update({
-      where: { id: business.id },
-      data: { emailVerified: true, verificationToken: null }
-    });
+    await db.updateTable('Business').set({ emailVerified: 1, verificationToken: null }).where('id', '=', business.id).execute();
 
     // Redirect user back to the onboarding page
     const frontendUrl = process.env.CORS_ORIGINS?.split(',')[0] || 'http://localhost:5173';
@@ -125,7 +124,7 @@ router.get('/verify-status', async (req, res) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET) as any;
 
-    const business = await prisma.business.findUnique({ where: { id: decoded.businessId } });
+    const business = await db.selectFrom('Business').selectAll().where('id', '=', decoded.businessId).executeTakeFirst();
     if (!business) return res.status(404).json({ error: 'Business not found' });
 
     res.json({ emailVerified: business.emailVerified });
@@ -144,15 +143,12 @@ router.post('/resend-verification', async (req, res) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET) as any;
 
-    const business = await prisma.business.findUnique({ where: { id: decoded.businessId } });
+    const business = await db.selectFrom('Business').selectAll().where('id', '=', decoded.businessId).executeTakeFirst();
     if (!business) return res.status(404).json({ error: 'Business not found' });
     if (business.emailVerified) return res.status(400).json({ error: 'Already verified' });
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
-    await prisma.business.update({
-      where: { id: business.id },
-      data: { verificationToken }
-    });
+    await db.updateTable('Business').set({ verificationToken }).where('id', '=', business.id).execute();
 
     const fromName = process.env.BREVO_FROM_NAME || 'Whiz POS';
     const fromEmail = process.env.BREVO_FROM_EMAIL || 'support@whizpoint.app';
@@ -186,15 +182,7 @@ router.post('/setup', async (req, res) => {
     const { businessName, kraPin } = req.body;
     const apiKey = crypto.randomBytes(32).toString('hex');
 
-    const business = await prisma.business.update({
-      where: { id: decoded.businessId },
-      data: {
-        name: businessName,
-        kraPin,
-        setupComplete: true,
-        apiKey
-      }
-    });
+    const business = await db.updateTable('Business').set({ name: businessName, kraPin, setupComplete: 1, apiKey }).where('id', '=', decoded.businessId).returningAll().executeTakeFirstOrThrow();
 
     res.json({ success: true, business, apiKey });
   } catch (error) {
@@ -208,7 +196,10 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { email }, include: { business: true } });
+    const user = await db.selectFrom('User').selectAll().where('email', '=', email).executeTakeFirst();
+    if (user) {
+      user.business = await db.selectFrom('Business').selectAll().where('id', '=', user.businessId).executeTakeFirst();
+    }
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -235,15 +226,11 @@ router.post('/verify-api-key', async (req, res) => {
       return res.status(400).json({ error: 'API Key is required' });
     }
 
-    const business = await prisma.business.findFirst({
-      where: { apiKey },
-      include: {
-        users: {
-          where: { role: 'ADMIN' },
-          take: 1
-        }
-      }
-    });
+    const business = await db.selectFrom('Business').selectAll().where('apiKey', '=', apiKey).executeTakeFirst();
+    if (business) {
+      const adminUsers = await db.selectFrom('User').selectAll().where('businessId', '=', business.id).where('role', '=', 'ADMIN').limit(1).execute();
+      business.users = adminUsers;
+    }
 
     if (!business) {
       return res.status(401).json({ error: 'Invalid API Key' });
@@ -276,10 +263,7 @@ router.post('/verify-api-key', async (req, res) => {
   
       const pairingCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit code
       
-      await prisma.business.update({
-        where: { id: decoded.businessId },
-        data: { pairingCode }
-      });
+      await db.updateTable('Business').set({ pairingCode }).where('id', '=', decoded.businessId).execute();
   
       res.json({ success: true, pairingCode });
     } catch (error) {
@@ -296,19 +280,14 @@ router.post('/verify-api-key', async (req, res) => {
         return res.status(400).json({ error: 'API Key and Pairing Code are required' });
       }
 
-      const business = await prisma.business.findFirst({
-        where: { apiKey, pairingCode }
-      });
+      const business = await db.selectFrom('Business').selectAll().where('apiKey', '=', apiKey).where('pairingCode', '=', pairingCode).executeTakeFirst();
 
       if (!business) {
         return res.status(401).json({ error: 'Invalid pairing code or API key' });
       }
 
       // Optionally wipe the pairing code so it's one-time use
-      await prisma.business.update({
-        where: { id: business.id },
-        data: { pairingCode: null }
-      });
+      await db.updateTable('Business').set({ pairingCode: null }).where('id', '=', business.id).execute();
 
       res.json({ success: true, businessId: business.id });
     } catch (error) {

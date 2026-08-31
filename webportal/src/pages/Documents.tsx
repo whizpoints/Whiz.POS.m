@@ -6,7 +6,7 @@ import {
   FileText, Download, Plus, Trash2, Upload, Image as ImageIcon,
   Settings, User, Calendar, DollarSign, LayoutTemplate,
   Printer, Eye, FileOutput, FileInput, AlertTriangle, Scale, CheckCircle,
-  Save, FolderOpen, X
+  Save, FolderOpen, X, Search
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { DocumentModal } from '../components/invoice/DocumentModal';
@@ -55,8 +55,11 @@ export default function InvoiceGenerator() {
   // Search State
   const [searchTerm, setSearchTerm] = useState('');
   const [showTransactionSearch, setShowTransactionSearch] = useState(false);
-
-  // Saved Docs State
+  
+  // Settings & Modal State
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
   const [showSavedDocs, setShowSavedDocs] = useState(false);
   const [currentDocId, setCurrentDocId] = useState<string | null>(null);
 
@@ -130,71 +133,89 @@ export default function InvoiceGenerator() {
     }
   }, [documentSettings, currentDocId, docType]);
 
-  const handleSaveDocument = () => {
-    const docData = {
-        docNumber,
-        date,
-        dueDate,
-        clientName,
-        clientCompany,
-        clientAddress,
-        clientEmail,
-        items,
-        subtotal,
-        taxAmount,
-        total,
-        taxRate,
-        notes,
-        paymentInfo,
-        subject,
-        bodyText: templateString,
-        partialAmount,
-        settlementDate,
-        daysNotice,
-        paymentMode,
-        projectReference,
-        branding: {
-          logoImage,
-          headerImage,
-          backgroundImage: showWatermark ? backgroundImage : null,
-          useCustomHeader
+  // Fetch saved clients and documents on load
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('whiz-token');
+        if (!token) return;
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        const [clientsRes, docsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/clients`, { headers }),
+          fetch(`${API_BASE_URL}/api/saved-documents`, { headers })
+        ]);
+        if (clientsRes.ok) {
+           const clients = await clientsRes.json();
+           usePosStore.setState({ creditCustomers: clients });
         }
+        if (docsRes.ok) {
+           const docs = await docsRes.json();
+           usePosStore.setState({ documents: docs.map((d: any) => ({
+             id: d.id,
+             type: d.type,
+             name: d.customerName || `Untitled ${d.type}`,
+             date: d.date,
+             data: {
+               ...d.metadata,
+               items: d.items,
+               subtotal: d.subtotal,
+               taxAmount: d.tax,
+               total: d.total,
+               notes: d.notes,
+               clientName: d.customerName,
+               clientCompany: d.customerName,
+               clientEmail: d.customerEmail,
+               clientAddress: d.customerAddress,
+             }
+           })) });
+        }
+      } catch (err) {}
     };
+    fetchData();
+  }, []);
 
-    const newDoc: SavedDocument = {
-      id: currentDocId || `DOC${Date.now()}`,
-      type: docType,
-      name: clientCompany || clientName || `Untitled ${docType}`,
-      date: new Date().toISOString(),
-      data: docData
-    };
-
-    saveDocument(newDoc);
-    setCurrentDocId(newDoc.id);
-    toast.success('Document saved successfully!');
-    setShowSavedDocs(true);
+  const handleSaveDocument = async () => {
+    const docData = { docNumber, date, dueDate, clientName, clientCompany, clientAddress, clientEmail, items, subtotal, taxAmount, total, taxRate, notes, paymentInfo, subject, bodyText: templateString, partialAmount, settlementDate, daysNotice, paymentMode, projectReference, branding: { logoImage, headerImage, backgroundImage: showWatermark ? backgroundImage : null, useCustomHeader } };
+    const newDocId = currentDocId || `DOC${Date.now()}`;
+    const apiDoc = { id: newDocId, type: docType, date: new Date().toISOString(), customerName: clientCompany || clientName || 'Unknown', customerEmail: clientEmail, customerPhone: clientAddress, customerAddress: clientAddress, items: items, subtotal: subtotal, tax: taxAmount, total: total, notes: notes, status: 'DRAFT', metadata: docData };
+    
+    try {
+        const token = localStorage.getItem('whiz-token');
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+        const res = await fetch(`${API_BASE_URL}/api/saved-documents`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(apiDoc)
+        });
+        if (res.ok) {
+            const savedDoc = await res.json();
+            const localFormat: SavedDocument = { id: savedDoc.id, type: savedDoc.type, name: savedDoc.customerName || `Untitled ${savedDoc.type}`, date: savedDoc.date, data: docData };
+            saveDocument(localFormat);
+            setCurrentDocId(savedDoc.id);
+            toast.success('Document saved permanently to Neon Database!');
+        } else { toast.error('Failed to save document to cloud.'); }
+    } catch (e) { toast.error('Network error saving document.'); }
   };
 
-  const handleSaveClient = () => {
-    if (!clientName && !clientCompany) {
-        toast.error('Please enter a Client Name or Company Name first.');
-        return;
-    }
-    const newCustomer = {
-      id: Date.now().toString(),
-      name: clientCompany || clientName,
-      phone: clientAddress,
-      email: clientEmail,
-      address: clientAddress,
-      creditLimit: 0,
-      totalCredit: 0,
-      paidAmount: 0,
-      balance: 0,
-      notes: clientName !== clientCompany ? `Contact: ${clientName}` : '',
-      lastUpdated: new Date().toISOString()
-    };
-    saveCreditCustomer(newCustomer);
-    toast.success('Client saved permanently to Address Book!');
+  const handleSaveClient = async () => {
+    if (!clientName && !clientCompany) return toast.error('Please enter a Client Name or Company Name first.');
+    const newCustomer = { id: Date.now().toString(), name: clientCompany || clientName, phone: clientAddress, email: clientEmail, address: clientAddress };
+    try {
+        const token = localStorage.getItem('whiz-token');
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+        const res = await fetch(`${API_BASE_URL}/api/clients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(newCustomer)
+        });
+        if (res.ok) {
+            const savedClient = await res.json();
+            usePosStore.setState((s: any) => ({ creditCustomers: [...s.creditCustomers, savedClient] }));
+            toast.success('Client permanently saved to Neon Database!');
+        } else { toast.error('Failed to save client to cloud.'); }
+    } catch (e) { toast.error('Network error saving client.'); }
   };
 
   const handleLoadDocument = (doc: SavedDocument) => {
@@ -347,7 +368,7 @@ export default function InvoiceGenerator() {
     <div className="min-h-screen bg-slate-50 p-6 pb-24">
 
       {/* Header Area */}
-      <div className="max-w-5xl mx-auto mb-8 flex justify-between items-center">
+      <div className="max-w-5xl mx-auto mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
              <LayoutTemplate className="w-6 h-6 text-sky-600" />
@@ -356,7 +377,7 @@ export default function InvoiceGenerator() {
           <p className="text-slate-500 text-sm mt-1">Create Quotes, Invoices, Orders & Legal Notices</p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-2">
            <button
              onClick={() => setShowSavedDocs(true)}
              className="flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
@@ -365,11 +386,11 @@ export default function InvoiceGenerator() {
            </button>
            <button
              onClick={handleSaveDocument}
-             className="flex items-center gap-2 bg-sky-600 text-white hover:bg-sky-700 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
+             className="flex items-center gap-2 bg-sky-600 text-white hover:bg-sky-700 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm z-10"
            >
              <Save className="w-4 h-4" /> {currentDocId ? 'Update' : 'Save'}
            </button>
-           <div className="h-8 w-px bg-slate-200 mx-2"></div>
+           <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1"></div>
            <button
              onClick={() => openPreview('a4')}
              className="flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
@@ -384,6 +405,52 @@ export default function InvoiceGenerator() {
            </button>
         </div>
       </div>
+
+      {/* Client Search Modal */}
+      {showClientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-slate-800">Select Client</h2>
+              <button onClick={() => setShowClientModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 border-b border-slate-100">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search clients..."
+                  value={clientSearch}
+                  onChange={(e) => setClientSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                />
+              </div>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-2">
+              {creditCustomers.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase())).map(client => (
+                <button
+                  key={client.id}
+                  onClick={() => {
+                    setClientCompany(client.name);
+                    setClientEmail(client.email || '');
+                    setClientAddress(client.phone || '');
+                    setShowClientModal(false);
+                  }}
+                  className="w-full text-left p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0"
+                >
+                  <div className="font-medium text-slate-800 text-sm">{client.name}</div>
+                  <div className="text-xs text-slate-500 mt-1">{client.email} {client.phone && `• ${client.phone}`}</div>
+                </button>
+              ))}
+              {creditCustomers.length === 0 && (
+                <div className="text-center p-4 text-sm text-slate-500">No saved clients found.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Saved Documents Modal */}
       {showSavedDocs && (

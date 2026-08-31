@@ -1,7 +1,7 @@
 import express from 'express';
+import { randomUUID } from 'crypto';
 import db from '../db.js';
 import jwt from 'jsonwebtoken';
-import { randomUUID } from 'crypto';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
@@ -94,4 +94,3 @@ router.delete('/:id', async (req: any, res: any) => {
 });
 
 export default router;
-
