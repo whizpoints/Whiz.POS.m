@@ -16,6 +16,23 @@ export default function AuthPage() {
     password: ''
   });
 
+  // Handle OAuth Redirect
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const userStr = params.get('user');
+    if (token && userStr) {
+      try {
+        localStorage.setItem('whiz-token', token);
+        localStorage.setItem('whiz-user', userStr);
+        toast.success('Successfully logged in with Google!');
+        navigate('/dashboard');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [navigate]);
+
 
   const handleGoogleLogin = () => {
     const API_BASE_URL = window.location.protocol === 'file:' ? 'http://localhost:5050' : (import.meta.env.VITE_API_BASE_URL || window.location.origin);

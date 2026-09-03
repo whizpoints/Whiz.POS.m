@@ -393,7 +393,110 @@ router.post('/verify-api-key', async (req, res) => {
     }
   });
 
+
+// ==================== GOOGLE OAUTH ====================
+router.get('/google', (req, res) => {
+  const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = req.hostname.includes('localhost') 
+    ? 'http://localhost:5050/api/auth/google/callback' 
+    : (req.hostname === 'api.whizpoint.app' ? 'https://api.whizpoint.app/api/auth/google/callback' : 'https://backoffice.whizpoint.app/api/auth/google/callback');
+  
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email%20profile`;
+  res.redirect(authUrl);
+});
+
+router.get('/google/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) return res.status(400).send('No code provided');
+
+    const redirectUri = req.hostname.includes('localhost') 
+      ? 'http://localhost:5050/api/auth/google/callback' 
+      : (req.hostname === 'api.whizpoint.app' ? 'https://api.whizpoint.app/api/auth/google/callback' : 'https://backoffice.whizpoint.app/api/auth/google/callback');
+
+    // 1. Get tokens
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri
+      })
+    });
+    
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) {
+      console.error('Google OAuth token error:', tokenData);
+      return res.status(400).send('Failed to obtain access token');
+    }
+
+    // 2. Get user info
+    const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+    
+    const userData = await userRes.json();
+    if (!userData.email) return res.status(400).send('No email returned from Google');
+
+    // 3. Find or Create User
+    let user = await prisma.user.findUnique({ where: { email: userData.email } });
+    
+    if (!user) {
+      // Create new user & business
+      const tempPassword = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      
+      const newBusiness = await prisma.business.create({
+        data: {
+          name: userData.name ? `${userData.name}'s Business` : 'My Business',
+          email: userData.email,
+          users: {
+            create: {
+              email: userData.email,
+              password: hashedPassword,
+              name: userData.name,
+              role: 'OWNER',
+            }
+          }
+        },
+        include: { users: true }
+      });
+      user = newBusiness.users[0];
+    }
+
+    // 4. Generate JWT
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role, businessId: user.businessId },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    const userPayload = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      businessId: user.businessId
+    };
+
+    // 5. Redirect back to frontend
+    const frontendUrl = req.hostname.includes('localhost') 
+      ? 'http://localhost:5173/auth' 
+      : 'https://backoffice.whizpoint.app/auth';
+
+    res.redirect(`${frontendUrl}?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(userPayload))}`);
+
+  } catch (error) {
+    console.error('OAuth error:', error);
+    res.status(500).send('OAuth Authentication Failed');
+  }
+});
+
 export default router;
+
 
 
 
