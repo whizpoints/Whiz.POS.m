@@ -37,7 +37,12 @@ const serverPaths = [
     // 1. Local Server Electron Data
     path.join(APPDATA, 'whiz-local-server'),
     path.join(LOCALAPPDATA, 'whiz-local-server'),
+    path.join(process.env.ALLUSERSPROFILE || 'C:\\ProgramData', 'whizpos-server'),
     // 2. Local Server DB
+    path.join(__dirname, 'local-server', 'db', 'local.db'),
+    path.join(__dirname, 'local-server', 'db', 'local.db-journal'),
+    path.join(__dirname, 'local-server', 'local.db'),
+    path.join(__dirname, 'local-server', 'local.db-journal'),
     path.join(__dirname, 'local-server', 'prisma', 'local.db'),
     path.join(__dirname, 'local-server', 'prisma', 'local.db-journal'),
     // 3. Webportal DB

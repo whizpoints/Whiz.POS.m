@@ -668,7 +668,24 @@ export const usePosStore = create<PosState>()(
        */
       addToCart: (product) => {
         set((state) => {
+          // Prevent adding out-of-stock items
+          const availableStock = product.stock ?? 0;
           const existingItem = state.cart.find(item => item.product.id === product.id);
+          const currentCartQty = existingItem ? existingItem.quantity : 0;
+
+          if (availableStock <= 0) {
+            // Allow adding if stock tracking is disabled (stock === undefined/null)
+            if (product.stock !== undefined && product.stock !== null) {
+              console.warn(`[CART] Cannot add ${product.name}: out of stock (${availableStock})`);
+              return state; // No change
+            }
+          }
+
+          if (availableStock > 0 && currentCartQty >= availableStock) {
+            console.warn(`[CART] Cannot add more ${product.name}: only ${availableStock} in stock, ${currentCartQty} in cart`);
+            return state; // No change
+          }
+
           if (existingItem) {
             return {
               cart: state.cart.map(item =>
@@ -1451,7 +1468,8 @@ export const usePosStore = create<PosState>()(
               try {
                 const sinceTime = state.lastSyncTime || '2000-01-01T00:00:00.000Z';
                 const locationQuery = state.businessSetup?.locationId ? `locationId=${state.businessSetup.locationId}&` : '';
-                const response = await fetch(`${apiUrl}/api/sync/delta?${locationQuery}since=${encodeURIComponent(sinceTime)}`, {
+                const outletQuery = state.businessSetup?.outletId ? `outletId=${state.businessSetup.outletId}&` : '';
+                const response = await fetch(`${apiUrl}/api/sync/delta?${locationQuery}${outletQuery}since=${encodeURIComponent(sinceTime)}`, {
                   headers: {
                     'Authorization': `Bearer ${apiKey}`,
                     'X-API-KEY': apiKey
@@ -1460,7 +1478,7 @@ export const usePosStore = create<PosState>()(
 
                 if (response.status === 401) {
                    console.error('API Key invalid or revoked. Resetting POS registration.');
-                   get().saveBusinessSetup({ ...state.businessSetup, apiKey: null, backOfficeApiKey: null, isSetup: false } as any);
+                   get().setSyncStatus({ error: 'API Key invalid or revoked. Please reset POS registration in Settings.', isSyncing: false, currentTask: 'Sync failed' });
                    return;
                 }
 
@@ -1484,7 +1502,23 @@ const serverData = await response.json();
                           if (payload.customers?.length > 0) mergePromises.push(window.electron.mergeData('credit-customers.json', payload.customers));
                           if (payload.suppliers?.length > 0) mergePromises.push(window.electron.mergeData('suppliers.json', payload.suppliers));
                           if (payload.transactions?.length > 0) mergePromises.push(window.electron.mergeData('transactions.json', payload.transactions));
-                          if (payload.businessSetup) mergePromises.push(window.electron.mergeData('business-setup.json', payload.businessSetup));
+                          if (payload.businessSetup) {
+                              const safeBusinessSetup = { ...payload.businessSetup };
+                              delete safeBusinessSetup.apiKey;
+                              delete safeBusinessSetup.terminalName;
+                              delete safeBusinessSetup.outletId;
+                              delete safeBusinessSetup.isSetup;
+                              delete safeBusinessSetup.isLoggedIn;
+
+                              // If locationId changed (e.g. stale backup value), force a full re-sync
+                              const currentLocationId = state.businessSetup?.locationId;
+                              if (safeBusinessSetup.locationId && currentLocationId && safeBusinessSetup.locationId !== currentLocationId) {
+                                console.log(`[SYNC] locationId changed: ${currentLocationId} → ${safeBusinessSetup.locationId}. Resetting lastSyncTime for full re-sync.`);
+                                set({ lastSyncTime: null });
+                              }
+
+                              mergePromises.push(window.electron.mergeData('business-setup.json', safeBusinessSetup));
+                          }
                           
                           // We also save sync-metadata to SQLite
                           mergePromises.push(window.electron.mergeData('sync-metadata.json', { lastPullSync: serverData.timestamp || new Date().toISOString() }));
@@ -2223,7 +2257,7 @@ const serverData = await response.json();
             console.error('Pull sync error:', error);
             if (error.message && error.message.includes('401')) {
                 console.error('API Key invalid or revoked during Pull. Resetting POS registration.');
-                get().saveBusinessSetup({ ...state.businessSetup, apiKey: null, backOfficeApiKey: null, isSetup: false } as any);
+                get().setSyncStatus({ error: 'API Key invalid or revoked. Please reset POS registration in Settings.', isSyncing: false, currentTask: 'Sync failed' });
                 return;
             }
             get().setSyncStatus({ error: error.message, isSyncing: false, currentTask: 'Pull failed' });
@@ -2282,7 +2316,7 @@ const serverData = await response.json();
             console.error('Push sync error:', error);
             if (error.message && error.message.includes('401')) {
                 console.error('API Key invalid or revoked during Push. Resetting POS registration.');
-                get().saveBusinessSetup({ ...state.businessSetup, apiKey: null, backOfficeApiKey: null, isSetup: false } as any);
+                get().setSyncStatus({ error: 'API Key invalid or revoked. Please reset POS registration in Settings.', isSyncing: false, currentTask: 'Sync failed' });
                 return;
             }
             get().setSyncStatus({ error: error.message, currentTask: 'Push failed' });

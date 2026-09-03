@@ -52,7 +52,9 @@ const logFilePath = path.join(logBasePath, 'logs.txt');
 function logToFile(message) {
     const timestamp = new Date().toISOString();
     const logLine = `[${timestamp}] ${message}\n`;
-    fs.appendFile(logFilePath, logLine).catch(err => console.error('Failed to write to log file:', err));
+    fs.mkdir(logBasePath, { recursive: true })
+        .then(() => fs.appendFile(logFilePath, logLine))
+        .catch(err => process.stderr.write('Failed to write to log file: ' + err.message + '\n'));
 }
 
 // Override console methods to capture logs

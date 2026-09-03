@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Star, Edit2, Trash2 } from 'lucide-react';
 import { getApiBaseUrl } from '../lib/utils';
+import { Mail, RefreshCw } from 'lucide-react';
 import CustomerModal from '../components/Customers/CustomerModal';
 import toast from 'react-hot-toast';
 
@@ -8,6 +9,11 @@ export default function Customers() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailCustomer, setEmailCustomer] = useState<any>(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   useEffect(() => {
@@ -47,6 +53,39 @@ export default function Customers() {
       }
     } catch (err) {
       toast.error('Network error');
+    }
+  };
+
+  
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailSubject || !emailBody) return toast.error('Subject and Body are required');
+    if (!emailCustomer?.email) return toast.error('Customer has no email address');
+
+    setIsSendingEmail(true);
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/email/send-custom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          to: emailCustomer.email,
+          subject: emailSubject,
+          body: emailBody
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Email sent successfully!');
+        setIsEmailModalOpen(false);
+      } else {
+        toast.error(data.error || 'Failed to send email. Check your settings.');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -125,6 +164,9 @@ export default function Customers() {
                       <td className="font-tabular font-semibold text-right">{c.totalSpent.toLocaleString()}</td>
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => { setEmailCustomer(c); setEmailSubject(''); setEmailBody(''); setIsEmailModalOpen(true); }} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-blue-500" title="Send Email">
+                            <Mail className="w-4 h-4" />
+                          </button>
                           <button onClick={() => handleEdit(c)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]">
                             <Edit2 className="w-4 h-4" />
                           </button>

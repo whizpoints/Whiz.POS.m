@@ -22,6 +22,7 @@ interface InvoiceItem {
   id: string;
   description: string;
   quantity: number;
+  unit?: string;
   price: number;
 }
 
@@ -72,10 +73,11 @@ interface DocumentPreviewProps {
   branding: Branding;
   signatory?: Signatory | null;
   paperSize: 'a4' | 'a5';
+  verificationCode?: string;
 }
 
 export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewProps>(
-  ({ type, data, branding, paperSize, signatory }, ref) => {
+  ({ type, data, branding, paperSize, signatory, verificationCode }, ref) => {
 
     // Helper to replace placeholders in text templates
     const processText = (template: string) => {
@@ -115,7 +117,20 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
     );
 
     // Determine Title Display
-    const getTitle = () => {
+    
+  const getProxyUrl = (url: string | undefined | null) => {
+    if (!url) return undefined;
+    if (url.startsWith('http')) {
+      const isWebportal = typeof window !== 'undefined' && window.location.href.includes('/dashboard');
+      const baseUrl = isWebportal ? 'https://api.whizpoint.app' : 'http://localhost:5050';
+      return `${baseUrl}/api/documents/proxy-image?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  };
+  
+  
+
+  const getTitle = () => {
       switch(type) {
         case 'PURCHASE_ORDER': return 'PURCHASE ORDER';
         case 'WORK_ORDER': return 'WORK ORDER';
@@ -148,7 +163,7 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
       >
         {branding.backgroundImage && (
           <div className="absolute inset-0 pointer-events-none opacity-10 flex items-center justify-center overflow-hidden z-0">
-            <img src={branding.backgroundImage} className="w-full h-full object-cover" alt="bg" />
+            <img src={getProxyUrl(branding.backgroundImage)} className="w-full h-full object-cover" alt="bg" />
           </div>
         )}
 
@@ -156,44 +171,41 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
 
           {/* --- HEADER --- */}
           <div className="bg-white text-slate-900 p-8 border-b-2 border-slate-100">
-             <div className="flex justify-between items-start">
-                <div className="w-7/12">
-                   {branding.useCustomHeader && branding.headerImage ? (
-                     <img src={branding.headerImage} alt="Header" className="max-w-full max-h-28 object-contain" />
-                   ) : (
-                     <div className="space-y-2">
-                        {branding.logoImage && <img src={branding.logoImage} alt="Logo" className="h-20 object-contain mb-4" />}
-                        <div>
-                           <h1 className="text-2xl font-bold text-sky-900">{branding.businessName}</h1>
-                           <p className="text-slate-600 text-xs whitespace-pre-line mt-1">
-                             {branding.address}{'\n'}
-                             {branding.phone} | {branding.email}
-                           </p>
-                        </div>
-                     </div>
-                   )}
-                </div>
+            <div className="flex justify-between items-start">
+              {/* Top Left: Business Name & Contact Info */}
+              <div className="w-1/2 pr-4">
+                {branding.logoImage ? (
+                  <img src={getProxyUrl(branding.logoImage)} className="w-auto h-20 object-contain mb-3" alt="Logo" crossOrigin="anonymous" />
+                ) : null}
+                <h1 className="text-2xl font-bold text-sky-900 leading-tight">{branding.businessName}</h1>
+                <p className="text-slate-600 text-xs whitespace-pre-line mt-1.5 leading-relaxed">
+                  {branding.address}{'\n'}
+                  {branding.phone}{'\n'}
+                  {branding.email}
+                </p>
+              </div>
 
-                <div className="text-right w-5/12">
-                   <h2 className="text-3xl font-black text-sky-900 tracking-widest uppercase">{getTitle()}</h2>
-                   <div className="mt-4 inline-block text-right">
-                      <div className="flex justify-end gap-4 text-xs mb-1">
-                        <span className="text-slate-500 uppercase tracking-wider">Date:</span>
-                        <span className="font-bold text-slate-900">{data.date}</span>
-                      </div>
-                      <div className="flex justify-end gap-4 text-xs mb-1">
-                        <span className="text-slate-500 uppercase tracking-wider">Ref #:</span>
-                        <span className="font-bold text-slate-900">{data.docNumber}</span>
-                      </div>
-                      {data.dueDate && (
-                        <div className="flex justify-end gap-4 text-xs">
-                            <span className="text-slate-500 uppercase tracking-wider">Due Date:</span>
-                            <span className="font-bold text-slate-900">{data.dueDate}</span>
-                        </div>
-                      )}
-                   </div>
+              {/* Top Right: Document Type, Date, Ref */}
+              <div className="w-1/2 flex flex-col items-end text-right">
+                <h2 className="text-3xl font-black text-sky-900 tracking-widest uppercase mb-4">{getTitle()}</h2>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 min-w-[200px]">
+                  <div className="flex justify-between gap-4 text-xs mb-1.5">
+                    <span className="text-slate-500 uppercase tracking-wider font-semibold">Ref #:</span>
+                    <span className="font-bold text-slate-900">{data.docNumber}</span>
+                  </div>
+                  <div className="flex justify-between gap-4 text-xs mb-1.5">
+                    <span className="text-slate-500 uppercase tracking-wider font-semibold">Date:</span>
+                    <span className="font-bold text-slate-900">{data.date}</span>
+                  </div>
+                  {data.dueDate && (
+                    <div className="flex justify-between gap-4 text-xs">
+                      <span className="text-slate-500 uppercase tracking-wider font-semibold">Due Date:</span>
+                      <span className="font-bold text-slate-900">{data.dueDate}</span>
+                    </div>
+                  )}
                 </div>
-             </div>
+              </div>
+            </div>
           </div>
 
           {/* --- CLIENT --- */}
@@ -217,7 +229,7 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
                     <tr className="border-b-2 border-sky-900 text-sm">
                        <th className="py-2 font-bold text-sky-900 w-12">#</th>
                        <th className="py-2 font-bold text-sky-900">Description</th>
-                       <th className="py-2 font-bold text-sky-900 text-center w-16">Qty</th>
+                       <th className="py-2 font-bold text-sky-900 text-center w-24">Qty</th>
                        {type !== 'DELIVERY_NOTE' && (
                          <>
                            <th className="py-2 font-bold text-sky-900 text-right w-24">Rate</th>
@@ -231,7 +243,7 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
                       <tr key={item.id} className="border-b border-slate-100 text-sm">
                          <td className="py-3 text-slate-500 align-top">{index + 1}</td>
                          <td className="py-3 font-medium align-top whitespace-pre-wrap">{item.description}</td>
-                         <td className="py-3 text-center align-top">{item.quantity}</td>
+                         <td className="py-3 text-center align-top">{item.quantity} {item.unit ? <span className="text-slate-900 font-medium ml-0.5">{item.unit}</span> : ''}</td>
                          {type !== 'DELIVERY_NOTE' && (
                            <>
                              <td className="py-3 text-right align-top">{item.price.toLocaleString()}</td>

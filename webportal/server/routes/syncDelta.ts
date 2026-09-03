@@ -330,7 +330,49 @@ router.post('/', async (req: any, res: any) => {
        }
     }
     
-    // Update business settings safely by merging
+    
+    // 5. Saved Documents
+    if (documents && Array.isArray(documents)) {
+       for (const d of documents) {
+          if (!d.id) continue;
+          const existing = await prisma.savedDocument.findFirst({ where: { businessId, id: String(d.id) } });
+          if (resolveConflict(d, existing)) {
+              const data = {
+                  type: d.type || 'INVOICE',
+                  date: d.date ? new Date(d.date) : new Date(),
+                  dueDate: d.dueDate ? new Date(d.dueDate) : null,
+                  customerName: String(d.customerName || d.clientName || 'Walk-in'),
+                  customerEmail: d.customerEmail || d.clientEmail || null,
+                  customerPhone: d.customerPhone || null,
+                  customerAddress: d.customerAddress || d.clientAddress || null,
+                  items: JSON.stringify(d.items || []),
+                  subtotal: Number(d.subtotal) || 0,
+                  tax: Number(d.taxAmount) || 0,
+                  total: Number(d.total) || 0,
+                  notes: d.notes || null,
+                  status: d.status || 'DRAFT',
+                  metadata: JSON.stringify({
+                    docNumber: d.docNumber,
+                    subject: d.subject,
+                    bodyText: d.bodyText,
+                    partialAmount: d.partialAmount,
+                    settlementDate: d.settlementDate,
+                    daysNotice: d.daysNotice,
+                    paymentMode: d.paymentMode
+                  }),
+                  updatedAt: d.updatedAt ? new Date(d.updatedAt) : new Date()
+              };
+
+              if (existing) {
+                  await prisma.savedDocument.update({ where: { id: existing.id }, data });
+              } else {
+                  await prisma.savedDocument.create({ data: { ...data, id: String(d.id), businessId, createdAt: data.date } });
+              }
+          }
+       }
+    }
+
+      // Update business settings safely by merging
     if (businessSetup) {
        const b = await prisma.business.findUnique({ where: { id: businessId } });
        if (b) {

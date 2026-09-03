@@ -5,14 +5,37 @@ import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+
+// Proxy images to bypass CORS in html-to-image
+router.get('/proxy-image', async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') return res.status(400).send('URL required');
+    
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/png');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(buffer);
+  } catch (err) {
+    console.error('Image proxy error:', err);
+    res.status(500).send('Failed to proxy image');
+  }
+});
+
+
 
 // Helper to authenticate
 const authenticate = async (req: any, res: any, next: any) => {
   const token = req.query.token as string;
   if (!token) return res.status(401).send('Unauthorized: No token');
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret')) as any;
     req.businessId = decoded.businessId;
     next();
   } catch (err) {

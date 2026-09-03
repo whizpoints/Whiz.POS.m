@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Star, Edit2, Trash2 } from 'lucide-react';
+import { Search, Plus, Star, Edit2, Trash2, Mail, RefreshCw } from 'lucide-react';
 import CustomerModal from '../components/Customers/CustomerModal';
 import toast from 'react-hot-toast';
+import { getApiBaseUrl } from '../lib/utils';
 
 export default function Customers() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailCustomer, setEmailCustomer] = useState<any>(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   useEffect(() => {
@@ -46,6 +52,39 @@ export default function Customers() {
       }
     } catch (err) {
       toast.error('Network error');
+    }
+  };
+
+  
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailSubject || !emailBody) return toast.error('Subject and Body are required');
+    if (!emailCustomer?.email) return toast.error('Customer has no email address');
+
+    setIsSendingEmail(true);
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/email/send-custom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          to: emailCustomer.email,
+          subject: emailSubject,
+          body: emailBody
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Email sent successfully!');
+        setIsEmailModalOpen(false);
+      } else {
+        toast.error(data.error || 'Failed to send email. Check your settings.');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -125,9 +164,14 @@ export default function Customers() {
                       <td className="font-tabular font-semibold text-right">{c.totalSpent.toLocaleString()}</td>
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => { setEmailCustomer(c); setEmailSubject(''); setEmailBody(''); setIsEmailModalOpen(true); }} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-blue-500" title="Send Email">
+                            <Mail className="w-4 h-4" />
+                          </button>
                           <button onClick={() => handleEdit(c)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-sky-600">
                             <Edit2 className="w-4 h-4" />
-                          </button>
+                        </button>
+                        
+
                           <button onClick={() => handleDelete(c.id)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-600">
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -168,9 +212,14 @@ export default function Customers() {
                       {c.loyaltyPoints} PTS
                     </span>
                     <div className="flex gap-2">
+                          <button onClick={() => { setEmailCustomer(c); setEmailSubject(''); setEmailBody(''); setIsEmailModalOpen(true); }} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-blue-500" title="Send Email">
+                            <Mail className="w-4 h-4" />
+                          </button>
                       <button onClick={() => handleEdit(c)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] h-8 w-8">
                         <Edit2 className="w-4 h-4" />
-                      </button>
+                        </button>
+                        
+
                       <button onClick={() => handleDelete(c.id)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-500 h-8 w-8">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -190,6 +239,48 @@ export default function Customers() {
         customer={selectedCustomer}
         onComplete={fetchCustomers}
       />
+      
+      {isEmailModalOpen && emailCustomer && (
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-bold">Email {emailCustomer.name}</h2>
+              <button onClick={() => setIsEmailModalOpen(false)} className="text-slate-500 hover:text-slate-800">&times;</button>
+            </div>
+            <form onSubmit={handleSendEmail} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Subject</label>
+                <input 
+                  type="text" 
+                  value={emailSubject} 
+                  onChange={e => setEmailSubject(e.target.value)} 
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500" 
+                  placeholder="Hello from WhizPOS"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Message</label>
+                <textarea 
+                  value={emailBody} 
+                  onChange={e => setEmailBody(e.target.value)} 
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 h-32 resize-none" 
+                  placeholder="Type your message here..."
+                  required
+                ></textarea>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setIsEmailModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                <button type="submit" disabled={isSendingEmail} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
+                  {isSendingEmail ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                  Send Email
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -3,6 +3,29 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
+
+// Proxy images to bypass CORS in html-to-image
+router.get('/proxy-image', async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') return res.status(400).send('URL required');
+    
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/png');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(buffer);
+  } catch (err) {
+    console.error('Image proxy error:', err);
+    res.status(500).send('Failed to proxy image');
+  }
+});
+
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 

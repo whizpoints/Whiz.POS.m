@@ -24,13 +24,17 @@ router.post('/register', async (req, res) => {
       
     if (terminal) {
       terminal = await db.updateTable('Terminal')
-        // @ts-ignore`n.set({ name, status: 'PENDING' })
+        
+// @ts-ignore
+.set({ name, status: 'PENDING' })
         .where('macAddress', '=', macAddress)
         .returningAll()
         .executeTakeFirstOrThrow();
     } else {
       terminal = await db.insertInto('Terminal')
-        // @ts-ignore`n.values({ id: randomUUID(), macAddress, name, status: 'PENDING' })
+        
+// @ts-ignore
+.values({ id: randomUUID(), macAddress, name, status: 'PENDING' })
         .returningAll()
         .executeTakeFirstOrThrow();
     }
@@ -69,7 +73,9 @@ router.post('/:id/approve', async (req, res) => {
       .executeTakeFirst();
 
     if (!outlet) {
-      outlet = await db.insertInto('Outlet')// @ts-ignore`n.values({
+      outlet = await db.insertInto('Outlet')
+// @ts-ignore
+.values({
         id: randomUUID(),
         name: terminalRequest.name,
         businessId: business.id,
@@ -78,7 +84,9 @@ router.post('/:id/approve', async (req, res) => {
     }
 
     const updatedTerminal = await db.updateTable('Terminal')
-      // @ts-ignore`n.set({ status: 'APPROVED', apiKey, outletId: outlet.id })
+      
+// @ts-ignore
+.set({ status: 'APPROVED', apiKey, outletId: outlet.id })
       .where('id', '=', id)
       .returningAll()
       .executeTakeFirstOrThrow();
@@ -108,7 +116,9 @@ router.post('/:id/reject', async (req, res) => {
   const { id } = req.params;
   try {
     const terminal = await db.updateTable('Terminal')
-      // @ts-ignore`n.set({ status: 'REJECTED' })
+      
+// @ts-ignore
+.set({ status: 'REJECTED' })
       .where('id', '=', id)
       .returningAll()
       .executeTakeFirstOrThrow();

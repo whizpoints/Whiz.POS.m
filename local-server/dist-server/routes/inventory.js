@@ -8,7 +8,6 @@ import ExcelJS from 'exceljs';
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 // const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const authenticate = (req, res, next) => {
     let token = null;
     const authHeader = req.headers.authorization;
@@ -21,7 +20,7 @@ const authenticate = (req, res, next) => {
     if (!token)
         return res.status(401).json({ error: 'Missing authorization header or token' });
     try {
-        const payload = jwt.verify(token, JWT_SECRET);
+        const payload = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret'));
         req.user = payload;
         next();
     }
@@ -35,7 +34,7 @@ router.get('/', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { locationId } = req.query;
-        const products = (async () => {
+        const products = await (async () => {
             const prods = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
             const invs = await db.selectFrom('ProductInventory').selectAll().where('productId', 'in', prods.length > 0 ? prods.map(p => p.id) : ['']).execute();
             const locs = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).execute();
@@ -197,7 +196,8 @@ router.put('/:id', async (req, res) => {
                         quantity: Math.abs(variance),
                         reference: 'Server Manual Update',
                         sourceTerminal: 'SERVER',
-                        timestamp: new Date()
+                        timestamp: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
                     }).execute();
                 }
             }
@@ -333,7 +333,7 @@ router.get('/template/reconciliation', async (req, res) => {
             if (loc)
                 targetLocationId = loc.id;
         }
-        const products = (async () => {
+        const products = await (async () => {
             const prods = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
             const invs = await db.selectFrom('ProductInventory').selectAll().where('locationId', '=', targetLocationId).where('productId', 'in', prods.length > 0 ? prods.map(p => p.id) : ['']).execute();
             for (const p of prods) {
@@ -425,7 +425,9 @@ router.post('/import/reconciliation', upload.single('file'), async (req, res) =>
                     type: delta > 0 ? 'in' : 'out',
                     quantity: Math.abs(delta),
                     reference: 'Excel Bulk Reconciliation',
-                    sourceTerminal: 'SERVER'
+                    sourceTerminal: 'SERVER',
+                    timestamp: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
                 }).execute();
             }
             catch (e) { }
@@ -468,7 +470,8 @@ router.post('/quick-add', async (req, res) => {
             quantity: quantity,
             reference: 'Quick Add from Server',
             sourceTerminal: 'SERVER',
-            timestamp: new Date()
+            timestamp: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         }).execute();
         res.json({ success: true, message: 'Stock added successfully' });
     }

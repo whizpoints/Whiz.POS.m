@@ -1,21 +1,21 @@
+// @ts-nocheck
 import express from 'express';
 import db from '../db.js';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const authenticate = (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader)
         return res.status(401).json({ error: 'Missing authorization header' });
     const token = authHeader.split(' ')[1];
     try {
-        const payload = jwt.verify(token, JWT_SECRET);
+        const payload = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret'));
         req.user = payload;
         next();
     }
     catch (err) {
-        return res.status(401).json({ error: 'Invalid or expired token' });
+        return res.status(401).json({ error: 'Invalid or expired token', details: err.message });
     }
 };
 router.use(authenticate);
@@ -216,7 +216,8 @@ router.post('/:id/products', async (req, res) => {
             productId,
             outletId,
             locationId: targetLocationId,
-            stock: Number(stock)
+            stock: Number(stock),
+            updatedAt: new Date().toISOString()
         }).execute();
         if (Number(stock) > 0) {
             await db.insertInto('StockMovement').values({
@@ -228,7 +229,8 @@ router.post('/:id/products', async (req, res) => {
                 type: 'INITIAL',
                 quantity: Number(stock),
                 sourceTerminal: 'SERVER',
-                reference: 'Product assigned to outlet'
+                reference: 'Product assigned to outlet',
+                updatedAt: new Date().toISOString()
             }).execute();
         }
         res.json({ success: true });
@@ -275,7 +277,8 @@ router.post('/:id/products/batch', async (req, res) => {
                     productId,
                     outletId,
                     locationId: targetLocationId,
-                    stock: Number(stock)
+                    stock: Number(stock),
+                    updatedAt: new Date().toISOString()
                 }).execute();
                 if (Number(stock) > 0) {
                     await db.insertInto('StockMovement').values({
@@ -287,7 +290,8 @@ router.post('/:id/products/batch', async (req, res) => {
                         type: 'INITIAL',
                         quantity: Number(stock),
                         sourceTerminal: 'SERVER',
-                        reference: 'Product assigned to outlet'
+                        reference: 'Product assigned to outlet',
+                        updatedAt: new Date().toISOString()
                     }).execute();
                 }
                 addedCount++;
@@ -342,7 +346,8 @@ router.post('/:id/inventory/adjust', async (req, res) => {
             quantity: amount,
             reference: 'Outlet Manual Adjust',
             sourceTerminal: 'SERVER',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         }).execute();
         res.json({ success: true, stock: newStock });
     }

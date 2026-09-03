@@ -6,6 +6,10 @@ export default function Sales() {
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { activeLocationId } = useBranchContext();
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailReceiptId, setEmailReceiptId] = useState<string | null>(null);
+  const [emailTo, setEmailTo] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,6 +46,38 @@ export default function Sales() {
       case 'Pending': return 'badge-warning';
       case 'Refunded': return 'badge-error';
       default: return 'badge-info';
+    }
+  };
+
+  
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailTo) return toast.error('Email address is required');
+    if (!emailReceiptId) return;
+
+    setIsSendingEmail(true);
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/email/send-receipt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          receiptId: emailReceiptId,
+          recipientEmail: emailTo
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Receipt sent successfully!');
+        setIsEmailModalOpen(false);
+      } else {
+        toast.error(data.error || 'Failed to send receipt. Check your email settings.');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 

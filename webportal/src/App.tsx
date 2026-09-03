@@ -19,6 +19,7 @@ import Docs from './pages/Docs';
 import NotFound from './pages/NotFound';
 import Inventory from './pages/Inventory';
 import VerifyEmailPage from './pages/VerifyEmailPage';
+import VerifyDocument from './pages/VerifyDocument';
 import { BranchProvider, useBranchContext } from './context/BranchContext';
 
 import Customers from './pages/Customers';
@@ -183,6 +184,7 @@ function App() {
           <Route path="/faq" element={<PublicLayout><FAQ /></PublicLayout>} />
           <Route path="/docs" element={<PublicLayout><Docs /></PublicLayout>} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/V/:code" element={<PublicLayout><VerifyDocument /></PublicLayout>} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardWrapper><Dashboard /></DashboardWrapper></ProtectedRoute>} />
           <Route path="/dashboard/settings" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
           <Route path="/dashboard/outlets" element={<DashboardWrapper><OutletsDevices /></DashboardWrapper>} />
@@ -356,7 +358,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
   })();
 
   return (
-    <div className="app-shell flex">
+    <div className="app-shell flex h-screen overflow-hidden">
       <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <Link to="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
@@ -405,9 +407,9 @@ function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="sidebar-mobile-overlay" onClick={() => setMobileOpen(false)} />
       )}
 
-      <div className="flex-1 flex flex-col main-with-sidebar min-w-0">
+      <div className="flex-1 flex flex-col main-with-sidebar min-w-0 h-screen overflow-y-auto relative">
         <div className="app-content flex-1 flex flex-col">
-          <header className="topbar">
+          <header className="topbar sticky top-0 z-[60] bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm" style={{ padding: "0.75rem 1.5rem" }}>
             <div className="page-title-wrap min-w-0">
               <button className="btn btn-icon btn-secondary sidebar-toggle shrink-0" onClick={() => setMobileOpen(true)} aria-label="Menu">
                 <Menu />

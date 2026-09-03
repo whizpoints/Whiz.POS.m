@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowUpRight, ArrowDownRight, Activity, Receipt, CreditCard, DollarSign } from 'lucide-react';
 import { useBranchContext } from '../context/BranchContext';
-import WelcomePopup from '../components/WelcomePopup';
+
 
 interface DashboardStats {
   totalSales: number;
@@ -67,7 +67,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <WelcomePopup />
+      
       <div className="space-y-5 animate-in px-4 py-4 md:p-6">
       <section>
         <div className="kpi-grid">

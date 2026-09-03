@@ -1,9 +1,14 @@
 // @ts-nocheck
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 import authRoutes from './routes/auth.js';
 import syncRoutes from './routes/sync.js';
@@ -16,6 +21,7 @@ import customersRoutes from './routes/customers.js';
 import mpesaRoutes from './routes/mpesa.js';
 import terminalRoutes from './routes/terminal.js';
 import terminalsRoutes from './routes/terminals.js';
+import emailRoutes from './routes/email.js';
 import adminRoutes from './routes/admin.js';
 import settingsRoutes from './routes/settings.js';
 import reconciliationRoutes from './routes/reconciliation.js';
@@ -42,6 +48,14 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // (Static files are served later below)
 
+
+// Serve local uploads
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/sync/delta', syncDeltaRoutes);
@@ -54,6 +68,7 @@ app.use('/api/mpesa', mpesaRoutes);
 app.use('/api/callbacks/payments', mpesaRoutes); // Daraja complains about 'mpesa' in callback URLs
 app.use('/api/terminal', terminalRoutes);
 app.use('/api/terminals', terminalsRoutes);
+app.use('/api/email', emailRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/reconciliation', reconciliationRoutes);
@@ -72,8 +87,8 @@ app.get('/api/health', (req, res) => {
 
 // Serve React Frontend (Monolith Architecture)
 // Determine __dirname equivalent in ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
+
 
 import fs from 'fs';
 const clientBuildPath = path.join(__dirname, '../dist');

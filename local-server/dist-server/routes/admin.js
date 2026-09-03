@@ -1,8 +1,8 @@
+// @ts-nocheck
 import { Router } from 'express';
 import db from '../db.js';
 import jwt from 'jsonwebtoken';
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 // Middleware to verify if user is super admin
 // (For demo purposes, we will assume any user with role 'ADMIN' is a super admin for now, 
 // but in reality you'd want a separate SUPER_ADMIN role or specific email checking)
@@ -12,7 +12,7 @@ const requireSuperAdmin = async (req, res, next) => {
         if (!authHeader)
             return res.status(401).json({ error: 'Unauthorized' });
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret'));
         if (decoded.role !== 'ADMIN') {
             return res.status(403).json({ error: 'Forbidden' });
         }

@@ -10,6 +10,14 @@ import os from 'os';
 import { dialog } from 'electron';
 import * as fs from 'fs';
 
+// Redirect all app data and databases to C:\ProgramData\whizpos-server
+const programDataDir = process.env.PROGRAMDATA || 'C:\\ProgramData';
+const targetUserData = path.join(programDataDir, 'whizpos-server');
+if (!fs.existsSync(targetUserData)) {
+  fs.mkdirSync(targetUserData, { recursive: true });
+}
+app.setPath('userData', targetUserData);
+
 process.on('uncaughtException', (error) => {
   const logPath = path.join(app.getPath('userData'), 'crash.log');
   fs.writeFileSync(logPath, error?.stack || error?.message || String(error));
@@ -52,7 +60,7 @@ function startBackendServer() {
       stdio: 'inherit',
       shell: true,
       windowsHide: true,
-      env: { ...process.env, PORT: '5050', DATABASE_URL: 'file:./local.db' }
+      env: { ...process.env, PORT: '5050', DATABASE_URL: 'file:./db/local.db' }
     });
   } else {
     // In prod, setup database in AppData

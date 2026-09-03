@@ -38,7 +38,7 @@ function initDB(userDataPath) {
             id TEXT PRIMARY KEY, businessId TEXT, productId TEXT, type TEXT, quantity INTEGER, 
             reference TEXT, timestamp TEXT
         );
-        CREATE INDEX IF NOT EXISTS idx_stockMovements_productId ON stockMovements(productId);
+        
 
         CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS salaries (id TEXT PRIMARY KEY, data TEXT);
@@ -65,6 +65,19 @@ function initDB(userDataPath) {
         -- Sync Queue
         CREATE TABLE IF NOT EXISTS pending_syncs (id TEXT PRIMARY KEY, type TEXT, data TEXT, timestamp TEXT);
     `);
+
+    // Safe Schema Migrations
+    const migrations = [
+        "ALTER TABLE stockMovements ADD COLUMN productId TEXT;",
+        "CREATE INDEX IF NOT EXISTS idx_stockMovements_productId ON stockMovements(productId);"
+    ];
+    for (const sql of migrations) {
+        try {
+            db.exec(sql);
+        } catch (e) {
+            // Ignore if column/index already exists or fails
+        }
+    }
 
     return dbPath;
 }
@@ -600,3 +613,4 @@ module.exports = {
     backupDB: async (destPath) => { await db.backup(destPath); },
     closeDB: () => { if (db) { db.close(); db = null; } }
 };
+

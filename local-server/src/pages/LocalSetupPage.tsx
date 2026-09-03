@@ -78,7 +78,7 @@ export default function AuthPage() {
         })
         .catch(_err => {
           console.log('Waiting for backend server to start...');
-          setTimeout(checkStatus, 1500); // Retry every 1.5s until backend boots
+          setTimeout(checkStatus, 300); // Retry every 1.5s until backend boots
         });
     };
     checkStatus();

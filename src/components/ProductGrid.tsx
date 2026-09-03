@@ -147,14 +147,16 @@ export default function ProductGrid() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-2">
-        {filteredProducts.map((product) => (
+        {filteredProducts.map((product) => {
+          const isOutOfStock = product.stock !== undefined && product.stock !== null && product.stock <= 0;
+          return (
           <div
             key={product.id}
-            className="bg-gray-50 rounded-lg p-4 hover:shadow-xl transition-shadow cursor-pointer border border-gray-200 flex flex-col justify-between"
+            className={`bg-gray-50 rounded-lg p-4 hover:shadow-xl transition-shadow cursor-pointer border flex flex-col justify-between ${isOutOfStock ? 'border-red-200 opacity-60' : 'border-gray-200'}`}
             onClick={() => addToCart(product)}
           >
             <div>
-              <div className="aspect-square bg-gray-200 rounded-md mb-3 flex items-center justify-center overflow-hidden">
+              <div className="aspect-square bg-gray-200 rounded-md mb-3 flex items-center justify-center overflow-hidden relative">
                 <img
                   // Prioritize remote URL, then local file path, then placeholder
                   src={product.image || product.localImage || CART_PLACEHOLDER}
@@ -168,16 +170,32 @@ export default function ProductGrid() {
                     }
                   }}
                 />
+                {isOutOfStock && (
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">OUT OF STOCK</span>
+                  </div>
+                )}
               </div>
               <h3 className="font-medium text-gray-800 text-sm mb-1">{product.name}</h3>
-              <p className="text-lg font-bold text-blue-600">KES {product.price}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-lg font-bold text-blue-600">KES {product.price}</p>
+                {product.stock !== undefined && product.stock !== null && (
+                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {product.stock > 0 ? `${product.stock} in stock` : 'No stock'}
+                  </span>
+                )}
+              </div>
             </div>
-            <button className="mt-3 w-full bg-blue-500 text-white rounded-lg py-2.5 px-4 hover:bg-blue-600 transition-colors flex items-center justify-center text-sm font-semibold">
+            <button 
+              className={`mt-3 w-full rounded-lg py-2.5 px-4 transition-colors flex items-center justify-center text-sm font-semibold ${isOutOfStock ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+              disabled={isOutOfStock}
+            >
               <Plus className="w-5 h-5 mr-2" />
-              Add to Cart
+              {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

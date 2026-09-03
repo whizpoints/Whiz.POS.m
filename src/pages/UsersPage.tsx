@@ -4,6 +4,7 @@ import { User } from '../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Switch } from '../components/ui/Switch';
 import { Badge } from '../components/ui/badge';
 import { Modal } from '../components/ui/modal';
 import { Edit, Trash2, Shield, User as UserIcon, Lock, Unlock, Plus } from 'lucide-react';
@@ -231,3 +232,4 @@ export default function UsersPage() {
     </div>
   );
 }
+

@@ -1,15 +1,15 @@
+// @ts-nocheck
 import { Router } from 'express';
 import db from '../db.js';
 import jwt from 'jsonwebtoken';
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const authenticate = (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader)
         return res.status(401).json({ error: 'Missing authorization header' });
     const token = authHeader.split(' ')[1];
     try {
-        const payload = jwt.verify(token, JWT_SECRET);
+        const payload = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret'));
         req.user = payload;
         next();
     }

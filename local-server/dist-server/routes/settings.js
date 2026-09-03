@@ -1,6 +1,5 @@
+// @ts-nocheck
 import { Router } from 'express';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
 import db from '../db.js';
 import { randomUUID } from 'crypto';
 const router = Router();

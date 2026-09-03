@@ -1,4 +1,6 @@
 import express from 'express';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -9,6 +11,7 @@ import syncRoutes from './routes/sync.js';
 import syncDeltaRoutes from './routes/syncDelta.js';
 import dashboardRoutes from './routes/dashboard.js';
 import businessRoutes from './routes/business.js';
+import emailRoutes from './routes/email.js';
 import inventoryRoutes from './routes/inventory.js';
 import customersRoutes from './routes/customers.js';
 import mpesaRoutes from './routes/mpesa.js';
@@ -46,6 +49,7 @@ app.use('/api/sync/delta', syncDeltaRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/business', businessRoutes);
+app.use('/api/email', emailRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/mpesa', mpesaRoutes);
@@ -63,7 +67,102 @@ app.use('/api/saved-documents', savedDocsRoutes);
 app.use('/api/downloads', downloadsRoutes);
 
 // Health check
-app.get('/api/health', (req, res) => {
+
+
+
+// Document Verification Route
+app.get('/api/verify/:code', async (req, res) => {
+  const { code } = req.params;
+  const upperCode = code.toUpperCase();
+  
+  if (!code || code.length < 5) {
+    return res.status(404).send('Invalid verification code');
+  }
+
+  let docData = null;
+  
+  try {
+    
+    
+    const getVerificationCode = (str) => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+      }
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      let codeStr = '';
+      let num = Math.abs(hash);
+      for (let i = 0; i < 6; i++) {
+        codeStr += chars[num % 26];
+        num = Math.floor(num / 26);
+      }
+      return codeStr;
+    };
+
+    
+    // 0. Check Immutable Export Snapshot FIRST (O(1) fast lookup)
+    const snapshot = await prisma.savedDocument.findUnique({ where: { id: `EXP-${upperCode}` }, include: { business: true } });
+    if (snapshot) {
+       docData = {
+          business: snapshot.business, type: snapshot.type, date: snapshot.date, total: snapshot.total,
+          customerName: snapshot.customerName, items: JSON.parse(snapshot.items || '[]')
+       };
+    }
+
+    const allDocs = await prisma.savedDocument.findMany({ include: { business: true } });
+
+    
+    // 1. Check New 6-Letter Codes
+    for (const d of allDocs) {
+       let docNum = '';
+         let clientName = '';
+         try { 
+            const meta = JSON.parse(d.metadata || '{}');
+            docNum = meta.docNumber || ''; 
+            clientName = meta.clientName || '';
+         } catch(e){}
+         const str = docNum + clientName;
+       if (getVerificationCode(str) === upperCode) {
+          docData = {
+            business: d.business, type: d.type, date: d.date, total: d.total, 
+            customerName: d.customerName, items: JSON.parse(d.items || '[]')
+          };
+          break;
+       }
+    }
+
+    // 2. Check Receipts
+    if (!docData) {
+       const allReceipts = await prisma.receipt.findMany({ include: { business: true, items: true } });
+       for (const r of allReceipts) {
+          const str = r.receiptNumber + (r.customerPhone || '');
+          if (getVerificationCode(str) === upperCode) {
+             docData = {
+                business: r.business, type: 'RECEIPT', date: r.createdAt, total: r.totalAmount, 
+                customerName: r.customerPhone || 'Walk-in', 
+                items: r.items.map(i => ({ description: i.productName, quantity: i.quantity, total: i.totalPrice }))
+             };
+             break;
+          }
+       }
+    }
+
+    // 3. Fallback Old 6-Digit Codes
+    
+  } catch (err) {
+    console.error('Verification error:', err);
+  }
+  
+  if (!docData) {
+    return res.status(404).json({ success: false, message: 'Invalid Document' });
+  }
+  return res.json({ success: true, data: docData });
+});
+
+
+
+  app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
@@ -89,7 +188,10 @@ setInterval(async () => {
     // 2. Send to https://api.whizpoint.app/api/sync/up
     // 3. Mark as synced locally
     // console.log('[Sync Engine] Background sync completed.');
+
+    
   } catch (err) {
+
     console.error('[Sync Engine] Background sync failed:', err);
   }
 }, 60000); // Run every 60 seconds

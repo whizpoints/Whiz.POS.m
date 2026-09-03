@@ -1,20 +1,22 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import {
   Key, Copy, CheckCircle2, CreditCard, ShieldCheck, AlertTriangle,
-  RefreshCw, Eye, EyeOff, Save, Building2, Globe, Lock, User2,
+  RefreshCw, Eye, EyeOff, Save, Building2, Globe, Lock, User2, Mail,
   Bell, Palette, Database, Download, Trash2, ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
 
 
-type Tab = 'profile' | 'security' | 'payments' | 'etims';
+type Tab = 'profile' | 'security' | 'payments' | 'etims' | 'email' | 'backup';
 
 const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'profile', label: 'Business Profile', icon: <Building2 className="w-4 h-4" /> },
   { id: 'security', label: 'Server Link (API)', icon: <Key className="w-4 h-4" /> },
   { id: 'payments', label: 'Payment Methods', icon: <CreditCard className="w-4 h-4" /> },
-  { id: 'etims', label: 'eTIMS KRA', icon: <ShieldCheck className="w-4 h-4" /> }
+  { id: 'etims', label: 'eTIMS KRA', icon: <ShieldCheck className="w-4 h-4" /> },
+  { id: 'email', label: 'Email Configuration', icon: <Mail className="w-4 h-4" /> },
+  { id: 'backup', label: 'Backup & Restore', icon: <Database className="w-4 h-4" /> }
 ];
 
 export default function Settings() {
@@ -122,6 +124,8 @@ export default function Settings() {
         {tab === 'payments' && <PaymentsPanel />}
         {tab === 'etims' && <ETimsPanel profile={profile} onSave={updateProfileSettings} />}
         {tab === 'profile' && <ProfilePanel profile={profile} onSave={updateProfileSettings} />}
+        {tab === 'email' && <EmailPanel profile={profile} onSave={updateProfileSettings} />}
+        {tab === 'backup' && <BackupPanel />}
       </div>
     </div>
   );
@@ -1004,3 +1008,222 @@ function ChannelRow({ icon, name, value, muted }: { icon: string; name: string; 
   );
 }
 
+function BackupPanel() {
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async () => {
+    if (!file) return toast.error('Please select a backup file');
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/backup/import`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Backup imported successfully!');
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        toast.error(data.error || 'Failed to import backup');
+      }
+    } catch (err) {
+      toast.error('An error occurred');
+      console.error(err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel p-5 space-y-4">
+      <div className="space-y-1.5">
+        <h3 className="text-lg font-medium text-[color:var(--text-primary)]">Restore Backup</h3>
+        <p className="text-sm text-[color:var(--text-secondary)]">
+          Upload a Whiz POS JSON backup file to restore your settings, products, and categories.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <input 
+          type="file" 
+          accept=".json,.wpos"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="block w-full text-sm text-[color:var(--text-secondary)]
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-full file:border-0
+            file:text-sm file:font-semibold
+            file:bg-[color:var(--bg-subtle)] file:text-[color:var(--text-primary)]
+            hover:file:bg-[color:var(--bg-hover)]"
+        />
+        
+        <button
+          onClick={handleUpload}
+          disabled={!file || uploading}
+          className="btn-primary w-fit flex items-center gap-2"
+        >
+          {uploading ? (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4" />
+          )}
+          {uploading ? 'Restoring...' : 'Restore Data'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EmailPanel({ profile, onSave }: any) {
+  const [formData, setFormData] = useState({
+    emailEnabled: profile?.settings?.emailEnabled || false,
+    emailFrom: profile?.settings?.emailFrom || profile?.settings?.email || '',
+    emailReplyTo: profile?.settings?.emailReplyTo || profile?.settings?.email || '',
+    emailAppPassword: profile?.settings?.emailAppPassword || ''
+  });
+  const [isTesting, setIsTesting] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const handleTestEmail = async () => {
+    if (!formData.emailAppPassword) {
+       toast.error("Please save your App Password first before testing.");
+       return;
+    }
+    setIsTesting(true);
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/email/test`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || 'Test email sent successfully!');
+      } else {
+        toast.error(data.error || 'Failed to send test email');
+      }
+    } catch (err: any) {
+      toast.error('Network error while testing email');
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  return (
+    <div className="bg-[color:var(--bg-secondary)] border border-[color:var(--border-color)] rounded-xl shadow-sm overflow-hidden">
+      <div className="p-4 md:p-6 border-b border-[color:var(--border-color)]">
+        <h2 className="text-lg font-bold text-[color:var(--text-primary)]">Email Configuration</h2>
+        <p className="text-sm text-[color:var(--text-secondary)] mt-1">Configure your Google Workspace or Gmail account to send receipts and invoices directly from WhizPOS.</p>
+      </div>
+      
+      <div className="p-4 md:p-6">
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg mb-6 text-sm">
+          <div className="flex items-start">
+            <AlertTriangle className="w-5 h-5 text-amber-500 mr-2 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold mb-1">Important: 2-Step Verification Required</p>
+              <p className="mb-2">To use a Gmail account, you must enable 2-Step Verification on your Google account and generate an <strong>App Password</strong>.</p>
+              <ol className="list-decimal pl-5 space-y-1 text-xs">
+                <li>Go to your <a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Google Account Security page</a></li>
+                <li>Enable 2-Step Verification if not already on</li>
+                <li>Go to App Passwords (or search "App Passwords")</li>
+                <li>Create a new password named "WhizPOS"</li>
+                <li>Copy the 16-character password and paste it below</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 max-w-xl">
+          <label className="flex items-center space-x-3 cursor-pointer p-4 border border-[color:var(--border-color)] rounded-lg hover:bg-[color:var(--bg-tertiary)] transition-colors">
+            <input 
+              type="checkbox" 
+              name="emailEnabled" 
+              checked={formData.emailEnabled} 
+              onChange={handleChange}
+              className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <div>
+              <p className="font-semibold text-[color:var(--text-primary)]">Enable Email Sending</p>
+              <p className="text-sm text-[color:var(--text-secondary)]">Allow WhizPOS to send emails to customers</p>
+            </div>
+          </label>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[color:var(--text-primary)] mb-1">Email From</label>
+              <input
+                type="email"
+                name="emailFrom"
+                value={formData.emailFrom}
+                onChange={handleChange}
+                placeholder="sales@yourbusiness.com"
+                className="w-full border border-[color:var(--border-color)] rounded-lg px-3 py-2 text-sm bg-[color:var(--bg-primary)] text-[color:var(--text-primary)]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[color:var(--text-primary)] mb-1">Reply-To Address</label>
+              <input
+                type="email"
+                name="emailReplyTo"
+                value={formData.emailReplyTo}
+                onChange={handleChange}
+                placeholder="sales@yourbusiness.com"
+                className="w-full border border-[color:var(--border-color)] rounded-lg px-3 py-2 text-sm bg-[color:var(--bg-primary)] text-[color:var(--text-primary)]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[color:var(--text-primary)] mb-1">Google App Password</label>
+            <div className="relative">
+              <input
+                type="password"
+                name="emailAppPassword"
+                value={formData.emailAppPassword}
+                onChange={handleChange}
+                placeholder={formData.emailAppPassword === '��������' ? '��������' : '16-character app password'}
+                className="w-full border border-[color:var(--border-color)] rounded-lg px-3 py-2 pr-10 text-sm bg-[color:var(--bg-primary)] text-[color:var(--text-primary)]"
+              />
+              <Lock className="w-4 h-4 text-gray-400 absolute right-3 top-2.5" />
+            </div>
+            <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+              Your password is encrypted and stored securely. We never expose it.
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="p-4 bg-[color:var(--bg-tertiary)] border-t border-[color:var(--border-color)] flex justify-between items-center">
+        <button
+          onClick={handleTestEmail}
+          disabled={isTesting || !formData.emailEnabled}
+          className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-300 disabled:opacity-50 flex items-center"
+        >
+          {isTesting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+          Send Test Email
+        </button>
+
+        <button
+          onClick={() => onSave(formData)}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          Save Settings
+        </button>
+      </div>
+    </div>
+  );
+}

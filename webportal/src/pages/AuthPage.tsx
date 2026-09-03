@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, Building2, Eye, EyeOff, ArrowRight, Activity } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Mail, Lock, Building2, ArrowRight, Activity, Eye, EyeOff, Star } from 'lucide-react';
+
+import { toast } from 'react-hot-toast';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -22,196 +22,249 @@ export default function AuthPage() {
 
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const API_BASE_URL = window.location.protocol === 'file:' ? 'http://localhost:5050' : (import.meta.env.VITE_API_BASE_URL || '');
+      const API_BASE_URL = window.location.protocol === 'file:' ? 'http://localhost:5050' : (import.meta.env.VITE_API_BASE_URL || window.location.origin);
       
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-
       const data = await res.json();
-
+      
       if (res.ok) {
         localStorage.setItem('whiz-token', data.token);
         localStorage.setItem('whiz-user', JSON.stringify(data.user));
-        toast.success(isLogin ? 'Welcome back!' : 'Account created successfully!');
-        
-        if (!isLogin) {
-          navigate('/verify-email');
-        } else {
-          if (data.business && data.business.emailVerified === false) {
-             navigate('/verify-email');
-          } else {
-             if (data.user?.role === 'Cashier' || data.user?.role === 'CASHIER') {
-               navigate('/dashboard/sales');
-             } else {
-               navigate('/dashboard');
-             }
-          }
-        }
+        toast.success(isLogin ? 'Successfully logged in!' : 'Account created successfully!');
+        navigate('/dashboard');
       } else {
         toast.error(data.error || 'Authentication failed');
       }
-    } catch (err) {
-      toast.error('Network error. Please try again.');
+    } catch (error: any) {
+      toast.error('Network error during authentication');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-end sm:justify-center p-0 sm:p-8 relative overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-100 via-white to-blue-50">
+    <div className="min-h-screen w-full flex bg-white font-sans selection:bg-sky-500/30 selection:text-sky-900">
       
-      {/* Soft, Light Background Meshes */}
-      <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-sky-200/50 rounded-full blur-[100px] mix-blend-multiply pointer-events-none animate-pulse duration-[10000ms]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[700px] h-[700px] bg-indigo-200/50 rounded-full blur-[120px] mix-blend-multiply pointer-events-none" />
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.04] mix-blend-overlay pointer-events-none"></div>
-
-      {/* Main Glass "Combo" Card */}
-      <div className="w-full h-full sm:h-auto sm:max-h-none max-h-[90vh] max-w-md bg-white/90 sm:bg-white/70 backdrop-blur-3xl sm:border border-white shadow-[0_-8px_40px_rgba(0,0,0,0.04)] sm:shadow-[0_8px_40px_rgba(0,0,0,0.1)] rounded-t-[3rem] sm:rounded-[2.5rem] relative z-10 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 mx-auto">
+      {/* LEFT PANEL - ULTRA MODERN GRADIENT BRANDING */}
+      <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 lg:p-16">
+        {/* Dynamic Multi-Color Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-sky-800 to-blue-900 z-0">
+          <div className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-gradient-to-br from-violet-500/40 to-fuchsia-500/10 blur-[120px] mix-blend-overlay animate-pulse" style={{ animationDuration: '8s' }} />
+          <div className="absolute -bottom-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-gradient-to-tr from-cyan-400/30 to-sky-400/10 blur-[100px] mix-blend-overlay animate-pulse" style={{ animationDuration: '12s' }} />
+          <div className="absolute top-1/4 left-1/4 w-[40%] h-[40%] rounded-full bg-blue-400/20 blur-[80px] mix-blend-overlay" />
+        </div>
         
-        {/* RIGHT PANEL - Authentication Form */}
-        <div className="w-full flex flex-col justify-start sm:justify-center px-6 py-10 sm:p-12 relative bg-white/50 sm:bg-white/40">
-          
-          {/* Mobile Drag Indicator */}
-          <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8 sm:hidden"></div>
+        {/* Decorative Grid Pattern Overlay */}
+        <div className="absolute inset-0 z-0" style={{ backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
-          {/* Mobile Brand Header */}
-          <div className="flex flex-col items-center mb-10">
-            <div className="w-20 h-20 bg-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-sky-500/10 border border-sky-100/50 mb-5">
-               <img src="/logo.png" alt="Whiz POS" className="w-12 h-12" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        {/* Content (Z-10 so it's above background) */}
+        <div className="relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-xl">
+               <img src="/logo.png" alt="Whiz POS" className="w-8 h-8" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             </div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Whiz<span className="text-sky-500">Cloud</span></h1>
+            <h1 className="text-2xl font-black text-white tracking-tight">Whiz<span className="text-sky-300">POS</span></h1>
+          </div>
+        </div>
+
+        <div className="relative z-10 mt-auto mb-16">
+          <h2 className="text-4xl xl:text-5xl font-black text-white leading-[1.1] mb-6 tracking-tight">
+            The intelligent <br />
+            retail operating <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-cyan-200 to-teal-200">
+              system.
+            </span>
+          </h2>
+          <p className="text-lg text-blue-100/80 max-w-md font-medium leading-relaxed mb-10">
+            Join thousands of modern businesses scaling their operations with enterprise-grade point of sale, inventory tracking, and beautiful invoicing.
+          </p>
+          
+          <div className="flex items-center gap-4">
+            <div className="flex -space-x-3">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="w-10 h-10 rounded-full border-2 border-indigo-900 bg-slate-200 overflow-hidden">
+                  <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" />
+                </div>
+              ))}
+            </div>
+            <div className="text-sm font-medium text-blue-100">
+              <div className="flex items-center text-amber-400 gap-1 mb-0.5">
+                <Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" />
+              </div>
+              Trusted by 500+ merchants
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT PANEL - CLEAN FORM */}
+      <div className="flex-1 flex flex-col justify-center items-center p-6 sm:p-12 relative overflow-y-auto">
+        {/* Mobile Logo */}
+        <div className="absolute top-6 left-6 lg:hidden flex items-center gap-2">
+          <div className="w-10 h-10 bg-sky-500 rounded-xl flex items-center justify-center shadow-lg">
+             <img src="/logo.png" alt="Whiz POS" className="w-6 h-6 brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          </div>
+          <h1 className="text-xl font-black text-slate-900 tracking-tight">Whiz<span className="text-sky-500">POS</span></h1>
+        </div>
+
+        <div className="w-full max-w-[420px] mx-auto pt-16 lg:pt-0">
+          
+          <div className="mb-10">
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 tracking-tight">
+              {isLogin ? 'Welcome back' : 'Create account'}
+            </h2>
+            <p className="text-slate-500 font-medium text-base">
+              {isLogin ? 'Enter your details to access your dashboard.' : 'Start managing your retail empire today.'}
+            </p>
           </div>
 
-          <div className="w-full max-w-[420px] mx-auto">
-            
-            <div className="mb-8 text-center">
-              <h2 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">
-                {isLogin ? 'Welcome back' : 'Create an account'}
-              </h2>
-              <p className="text-slate-500 font-medium text-base">
-                {isLogin ? 'Enter your details to access your dashboard.' : 'Start managing your retail empire today.'}
-              </p>
-            </div>
+          {/* Ultra Modern Mode Switcher */}
+          <div className="flex p-1 bg-slate-100/70 rounded-[1.25rem] mb-8 border border-slate-200/50 relative">
+            <div 
+              className="absolute inset-y-1 bg-white rounded-xl shadow-sm border border-slate-200/50 transition-all duration-300 ease-out" 
+              style={{ 
+                width: 'calc(50% - 4px)', 
+                left: isLogin ? '4px' : 'calc(50%)' 
+              }} 
+            />
+            <button
+              type="button"
+              onClick={() => setIsLogin(true)}
+              className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-colors relative z-10 ${
+                isLogin ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsLogin(false)}
+              className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-colors relative z-10 ${
+                !isLogin ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Register
+            </button>
+          </div>
 
-            {/* Mode Switcher */}
-            <div className="flex p-1.5 bg-slate-100/80 rounded-full mb-10 border border-slate-200/50 shadow-inner">
-              <button
-                type="button"
-                onClick={() => setIsLogin(true)}
-                className={`flex-1 py-3.5 text-[15px] font-bold rounded-full transition-all duration-300 ${
-                  isLogin 
-                  ? 'bg-white text-slate-900 shadow-md shadow-slate-200/50 border border-slate-200/50' 
-                  : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsLogin(false)}
-                className={`flex-1 py-3.5 text-[15px] font-bold rounded-full transition-all duration-300 ${
-                  !isLogin 
-                  ? 'bg-white text-slate-900 shadow-md shadow-slate-200/50 border border-slate-200/50' 
-                  : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Register
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {!isLogin && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                  <label className="text-sm font-bold text-slate-700 ml-2">Business Name</label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-500 transition-colors">
-                      <Building2 className="h-6 w-6" />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      value={formData.businessName}
-                      onChange={e => setFormData({ ...formData, businessName: e.target.value })}
-                      className="block w-full pl-14 pr-5 py-4 bg-white/70 backdrop-blur-sm border border-slate-200/80 rounded-3xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-sky-500 focus:ring-4 focus:ring-sky-500/15 transition-all outline-none shadow-sm text-base font-medium"
-                      placeholder="Acme Corporation"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 ml-2">Work Email</label>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {!isLogin && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="text-[13px] font-bold text-slate-700 ml-1">Business Name</label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-500 transition-colors">
-                    <Mail className="h-6 w-6" />
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-500 transition-colors">
+                    <Building2 className="h-5 w-5" />
                   </div>
                   <input
-                    type="email"
+                    type="text"
                     required
-                    value={formData.email}
-                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    className="block w-full pl-14 pr-5 py-4 bg-white/70 backdrop-blur-sm border border-slate-200/80 rounded-3xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-sky-500 focus:ring-4 focus:ring-sky-500/15 transition-all outline-none shadow-sm text-base font-medium"
-                    placeholder="you@company.com"
+                    value={formData.businessName}
+                    onChange={e => setFormData({ ...formData, businessName: e.target.value })}
+                    className="block w-full pl-11 pr-4 py-3.5 bg-white border-2 border-slate-200/60 rounded-2xl text-slate-900 placeholder-slate-400 focus:bg-sky-50/30 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 transition-all outline-none text-[15px] font-medium"
+                    placeholder="Acme Corporation"
                   />
                 </div>
               </div>
+            )}
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center ml-2 mr-2">
-                  <label className="text-sm font-bold text-slate-700">Password</label>
-                  {isLogin && (
-                    <a href="#" className="text-sm font-bold text-sky-600 hover:text-sky-700 transition-colors">
-                      Forgot password?
-                    </a>
-                  )}
+            <div className="space-y-1.5">
+              <label className="text-[13px] font-bold text-slate-700 ml-1">Work Email</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-500 transition-colors">
+                  <Mail className="h-5 w-5" />
                 </div>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-500 transition-colors">
-                    <Lock className="h-6 w-6" />
-                  </div>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={formData.password}
-                    onChange={e => setFormData({ ...formData, password: e.target.value })}
-                    className="block w-full pl-14 pr-14 py-4 bg-white/70 backdrop-blur-sm border border-slate-200/80 rounded-3xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-sky-500 focus:ring-4 focus:ring-sky-500/15 transition-all outline-none shadow-sm text-base font-medium"
-                    placeholder="••••••••"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-5 flex items-center text-slate-400 hover:text-slate-700 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="h-6 w-6" /> : <Eye className="h-6 w-6" />}
-                  </button>
+                <input
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={e => setFormData({ ...formData, email: e.target.value })}
+                  className="block w-full pl-11 pr-4 py-3.5 bg-white border-2 border-slate-200/60 rounded-2xl text-slate-900 placeholder-slate-400 focus:bg-sky-50/30 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 transition-all outline-none text-[15px] font-medium"
+                  placeholder="you@company.com"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center ml-1 mr-1">
+                <label className="text-[13px] font-bold text-slate-700">Password</label>
+                {isLogin && (
+                  <a href="#" className="text-[13px] font-bold text-sky-600 hover:text-sky-700 transition-colors">
+                    Forgot password?
+                  </a>
+                )}
+              </div>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-500 transition-colors">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={formData.password}
+                  onChange={e => setFormData({ ...formData, password: e.target.value })}
+                  className="block w-full pl-11 pr-12 py-3.5 bg-white border-2 border-slate-200/60 rounded-2xl text-slate-900 placeholder-slate-400 focus:bg-sky-50/30 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 transition-all outline-none text-[15px] font-medium tracking-wide"
+                  placeholder="��������"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-700 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full relative group overflow-hidden bg-slate-900 hover:bg-slate-800 text-white font-bold text-[16px] py-4 px-4 rounded-2xl transition-all disabled:opacity-70 shadow-lg shadow-slate-900/20 hover:shadow-xl hover:shadow-slate-900/30 active:scale-[0.98] flex items-center justify-center mt-6"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-100%] group-hover:translate-x-[100%] duration-1000" />
+              <span className="relative flex items-center gap-2">
+                {isLoading ? (
+                  <Activity className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    {isLogin ? 'Sign In to Dashboard' : 'Create Account'}
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </span>
+            </button>
+            
+            {isLogin && (
+              <div className="relative mt-8 mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-3 bg-white text-slate-500 font-medium">Or continue with</span>
                 </div>
               </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full relative group overflow-hidden bg-sky-500 hover:bg-sky-600 text-white font-extrabold text-[17px] py-4.5 px-4 rounded-3xl transition-all disabled:opacity-70 shadow-[0_12px_24px_rgba(14,165,233,0.35)] hover:shadow-[0_16px_32px_rgba(14,165,233,0.45)] active:scale-[0.98] flex items-center justify-center mt-8 h-14"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-100%] group-hover:translate-x-[100%] duration-1000" />
-                <span className="relative flex items-center gap-2">
-                  {isLoading ? (
-                    <Activity className="w-6 h-6 animate-pulse" />
-                  ) : (
-                    <>
-                      {isLogin ? 'Sign In to Dashboard' : 'Create Account'}
-                      <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                    </>
-                  )}
-                </span>
-              </button>
-            </form>
+            {isLogin && (
+              <div className="grid grid-cols-2 gap-3">
+                <button type="button" className="flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-semibold text-slate-700 text-sm shadow-sm">
+                  <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
+                  Google
+                </button>
+                <button type="button" className="flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-semibold text-slate-700 text-sm shadow-sm">
+                  <img src="https://www.svgrepo.com/show/448234/microsoft.svg" className="w-5 h-5" alt="Microsoft" />
+                  Microsoft
+                </button>
+              </div>
+            )}
             
-            <div className="mt-10 pt-8 border-t border-slate-200/50 text-center text-[13px] text-slate-500 font-medium">
-              By proceeding, you agree to our <a href="#" className="font-bold text-slate-700 hover:text-sky-600 transition-colors">Terms of Service</a> and <a href="#" className="font-bold text-slate-700 hover:text-sky-600 transition-colors">Privacy Policy</a>.
-            </div>
+          </form>
+          
+          <div className="mt-12 text-center text-[13px] text-slate-500 font-medium">
+            By proceeding, you agree to our <a href="#" className="font-bold text-slate-900 hover:text-sky-600 transition-colors">Terms of Service</a> and <a href="#" className="font-bold text-slate-900 hover:text-sky-600 transition-colors">Privacy Policy</a>.
           </div>
         </div>
       </div>

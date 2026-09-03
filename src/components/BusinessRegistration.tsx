@@ -1,10 +1,8 @@
+import Swal from 'sweetalert2';
 import React, { useState, useEffect } from 'react';
 import { usePosStore } from '../store/posStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Server, HardDrive, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
-import Swal from 'sweetalert2';
-import Swal from 'sweetalert2';
-import Swal from 'sweetalert2';
 import { soundManager } from '../lib/soundUtils';
 import setupBg from '../assets/setup_install_bg.png';
 import toast from 'react-hot-toast';
@@ -145,7 +143,7 @@ export default function BusinessRegistration() {
 
         // Trigger an immediate sync to get users before reload
         try {
-           localStorage.removeItem('lastSyncTime');
+           usePosStore.setState({ lastSyncTime: null });
            await syncFromServer();
         } catch (e) {
            console.error('Initial sync failed', e);

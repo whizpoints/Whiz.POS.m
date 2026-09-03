@@ -3,12 +3,31 @@ import db from '../db.js';
 import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
-import { uploadAsset } from '../services/s3Service.js';
+import { encrypt } from '../utils/crypto.js';
 const router = Router();
 // const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 // Use memory storage for multer to buffer the file directly to S3
-const upload = multer({ storage: multer.memoryStorage() });
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.join(__dirname, '../../uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadsDir);
+    },
+    filename: function (req, file, cb) {
+        const businessId = req.user?.businessId || 'unknown';
+        const ext = file.originalname.split('.').pop();
+        cb(null, `${businessId}-${Date.now()}.${ext}`);
+    }
+});
+const upload = multer({ storage: storage });
 const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     const apiKey = req.headers['x-api-key'] || (authHeader ? authHeader.split(' ')[1] : null);
@@ -82,6 +101,9 @@ router.post('/profile', async (req, res) => {
                     cleanedSettings[key] = value;
                 }
             }
+            if (cleanedSettings.emailAppPassword && !cleanedSettings.emailAppPassword.includes(':')) {
+                cleanedSettings.emailAppPassword = encrypt(cleanedSettings.emailAppPassword);
+            }
             finalSettings = JSON.stringify(cleanedSettings);
         }
         let updateData = {};
@@ -94,6 +116,13 @@ router.post('/profile', async (req, res) => {
         const business = Object.keys(updateData).length > 0
             ? await db.updateTable('Business').set(updateData).where('id', '=', businessId).returning(['id', 'name', 'settings', 'apiKey']).executeTakeFirstOrThrow()
             : await db.selectFrom('Business').select(['id', 'name', 'settings', 'apiKey']).where('id', '=', businessId).executeTakeFirst();
+        if (business && business.settings) {
+            const settingsObj = typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings;
+            if (settingsObj.emailAppPassword) {
+                settingsObj.emailAppPassword = '��������';
+                business.settings = JSON.stringify(settingsObj);
+            }
+        }
         res.json({ success: true, business });
     }
     catch (error) {
@@ -111,8 +140,7 @@ router.post('/logo', upload.single('logo'), async (req, res) => {
         }
         const fileExtension = file.originalname.split('.').pop();
         const fileName = `logos/${businessId}-${Date.now()}.${fileExtension}`;
-        // Upload to R2/S3
-        const logoUrl = await uploadAsset(file.buffer, fileName, file.mimetype);
+        const logoUrl = `http://localhost:${process.env.PORT || 5050}/uploads/${req.file.filename}`;
         // Update DB
         const updatedBusiness = await db.updateTable('Business').set({ logoUrl }).where('id', '=', businessId).returning(['id', 'name', 'logoUrl']).executeTakeFirstOrThrow();
         res.json({ success: true, business: updatedBusiness, logoUrl });
@@ -133,8 +161,7 @@ router.post('/document-asset', upload.single('file'), async (req, res) => {
         }
         const fileExtension = file.originalname.split('.').pop();
         const fileName = `document-assets/${businessId}-${assetType}-${Date.now()}.${fileExtension}`;
-        // Upload to R2/S3
-        const fileUrl = await uploadAsset(file.buffer, fileName, file.mimetype);
+        const fileUrl = `http://localhost:${process.env.PORT || 5050}/uploads/${req.file.filename}`;
         res.json({ success: true, fileUrl });
     }
     catch (error) {
@@ -203,7 +230,7 @@ router.post('/restore', async (req, res) => {
                     await db.updateTable('Category').set({ name: cat.name, businessId }).where('id', '=', cat.id).execute();
                 }
                 else {
-                    await db.insertInto('Category').values({ id: cat.id, name: cat.name, businessId }).execute();
+                    await db.insertInto('Category').values({ id: cat.id, name: cat.name, businessId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }).execute();
                 }
             }
         }
@@ -215,7 +242,7 @@ router.post('/restore', async (req, res) => {
                     await db.updateTable('Product').set({ sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel, businessId }).where('id', '=', p.id).execute();
                 }
                 else {
-                    await db.insertInto('Product').values({ id: p.id, sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel, businessId }).execute();
+                    await db.insertInto('Product').values({ id: p.id, sku: p.sku, barcode: p.barcode, name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, taxRate: p.taxRate, reorderLevel: p.reorderLevel, businessId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }).execute();
                 }
             }
         }
@@ -227,7 +254,7 @@ router.post('/restore', async (req, res) => {
                     await db.updateTable('User').set({ name: u.name, role: u.role, pin: u.pin, businessId }).where('email', '=', u.email).execute();
                 }
                 else {
-                    await db.insertInto('User').values({ id: randomUUID(), email: u.email, name: u.name, role: u.role, pin: u.pin, password: u.password, businessId }).execute();
+                    await db.insertInto('User').values({ id: randomUUID(), email: u.email, name: u.name, role: u.role, pin: u.pin, password: u.password, businessId, locationId: null, outletId: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }).execute();
                 }
             }
         }
@@ -239,7 +266,7 @@ router.post('/restore', async (req, res) => {
                     await db.updateTable('Customer').set({ name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent, businessId }).where('id', '=', c.id).execute();
                 }
                 else {
-                    await db.insertInto('Customer').values({ id: c.id, name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent, businessId }).execute();
+                    await db.insertInto('Customer').values({ id: c.id, name: c.name, phone: c.phone, email: c.email, loyaltyPoints: c.loyaltyPoints, totalSpent: c.totalSpent, businessId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }).execute();
                 }
             }
         }

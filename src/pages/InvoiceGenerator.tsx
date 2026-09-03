@@ -57,6 +57,7 @@ export default function InvoiceGenerator() {
   // Saved Docs State
   const [showSavedDocs, setShowSavedDocs] = useState(false);
   const [currentDocId, setCurrentDocId] = useState<string | null>(null);
+  const [pendingId] = useState(`DOC${Date.now()}`);
 
   // Letter State
   const [subject, setSubject] = useState('');
@@ -160,7 +161,7 @@ export default function InvoiceGenerator() {
     };
 
     const newDoc: SavedDocument = {
-      id: currentDocId || `DOC${Date.now()}`,
+      id: (currentDocId || pendingId),
       type: docType,
       name: clientCompany || clientName || `Untitled ${docType}`,
       date: new Date().toISOString(),
@@ -695,45 +696,75 @@ export default function InvoiceGenerator() {
                 </h3>
 
                 <div className="space-y-3">
-                  {items.map((item, index) => (
-                    <div key={item.id} className="flex gap-2 items-start p-2 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-100">
-                       <span className="text-xs text-slate-400 py-2 w-6 text-center">{index + 1}</span>
-                       <div className="flex-1 grid grid-cols-12 gap-2">
-                          <div className="col-span-6">
-                            <input
-                              type="text"
-                              placeholder="Description"
-                              value={item.description}
-                              onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-sky-500"
-                            />
-                          </div>
-                          <div className="col-span-2">
-                             <input
-                                type="number"
-                                placeholder="Qty"
-                                value={item.quantity}
-                                onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value))}
-                                className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-sky-500 text-center"
-                            />
-                          </div>
-                          <div className="col-span-3">
-                             <input
-                                type="number"
-                                placeholder="Price"
-                                value={item.price}
-                                onChange={(e) => updateItem(item.id, 'price', parseFloat(e.target.value))}
-                                className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-sky-500 text-right"
-                            />
-                          </div>
-                          <div className="col-span-1 flex justify-end">
-                             <button onClick={() => removeItem(item.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors">
-                               <Trash2 className="w-4 h-4" />
-                             </button>
-                          </div>
+                    {/* Explicit Table Headers to make UI clear */}
+                    <div className="flex gap-2 items-end px-2">
+                       <span className="w-6"></span>
+                       <div className="flex-1 grid grid-cols-12 gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          <div className="col-span-5">Description</div>
+                          <div className="col-span-2 text-center">Qty</div>
+                            <div className="col-span-2">Unit <span className="text-[9px] font-normal lowercase">(opt)</span></div>
+                          <div className="col-span-2 text-right">Price</div>
+                          <div className="col-span-1"></div>
                        </div>
                     </div>
-                  ))}
+
+                    {items.map((item, index) => (
+                      <div key={item.id} className="flex gap-2 items-start p-2 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-100">
+                         <span className="text-xs text-slate-400 py-2 w-6 text-center">{index + 1}</span>
+                         <div className="flex-1 grid grid-cols-12 gap-2">
+                            <div className="col-span-5">
+                              <input
+                                type="text"
+                                placeholder="Item Description"
+                                value={item.description}
+                                onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                                className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-sky-500"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                               <input
+                                  type="number"
+                                  placeholder="Qty"
+                                  value={item.quantity}
+                                  onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value))}
+                                  className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-sky-500 text-center"
+                              />
+                            </div>
+                              <div className="col-span-2 relative">
+                              <input
+                                type="text"
+                                list="unit-options"
+                                placeholder="Unit"
+                                value={item.unit || ''}
+                                onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
+                                className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-sky-500"
+                              />
+                              <datalist id="unit-options">
+                                 <option value="Dozen" />
+                                 <option value="Carton" />
+                                 <option value="Pcs" />
+                                 <option value="Box" />
+                                 <option value="Kg" />
+                                 <option value="Ltr" />
+                              </datalist>
+                            </div>
+                            <div className="col-span-2">
+                               <input
+                                  type="number"
+                                  placeholder="Price"
+                                  value={item.price}
+                                  onChange={(e) => updateItem(item.id, 'price', parseFloat(e.target.value))}
+                                  className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-sky-500 text-right"
+                              />
+                            </div>
+                            <div className="col-span-1 flex justify-end">
+                               <button onClick={() => removeItem(item.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors">
+                                 <Trash2 className="w-4 h-4" />
+                               </button>
+                            </div>
+                         </div>
+                      </div>
+                    ))}
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">

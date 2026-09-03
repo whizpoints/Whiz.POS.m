@@ -88,6 +88,9 @@ router.post('/profile', async (req: any, res: any) => {
         try {
           const oldSettings = typeof existing.settings === 'string' ? JSON.parse(existing.settings) : existing.settings;
           const newSettings = typeof settings === 'string' ? JSON.parse(settings) : settings;
+          if (newSettings.emailAppPassword && !newSettings.emailAppPassword.includes(':')) {
+             newSettings.emailAppPassword = encrypt(newSettings.emailAppPassword);
+          }
           mergedSettings = JSON.stringify({ ...oldSettings, ...newSettings });
         } catch(e) {}
       }

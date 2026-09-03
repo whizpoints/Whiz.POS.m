@@ -26,7 +26,7 @@ router.get('/', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const docs = await prisma.savedDocument.findMany({
-      where: { businessId },
+      where: { businessId, NOT: { id: { startsWith: 'EXP-' } } },
       orderBy: { createdAt: 'desc' }
     });
     // Parse JSON fields
@@ -37,6 +37,52 @@ router.get('/', async (req: any, res: any) => {
     }));
     res.json(parsedDocs);
   } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+// Export Document (Create Snapshot)
+router.post('/export', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const doc = req.body;
+    
+    // Generate a secure, unique 6-letter verification code
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let codeStr = '';
+    for (let i = 0; i < 6; i++) codeStr += chars.charAt(Math.floor(Math.random() * chars.length));
+    
+    const snapshotId = `EXP-${codeStr}`;
+    
+    await prisma.savedDocument.create({
+      data: {
+        id: snapshotId,
+        businessId,
+        type: doc.type || 'INVOICE',
+        date: doc.date ? new Date(doc.date) : new Date(),
+        dueDate: doc.dueDate ? new Date(doc.dueDate) : null,
+        customerName: doc.customerName || doc.clientCompany || doc.clientName || 'Unknown',
+        customerEmail: doc.customerEmail || doc.clientEmail || null,
+        customerPhone: doc.customerPhone || null,
+        customerAddress: doc.customerAddress || doc.clientAddress || null,
+        items: JSON.stringify(doc.items || []),
+        subtotal: Number(doc.subtotal) || 0,
+        tax: Number(doc.tax) || Number(doc.taxAmount) || 0,
+        total: Number(doc.total) || 0,
+        notes: doc.notes || null,
+        status: 'EXPORTED_SNAPSHOT',
+        metadata: JSON.stringify({
+          ...doc,
+          isSnapshot: true,
+          verificationCode: codeStr
+        })
+      }
+    });
+    
+    res.json({ success: true, verificationCode: codeStr });
+  } catch (error) {
+    console.error('Export Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
