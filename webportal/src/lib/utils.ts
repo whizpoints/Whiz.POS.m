@@ -7,7 +7,9 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getApiBaseUrl(): string {
   if (typeof window === 'undefined') return '';
-  return window.location.protocol === 'file:' ? 'http://localhost:5050' : '';
+  return window.location.protocol === 'file:' 
+    ? 'http://localhost:5050' 
+    : (import.meta.env.VITE_API_BASE_URL || '');
 }
 
 export function numberToWords(num: number): string {

@@ -206,6 +206,9 @@ export function buildTransactionalEmail(payload: EmailPayload): string {
       ${tenant.address ? `${tenant.address}<br/>` : ''}
       ${tenant.phone ? `${tenant.phone} | ` : ''}${tenant.business_email}<br/><br/>
       <em>This is an automated transactional message. Please do not reply directly to this email unless necessary.</em>
+      <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+        <span style="color: #9ca3af; font-size: 12px;">Powered by <strong>WhizPOS</strong> - Next Generation Point of Sale</span>
+      </div>
     </div>
   </div>
 </body>
