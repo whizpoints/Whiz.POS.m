@@ -179,7 +179,7 @@ function App() {
         />
         <Routes>
           <Route path="/" element={<PublicLayout><LandingPage /></PublicLayout>} />
-          <Route path="/auth" element={<PublicLayout><AuthPage /></PublicLayout>} />
+          <Route path="/auth" element={<AuthPage />} />
           <Route path="/pricing" element={<PublicLayout><Pricing /></PublicLayout>} />
           <Route path="/faq" element={<PublicLayout><FAQ /></PublicLayout>} />
           <Route path="/docs" element={<PublicLayout><Docs /></PublicLayout>} />

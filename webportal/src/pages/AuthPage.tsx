@@ -16,6 +16,12 @@ export default function AuthPage() {
     password: ''
   });
 
+
+  const handleGoogleLogin = () => {
+    const API_BASE_URL = window.location.protocol === 'file:' ? 'http://localhost:5050' : (import.meta.env.VITE_API_BASE_URL || window.location.origin);
+    window.location.href = `${API_BASE_URL}/api/auth/google`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -52,10 +58,11 @@ export default function AuthPage() {
       {/* LEFT PANEL - ULTRA MODERN GRADIENT BRANDING */}
       <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 lg:p-16">
         {/* Dynamic Multi-Color Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-sky-800 to-blue-900 z-0">
-          <div className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-gradient-to-br from-violet-500/40 to-fuchsia-500/10 blur-[120px] mix-blend-overlay animate-pulse" style={{ animationDuration: '8s' }} />
-          <div className="absolute -bottom-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-gradient-to-tr from-cyan-400/30 to-sky-400/10 blur-[100px] mix-blend-overlay animate-pulse" style={{ animationDuration: '12s' }} />
-          <div className="absolute top-1/4 left-1/4 w-[40%] h-[40%] rounded-full bg-blue-400/20 blur-[80px] mix-blend-overlay" />
+        
+        <div className="absolute inset-0 z-0 overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0369a1 100%)' }}>
+          <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] rounded-full mix-blend-screen filter blur-[100px] opacity-70 animate-pulse" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.8) 0%, rgba(0,0,0,0) 70%)', animationDuration: '8s' }} />
+          <div className="absolute bottom-[-20%] right-[-10%] w-[80%] h-[80%] rounded-full mix-blend-screen filter blur-[120px] opacity-60 animate-pulse" style={{ background: 'radial-gradient(circle, rgba(56,189,248,0.9) 0%, rgba(0,0,0,0) 70%)', animationDuration: '12s', animationDelay: '2s' }} />
+          <div className="absolute top-[30%] right-[20%] w-[50%] h-[50%] rounded-full mix-blend-screen filter blur-[90px] opacity-50 animate-pulse" style={{ background: 'radial-gradient(circle, rgba(236,72,153,0.6) 0%, rgba(0,0,0,0) 70%)', animationDuration: '10s', animationDelay: '1s' }} />
         </div>
         
         {/* Decorative Grid Pattern Overlay */}
@@ -250,7 +257,7 @@ export default function AuthPage() {
 
             {isLogin && (
               <div className="grid grid-cols-2 gap-3">
-                <button type="button" className="flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-semibold text-slate-700 text-sm shadow-sm">
+                <button type="button" onClick={handleGoogleLogin} className="flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-semibold text-slate-700 text-sm shadow-sm hover:shadow-md active:scale-[0.98]">
                   <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
                   Google
                 </button>
