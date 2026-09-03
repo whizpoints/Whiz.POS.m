@@ -226,6 +226,13 @@ const [scale, setScale] = useState(0.8);
       
       const imgData = await toJpeg(previewRef.current, { quality: 0.85, pixelRatio: 1.5, useCORS: true, backgroundColor: '#ffffff' });
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: paperSize });
+        pdf.setProperties({
+          title: `${type.replace(/_/g, ' ')} #${data?.docNumber || ''}`,
+          subject: `Commercial Document from ${branding?.businessName || 'WhizPOS'}`,
+          author: 'pos@whizpoint.app',
+          keywords: `${type.toLowerCase()}, ${data?.docNumber}, pos, receipt, invoice, whizpos`,
+          creator: 'WhizPoint Solutions Automation'
+        });
       const rect = previewRef.current.getBoundingClientRect();
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (rect.height * pdfWidth) / rect.width;
