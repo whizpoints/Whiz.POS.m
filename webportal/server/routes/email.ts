@@ -8,6 +8,46 @@ import { decrypt } from '../utils/crypto.js';
 import fs from 'fs';
 import path from 'path';
 
+
+// Microservice Email Dispatcher
+async function dispatchEmail(transporter, settings, mailOptions) {
+  if (process.env.MAILER_MICROSERVICE_URL) {
+    console.log('Routing email through Mailer Microservice...', process.env.MAILER_MICROSERVICE_URL);
+    const microserviceRes = await fetch(`${process.env.MAILER_MICROSERVICE_URL}/api/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.MAILER_API_KEY || 'whizpos_secret_mailer_key_2026'
+      },
+      body: JSON.stringify({
+        smtpConfig: {
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true,
+          auth: {
+            user: settings.emailFrom,
+            pass: decrypt(settings.emailAppPassword)
+          }
+        },
+        mailOptions
+      })
+    });
+    
+    let data;
+    try {
+      data = await microserviceRes.json();
+    } catch(e) {
+      throw new Error('Microservice completely failed or returned non-JSON');
+    }
+    
+    if (!data.success) throw new Error('Microservice Error: ' + data.error);
+    return data;
+  } else {
+    // Fallback to local nodemailer
+    return await dispatchEmail(transporter, settings, mailOptions);
+  }
+}
+
 const router = Router();
 
 import jwt from 'jsonwebtoken';
@@ -119,7 +159,7 @@ router.post('/test', authenticate, async (req: any, res: any) => {
       html: fullHtml
     };
 
-    await transporter.sendMail(mailOptions);
+    await dispatchEmail(transporter, settings, mailOptions);
     res.json({ success: true, message: 'Test email sent successfully' });
   } catch (error: any) {
     console.error('Test email error:', error);
@@ -200,7 +240,7 @@ router.post('/send-receipt', authenticate, async (req: any, res: any) => {
 
     const mailOptions = { from: `"${businessName}" <${settings.emailFrom}>`, to: recipientEmail, replyTo: settings.emailReplyTo || settings.emailFrom, subject: `Receipt #${transaction.receiptNumber} from ${businessName}`, html: generateEmailHtml(businessName, logoUrl, htmlContent, settings.emailFrom) };
 
-    await transporter.sendMail(mailOptions);
+    await dispatchEmail(transporter, settings, mailOptions);
     res.json({ success: true, message: 'Receipt sent successfully' });
 
   } catch (error: any) {
@@ -246,7 +286,7 @@ router.post('/send-custom', authenticate, async (req: any, res: any) => {
       attachments: attachments || [] // Array of { filename, content } or { filename, path }
     };
 
-    await transporter.sendMail(mailOptions);
+    await dispatchEmail(transporter, settings, mailOptions);
     res.json({ success: true, message: 'Email sent successfully' });
 
   } catch (error: any) {
