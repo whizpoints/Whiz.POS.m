@@ -407,9 +407,9 @@ router.post('/verify-api-key', async (req, res) => {
 // ==================== GOOGLE OAUTH ====================
 router.get('/google', (req, res) => {
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = req.hostname.includes('localhost') 
-    ? 'http://localhost:5050/api/auth/google/callback' 
-    : 'https://api.whizpoint.app/api/auth/google/callback';
+  const protocol = req.hostname.includes('localhost') ? 'http' : 'https';
+  const host = req.get('host') || req.hostname;
+  const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
   
   // Track where the request came from so we can redirect back to pos.whizpoint.app or backoffice
   let origin = (req.query.origin as string) || req.headers.referer || 'https://backoffice.whizpoint.app';
@@ -441,9 +441,9 @@ router.get('/google/callback', async (req, res) => {
       }
     }
 
-    const redirectUri = req.hostname.includes('localhost') 
-      ? 'http://localhost:5050/api/auth/google/callback' 
-      : 'https://api.whizpoint.app/api/auth/google/callback';
+    const protocol = req.hostname.includes('localhost') ? 'http' : 'https';
+    const host = req.get('host') || req.hostname;
+    const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
 
     // 1. Get tokens
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
