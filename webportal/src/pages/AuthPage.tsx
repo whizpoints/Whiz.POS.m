@@ -286,10 +286,6 @@ export default function AuthPage() {
             )}
             
           </form>
-          
-          <div className="mt-12 text-center text-[13px] text-slate-500 font-medium">
-            By proceeding, you agree to our <a href="#" className="font-bold text-slate-900 hover:text-sky-600 transition-colors">Terms of Service</a> and <a href="#" className="font-bold text-slate-900 hover:text-sky-600 transition-colors">Privacy Policy</a>.
-          </div>
         </div>
       </div>
     </div>
