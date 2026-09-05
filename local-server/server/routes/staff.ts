@@ -59,7 +59,7 @@ router.post('/', async (req: any, res: any) => {
     const { name, email, password, pin, role, outletId, locationId } = req.body;
 
     if (password) {
-      const passwordValidation = validatePassword(password);
+      const passwordValidation = validatePassword(password, name);
       if (!passwordValidation.isValid) {
         return res.status(400).json({ error: passwordValidation.message });
       }
@@ -178,7 +178,7 @@ router.put('/:id', async (req: any, res: any) => {
     if (hasValidPin) updateData.pin = trimmedPin;
     if (hasValidEmail) updateData.email = trimmedEmail;
     if (password) {
-      const passwordValidation = validatePassword(password);
+      const passwordValidation = validatePassword(password, trimmedName);
       if (!passwordValidation.isValid) {
         return res.status(400).json({ error: passwordValidation.message });
       }
