@@ -29,7 +29,7 @@ router.post('/register', async (req, res) => {
       apiKey, servedBy, receiptFooter, cloudBusinessId, cloudLocationId, printerType, mpesaPaybill, mpesaTill, mpesaAccount
     } = req.body;
 
-    const passwordValidation = validatePassword(password);
+    const passwordValidation = validatePassword(password, businessName);
     if (!passwordValidation.isValid) {
       return res.status(400).json({ error: passwordValidation.message });
     }
