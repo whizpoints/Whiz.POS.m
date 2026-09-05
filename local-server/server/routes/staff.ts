@@ -4,8 +4,10 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
 import jwt from 'jsonwebtoken';
+import { validatePassword } from '../utils/security.js';
 
 const router = express.Router();
+
 
 
 const authenticate = (req: any, res: any, next: any) => {
@@ -55,6 +57,13 @@ router.post('/', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const { name, email, password, pin, role, outletId, locationId } = req.body;
+
+    if (password) {
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({ error: passwordValidation.message });
+      }
+    }
 
     const trimmedEmail = typeof email === 'string' ? email.trim() : '';
     const trimmedPin = typeof pin === 'string' ? pin.trim() : '';
@@ -168,7 +177,11 @@ router.put('/:id', async (req: any, res: any) => {
     if (role) updateData.role = (role || 'CASHIER').toUpperCase();
     if (hasValidPin) updateData.pin = trimmedPin;
     if (hasValidEmail) updateData.email = trimmedEmail;
-    if (password && String(password).length >= 4) {
+    if (password) {
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({ error: passwordValidation.message });
+      }
       updateData.password = await bcrypt.hash(password, 10);
     }
 

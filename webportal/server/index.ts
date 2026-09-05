@@ -27,6 +27,8 @@ import clientsRoutes from './routes/clients.js';
 import savedDocsRoutes from './routes/saved-documents.js';
 import downloadsRoutes from './routes/downloads.js';
 
+import { wafMiddleware } from './middleware/waf.js';
+
 dotenv.config();
 
 const app = express();
@@ -40,6 +42,9 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Apply Security WAF & Rate-Limiter Middleware
+app.use(wafMiddleware);
 
 // (Static files are served later below)
 

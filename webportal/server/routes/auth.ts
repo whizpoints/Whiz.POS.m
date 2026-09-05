@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import { validatePassword } from '../utils/security.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -27,6 +28,11 @@ router.post('/register', async (req, res) => {
       businessName, email, password, kraPin, businessInfo, address, phone,
       apiKey, servedBy, receiptFooter, printerType, mpesaPaybill, mpesaTill, mpesaAccount
     } = req.body;
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({ error: passwordValidation.message });
+    }
 
     const existingBusiness = await prisma.business.findUnique({ where: { email } });
     if (existingBusiness) {
@@ -246,6 +252,10 @@ router.post('/setup', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    if (!password || password.length < 8) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     const user = await prisma.user.findUnique({ where: { email }, include: { business: true } });
     if (!user) {
