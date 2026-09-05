@@ -409,20 +409,41 @@ router.get('/google', (req, res) => {
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
   const redirectUri = req.hostname.includes('localhost') 
     ? 'http://localhost:5050/api/auth/google/callback' 
-    : (req.hostname === 'api.whizpoint.app' ? 'https://api.whizpoint.app/api/auth/google/callback' : 'https://backoffice.whizpoint.app/api/auth/google/callback');
+    : 'https://api.whizpoint.app/api/auth/google/callback';
   
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email%20profile`;
+  // Track where the request came from so we can redirect back to pos.whizpoint.app or backoffice
+  let origin = (req.query.origin as string) || req.headers.referer || 'https://backoffice.whizpoint.app';
+  if (origin.endsWith('/')) origin = origin.slice(0, -1);
+  if (origin.endsWith('/auth')) origin = origin.replace('/auth', '');
+  if (origin.endsWith('/login')) origin = origin.replace('/login', '');
+
+  const state = Buffer.from(origin).toString('base64');
+  
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email%20profile&state=${state}`;
   res.redirect(authUrl);
 });
 
 router.get('/google/callback', async (req, res) => {
+  let frontendOrigin = req.hostname.includes('localhost') ? 'http://localhost:5173' : 'https://backoffice.whizpoint.app';
+  
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code) return res.status(400).send('No code provided');
+
+    if (state && typeof state === 'string') {
+      try {
+        const decodedOrigin = Buffer.from(state, 'base64').toString('utf-8');
+        if (decodedOrigin.startsWith('http')) {
+          frontendOrigin = decodedOrigin;
+        }
+      } catch (e) {
+        console.error('Failed to parse OAuth state');
+      }
+    }
 
     const redirectUri = req.hostname.includes('localhost') 
       ? 'http://localhost:5050/api/auth/google/callback' 
-      : (req.hostname === 'api.whizpoint.app' ? 'https://api.whizpoint.app/api/auth/google/callback' : 'https://backoffice.whizpoint.app/api/auth/google/callback');
+      : 'https://api.whizpoint.app/api/auth/google/callback';
 
     // 1. Get tokens
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -460,29 +481,27 @@ router.get('/google/callback', async (req, res) => {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Account Not Found - Whiz POS</title>
-          <script src="https://cdn.tailwindcss.com"></script>
+          <title>404 - Account Not Found</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-            body { font-family: 'Inter', sans-serif; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+            .container { text-align: center; max-width: 500px; padding: 2rem; }
+            h1 { font-size: 6rem; font-weight: 700; margin: 0; color: #cbd5e1; line-height: 1; }
+            h2 { font-size: 1.5rem; font-weight: 600; margin: 1rem 0; color: #334155; }
+            p { color: #64748b; margin-bottom: 2rem; font-size: 1.125rem; }
+            .btn { display: inline-block; background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 0.375rem; text-decoration: none; font-weight: 500; transition: background-color 0.2s; margin: 0.5rem; }
+            .btn:hover { background-color: #4338ca; }
+            .btn-outline { background-color: transparent; color: #4f46e5; border: 1px solid #4f46e5; }
+            .btn-outline:hover { background-color: #f5f3ff; color: #4338ca; }
           </style>
         </head>
-        <body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
-          <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
-            <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-              </svg>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Account Not Found</h2>
-            <p class="text-gray-600 mb-8">We couldn't find a Whiz POS account associated with <strong class="text-gray-900">${userData.email}</strong>. Please sign up to create a new business account.</p>
-            <div class="space-y-4">
-              <a href="https://backoffice.whizpoint.app/onboarding" class="block w-full bg-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-indigo-700 transition duration-200">
-                Create a New Account
-              </a>
-              <a href="https://backoffice.whizpoint.app/auth" class="block w-full bg-white text-gray-700 font-semibold py-3 px-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition duration-200">
-                Use a Different Email
-              </a>
+        <body>
+          <div class="container">
+            <h1>404</h1>
+            <h2>Account Not Found</h2>
+            <p>The email address <strong>${userData.email}</strong> is not associated with any existing Whiz POS account.</p>
+            <div>
+              <a href="${frontendOrigin}/onboarding" class="btn">Create New Account</a>
+              <a href="${frontendOrigin}/auth" class="btn btn-outline">Back to Login</a>
             </div>
           </div>
         </body>
@@ -505,12 +524,8 @@ router.get('/google/callback', async (req, res) => {
       businessId: user.businessId
     };
 
-    // 5. Redirect back to frontend
-    const frontendUrl = req.hostname.includes('localhost') 
-      ? 'http://localhost:5173/auth' 
-      : 'https://backoffice.whizpoint.app/auth';
-
-    res.redirect(`${frontendUrl}?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(userPayload))}`);
+    // 5. Redirect back to correct frontend
+    res.redirect(`${frontendOrigin}/auth?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(userPayload))}`);
 
   } catch (error) {
     console.error('OAuth error:', error);
@@ -520,25 +535,23 @@ router.get('/google/callback', async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Authentication Error - Whiz POS</title>
-        <script src="https://cdn.tailwindcss.com"></script>
+        <title>500 - Authentication Error</title>
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-          body { font-family: 'Inter', sans-serif; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+          .container { text-align: center; max-width: 500px; padding: 2rem; }
+          h1 { font-size: 6rem; font-weight: 700; margin: 0; color: #fca5a5; line-height: 1; }
+          h2 { font-size: 1.5rem; font-weight: 600; margin: 1rem 0; color: #334155; }
+          p { color: #64748b; margin-bottom: 2rem; font-size: 1.125rem; }
+          .btn { display: inline-block; background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 0.375rem; text-decoration: none; font-weight: 500; transition: background-color 0.2s; }
+          .btn:hover { background-color: #4338ca; }
         </style>
       </head>
-      <body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
-        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
-          <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-          </div>
-          <h2 class="text-2xl font-bold text-gray-900 mb-2">OAuth Authentication Failed</h2>
-          <p class="text-gray-600 mb-8">We encountered an unexpected error while trying to authenticate you with Google. Please try again.</p>
-          <a href="https://backoffice.whizpoint.app/auth" class="inline-block w-full bg-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-indigo-700 transition duration-200">
-            Back to Login
-          </a>
+      <body>
+        <div class="container">
+          <h1>500</h1>
+          <h2>Authentication Error</h2>
+          <p>We encountered an unexpected error while trying to authenticate you with Google.</p>
+          <a href="${frontendOrigin}/auth" class="btn">Return to Login</a>
         </div>
       </body>
       </html>
