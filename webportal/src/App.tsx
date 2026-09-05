@@ -9,6 +9,8 @@ import { useState, useEffect, createContext, useContext, type ReactNode } from '
 
 
 import AuthPage from './pages/AuthPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import SettingsPage from './pages/Settings';
@@ -183,6 +185,8 @@ function App() {
           <Route path="/pricing" element={<PublicLayout><Pricing /></PublicLayout>} />
           <Route path="/faq" element={<PublicLayout><FAQ /></PublicLayout>} />
           <Route path="/docs" element={<PublicLayout><Docs /></PublicLayout>} />
+          <Route path="/terms" element={<PublicLayout><TermsPage /></PublicLayout>} />
+          <Route path="/privacy" element={<PublicLayout><PrivacyPage /></PublicLayout>} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/V/:code" element={<PublicLayout><VerifyDocument /></PublicLayout>} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardWrapper><Dashboard /></DashboardWrapper></ProtectedRoute>} />
