@@ -404,6 +404,77 @@ router.post('/verify-api-key', async (req, res) => {
   });
 
 
+const renderErrorPage = (statusCode: number, title: string, message: string, frontendUrl: string) => \`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>\${statusCode} - \${title}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: linear-gradient(135deg, #e0f2fe 0%, #f3e8ff 50%, #fdf4ff 100%); min-height: 100vh; margin: 0; }
+        .card-top { height: 4px; background: linear-gradient(90deg, #0ea5e9, #8b5cf6); border-top-left-radius: 1.5rem; border-top-right-radius: 1.5rem; position: absolute; top: 0; left: 0; right: 0; }
+    </style>
+</head>
+<body class="flex flex-col">
+    <header class="w-full flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg italic">W</div>
+            <span class="font-bold text-gray-900 text-xl tracking-tight">Whiz <span class="text-blue-500">POS</span></span>
+        </div>
+        <div class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-500">
+            <a href="\${frontendUrl}/pricing" class="hover:text-gray-900 transition-colors">Pricing</a>
+            <a href="\${frontendUrl}/faq" class="hover:text-gray-900 transition-colors">FAQ</a>
+            <a href="\${frontendUrl}/docs" class="hover:text-gray-900 transition-colors">Documentation</a>
+        </div>
+        <div class="flex items-center gap-4">
+            <a href="\${frontendUrl}/auth" class="bg-[#0ea5e9] hover:bg-[#0284c7] text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">Sign In</a>
+            <button class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+            </button>
+        </div>
+    </header>
+    <main class="flex-1 flex items-center justify-center p-4 pb-20">
+        <div class="bg-white/95 backdrop-blur-sm rounded-3xl shadow-xl w-full max-w-2xl relative text-center pt-8 pb-10 px-6 sm:px-12 border border-white">
+            <div class="card-top"></div>
+            <h1 class="text-[8rem] sm:text-[10rem] font-extrabold text-[#0f172a] leading-none mt-4 tracking-tighter">\${statusCode}</h1>
+            <h2 class="text-2xl sm:text-3xl font-bold text-[#0f172a] mt-2 mb-4">\${title}</h2>
+            <p class="text-gray-500 mb-8 max-w-md mx-auto text-[15px] leading-relaxed">\${message}</p>
+            <div class="max-w-md mx-auto relative mb-8 hidden sm:block">
+                <svg class="w-5 h-5 absolute left-3.5 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <input type="text" placeholder="Search for products, sales..." class="w-full pl-11 pr-14 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50/50" disabled>
+                <div class="absolute right-3 top-2.5 px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-400 text-[10px] font-semibold tracking-widest">⌘K</div>
+            </div>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-10">
+                <a href="\${frontendUrl}/" class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[#0f172a] font-semibold text-sm hover:bg-gray-50 transition-colors border border-gray-200">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Go to Homepage
+                </a>
+                <a href="\${frontendUrl}/auth" class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white font-semibold text-sm hover:opacity-90 transition-opacity shadow-md shadow-indigo-500/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    Try Signing In
+                </a>
+            </div>
+            <div class="border-t border-gray-100 pt-8 relative">
+                <p class="text-[11px] font-bold text-gray-400 tracking-widest uppercase mb-5">Try these instead</p>
+                <div class="flex flex-wrap items-center justify-center gap-2 max-w-[90%] mx-auto">
+                    <span class="px-3.5 py-1.5 rounded-full bg-[#dcfce7] text-[#166534] text-xs font-semibold">Inventory</span>
+                    <span class="px-3.5 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-gray-600 text-xs font-semibold">Sales</span>
+                    <span class="px-3.5 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-gray-600 text-xs font-semibold">Reports</span>
+                    <span class="px-3.5 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-gray-600 text-xs font-semibold">Settings</span>
+                    <span class="px-3.5 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-gray-600 text-xs font-semibold">Pricing</span>
+                    <span class="px-3.5 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-gray-600 text-xs font-semibold">Docs</span>
+                    <span class="px-3.5 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-gray-600 text-xs font-semibold">FAQ</span>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
+\`;
+
 // ==================== GOOGLE OAUTH ====================
 router.get('/google', (req, res) => {
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -428,7 +499,7 @@ router.get('/google/callback', async (req, res) => {
   
   try {
     const { code, state } = req.query;
-    if (!code) return res.status(400).send('No code provided');
+    if (!code) return res.status(400).send(renderErrorPage(400, 'Bad Request', 'No authentication code was provided by Google.', frontendOrigin));
 
     if (state && typeof state === 'string') {
       try {
@@ -461,7 +532,7 @@ router.get('/google/callback', async (req, res) => {
     const tokenData = await tokenRes.json();
     if (!tokenData.access_token) {
       console.error('Google OAuth token error:', tokenData);
-      return res.status(400).send('Failed to obtain access token');
+      return res.status(400).send(renderErrorPage(400, 'Authentication Failed', 'Failed to obtain access token from Google.', frontendOrigin));
     }
 
     // 2. Get user info
@@ -470,43 +541,17 @@ router.get('/google/callback', async (req, res) => {
     });
     
     const userData = await userRes.json();
-    if (!userData.email) return res.status(400).send('No email returned from Google');
+    if (!userData.email) return res.status(400).send(renderErrorPage(400, 'Missing Information', 'No email address was returned from Google.', frontendOrigin));
 
     let user = await prisma.user.findUnique({ where: { email: userData.email } });
     
     if (!user) {
-      return res.status(404).send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>404 - Account Not Found</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .container { text-align: center; max-width: 500px; padding: 2rem; }
-            h1 { font-size: 6rem; font-weight: 700; margin: 0; color: #cbd5e1; line-height: 1; }
-            h2 { font-size: 1.5rem; font-weight: 600; margin: 1rem 0; color: #334155; }
-            p { color: #64748b; margin-bottom: 2rem; font-size: 1.125rem; }
-            .btn { display: inline-block; background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 0.375rem; text-decoration: none; font-weight: 500; transition: background-color 0.2s; margin: 0.5rem; }
-            .btn:hover { background-color: #4338ca; }
-            .btn-outline { background-color: transparent; color: #4f46e5; border: 1px solid #4f46e5; }
-            .btn-outline:hover { background-color: #f5f3ff; color: #4338ca; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>404</h1>
-            <h2>Account Not Found</h2>
-            <p>The email address <strong>${userData.email}</strong> is not associated with any existing Whiz POS account.</p>
-            <div>
-              <a href="${frontendOrigin}/onboarding" class="btn">Create New Account</a>
-              <a href="${frontendOrigin}/auth" class="btn btn-outline">Back to Login</a>
-            </div>
-          </div>
-        </body>
-        </html>
-      `);
+      return res.status(404).send(renderErrorPage(
+        404, 
+        'Account Not Found', 
+        `We couldn't find a Whiz POS account associated with <strong class="text-gray-900">${userData.email}</strong>. Please sign up to create a new business account.`, 
+        frontendOrigin
+      ));
     }
 
     // 4. Generate JWT
@@ -529,33 +574,12 @@ router.get('/google/callback', async (req, res) => {
 
   } catch (error) {
     console.error('OAuth error:', error);
-    res.status(500).send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>500 - Authentication Error</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-          .container { text-align: center; max-width: 500px; padding: 2rem; }
-          h1 { font-size: 6rem; font-weight: 700; margin: 0; color: #fca5a5; line-height: 1; }
-          h2 { font-size: 1.5rem; font-weight: 600; margin: 1rem 0; color: #334155; }
-          p { color: #64748b; margin-bottom: 2rem; font-size: 1.125rem; }
-          .btn { display: inline-block; background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 0.375rem; text-decoration: none; font-weight: 500; transition: background-color 0.2s; }
-          .btn:hover { background-color: #4338ca; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h1>500</h1>
-          <h2>Authentication Error</h2>
-          <p>We encountered an unexpected error while trying to authenticate you with Google.</p>
-          <a href="${frontendOrigin}/auth" class="btn">Return to Login</a>
-        </div>
-      </body>
-      </html>
-    `);
+    res.status(500).send(renderErrorPage(
+      500, 
+      'Authentication Error', 
+      'We encountered an unexpected error while trying to authenticate you with Google. Please try again.', 
+      frontendOrigin
+    ));
   }
 });
 
