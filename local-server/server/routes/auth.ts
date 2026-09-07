@@ -79,9 +79,9 @@ router.post('/register', async (req, res) => {
     }).returningAll().executeTakeFirstOrThrow();
 
     await db.insertInto('StoreLocation').values({
-      id: randomUUID(),
+      id: cloudLocationId || randomUUID(),
       businessId: business.id,
-      name: 'Main Store',
+      name: businessName || 'Main Store',
       address: address || 'Local Setup'
     }).execute();
 

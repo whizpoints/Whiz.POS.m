@@ -16,8 +16,19 @@ export default function AuthPage() {
     password: ''
   });
 
-  // Handle OAuth Redirect
+  // Handle OAuth Redirect & Existing Sessions
   React.useEffect(() => {
+    // Check if already logged in
+    const existingToken = localStorage.getItem('whiz-token');
+    const existingUser = localStorage.getItem('whiz-user');
+    if (existingToken && existingUser) {
+      let userName = 'User';
+      try { userName = JSON.parse(existingUser).name || 'User'; } catch (e) {}
+      toast(`Already logged in as ${userName}. Redirecting to dashboard...`, { icon: '👋' });
+      navigate('/dashboard');
+      return;
+    }
+
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const userStr = params.get('user');

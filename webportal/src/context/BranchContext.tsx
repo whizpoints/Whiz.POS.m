@@ -12,14 +12,38 @@ interface BranchContextType {
   activeLocationId: string | 'ALL';
   setActiveLocationId: (id: string | 'ALL') => void;
   isLoading: boolean;
+  isLocked: boolean;
 }
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export const BranchProvider = ({ children }: { children: ReactNode }) => {
   const [locations, setLocations] = useState<StoreLocation[]>([]);
-  const [activeLocationId, setActiveLocationId] = useState<string | 'ALL'>('ALL');
+  const [activeLocationId, setActiveLocationIdState] = useState<string | 'ALL'>('ALL');
   const [isLoading, setIsLoading] = useState(true);
+
+  let userLocationId: string | null = null;
+  try {
+    const uStr = localStorage.getItem('whiz-user');
+    if (uStr && uStr !== 'undefined') {
+      const user = JSON.parse(uStr);
+      if (user.locationId) {
+        userLocationId = user.locationId;
+      }
+    }
+  } catch(e) {}
+
+  const setActiveLocationId = (id: string | 'ALL') => {
+    // Prevent switching if the user is locked to a branch
+    if (userLocationId) return;
+    setActiveLocationIdState(id);
+  };
+
+  useEffect(() => {
+    if (userLocationId) {
+      setActiveLocationIdState(userLocationId);
+    }
+  }, [userLocationId]);
 
   useEffect(() => {
     const fetchLocations = async () => {
@@ -54,7 +78,7 @@ export const BranchProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <BranchContext.Provider value={{ locations, activeLocationId, setActiveLocationId, isLoading }}>
+    <BranchContext.Provider value={{ locations, activeLocationId, setActiveLocationId, isLoading, isLocked: !!userLocationId } as any}>
       {children}
     </BranchContext.Provider>
   );

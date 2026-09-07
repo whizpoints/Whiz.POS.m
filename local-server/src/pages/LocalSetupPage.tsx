@@ -22,16 +22,17 @@ export default function AuthPage() {
   const totalSteps = 4;
   const [showSetupPw, setShowSetupPw] = useState(false);
   
-  // Step 1: Cloud
+  // Step 1: Cloud & Branch Selection
   const [apiKey, setApiKey] = useState('');
-  
-  // Step 2: Business Profile
+  const [availableLocations, setAvailableLocations] = useState<any[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [isApiKeyVerified, setIsApiKeyVerified] = useState(false);
   const [businessName, setBusinessName] = useState('');
-  const [businessInfo, setBusinessInfo] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
-  
-  // Step 3: POS Configurations
+  const [businessInfo, setBusinessInfo] = useState('');
+
+  // Step 2: POS Configurations
   const [servedBy, setServedBy] = useState('Cashier');
   const [receiptFooter, setReceiptFooter] = useState('Thank you for your business!');
   const [printerType, setPrinterType] = useState('thermal');
@@ -92,6 +93,38 @@ export default function AuthPage() {
     if (setupStep > 1) setSetupStep(prev => prev - 1);
   };
 
+  const handleVerifyApiKey = async () => {
+    if (!apiKey) return toast.error('Please enter an API key');
+    setLoading(true);
+    try {
+      const res = await fetch('https://api.whizpoint.app/api/business/locations', {
+        headers: { 'x-api-key': apiKey }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Invalid API Key');
+      
+      const profileRes = await fetch('https://api.whizpoint.app/api/business/profile', {
+        headers: { 'x-api-key': apiKey }
+      });
+      const profileData = await profileRes.json();
+      if (profileRes.ok) {
+        setBusinessName(profileData.name || '');
+        setBusinessData(profileData);
+      }
+
+      setAvailableLocations(data.locations || []);
+      if (data.locations && data.locations.length > 0) {
+        setSelectedLocationId(data.locations[0].id);
+      }
+      setIsApiKeyVerified(true);
+      toast.success('Successfully connected to cloud!');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -125,14 +158,17 @@ export default function AuthPage() {
     }
     setLoading(true);
     try {
+      const locAddress = availableLocations.find(l => l.id === selectedLocationId)?.address || '';
       const body = { 
         email: username, 
         password, 
         businessName, 
         businessInfo, 
-        address, 
+        address: locAddress, 
         phone,
         apiKey,
+        cloudLocationId: selectedLocationId,
+        cloudBusinessId: businessData?.id,
         servedBy,
         receiptFooter,
         printerType,
@@ -307,31 +343,45 @@ export default function AuthPage() {
                 ))}
               </div>
 
-              {/* Step 2: Business Profile */}
+              {/* Step 1: Cloud & Branch Selection */}
               {setupStep === 1 && (
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400"><Building2 className="w-5 h-5" /></div>
-                    <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Business Profile</h3>
+                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400"><Cloud className="w-5 h-5" /></div>
+                    <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Cloud Connection</h3>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Business Name *</label>
-                    <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="Acme Supermarket" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Phone *</label>
-                      <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="+254..." />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Address *</label>
-                      <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="123 Main St" />
+                    <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Business API Key *</label>
+                    <div className="flex gap-2">
+                      <input type="text" value={apiKey} onChange={(e) => { setApiKey(e.target.value); setIsApiKeyVerified(false); }} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="whiz_..." />
+                      <button type="button" onClick={handleVerifyApiKey} disabled={loading || !apiKey} className="px-4 py-3 rounded-xl bg-blue-500 text-white font-semibold disabled:opacity-50">Verify</button>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Tagline / Info</label>
-                    <input type="text" value={businessInfo} onChange={(e) => setBusinessInfo(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="Your friendly neighborhood store" />
-                  </div>
+                  
+                  {isApiKeyVerified && (
+                    <div className="space-y-1.5 animate-in fade-in mt-4">
+                      <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Select Branch (Location) *</label>
+                      {availableLocations.length > 0 ? (
+                        <select value={selectedLocationId} onChange={(e) => setSelectedLocationId(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }}>
+                          {availableLocations.map(loc => (
+                            <option key={loc.id} value={loc.id}>{loc.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-sm text-red-500 bg-red-50 p-3 rounded-xl">No branches found. Please create a branch in the Back Office first.</div>
+                      )}
+                    </div>
+                  )}
+
+                  {isApiKeyVerified && (
+                    <div className="mt-4 p-4 rounded-xl border" style={{ borderColor: 'var(--border-glass)', background: 'var(--bg-tertiary)' }}>
+                      <div className="text-xs uppercase font-semibold text-gray-500 mb-2">Business Details (Auto-filled)</div>
+                      <div className="font-medium">{businessName}</div>
+                      {availableLocations.find(l => l.id === selectedLocationId)?.address && (
+                         <div className="text-sm text-gray-500 mt-1">{availableLocations.find(l => l.id === selectedLocationId)?.address}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -429,7 +479,7 @@ export default function AuthPage() {
                     type="button"
                     onClick={handleNextStep}
                     disabled={
-                      (setupStep === 1 && (!businessName || !phone || !address))
+                      (setupStep === 1 && (!isApiKeyVerified || !selectedLocationId))
                     }
                     className="px-6 py-2.5 font-bold rounded-lg flex items-center gap-2 transition-all shadow-md text-white disabled:opacity-50"
                     style={{ background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)' }}
