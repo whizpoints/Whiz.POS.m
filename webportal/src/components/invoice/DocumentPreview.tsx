@@ -117,16 +117,17 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
     );
 
     // Determine Title Display
-    
-  const getProxyUrl = (url: string | undefined | null) => {
-    if (!url) return undefined;
-    if (url.startsWith('http')) {
-      const isWebportal = typeof window !== 'undefined' && window.location.href.includes('/dashboard');
-      const baseUrl = isWebportal ? 'https://api.whizpoint.app' : 'http://localhost:5050';
-      return `${baseUrl}/api/documents/proxy-image?url=${encodeURIComponent(url)}`;
-    }
-    return url;
-  };
+    const getProxyUrl = (url: string | undefined | null) => {
+      if (!url) return undefined;
+      if (url.startsWith('http')) {
+        // Use environment API base URL, or fallback to the same origin if running from web
+        const API_BASE_URL = typeof window !== 'undefined' && window.location.protocol === 'file:' 
+          ? 'http://localhost:5050' 
+          : (import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : ''));
+        return `${API_BASE_URL}/api/documents/proxy-image?url=${encodeURIComponent(url)}`;
+      }
+      return url;
+    };
   
   
 

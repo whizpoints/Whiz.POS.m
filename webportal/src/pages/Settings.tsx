@@ -717,7 +717,7 @@ function ETimsPanel({ profile, onSave }: any) {
             </div>
             <div>
               <label className="label">Control Unit URL</label>
-              <input type="url" name="etimsUrl" value={formData.etimsUrl} onChange={handleChange} className="input text-[13px]" placeholder="https://cu.etims.go.ke/..." />
+              <input type="url" name="etimsUrl" value={formData.etimsUrl} onChange={handleChange} className="input text-[13px]" placeholder="https://etims-api-sbx.kra.go.ke/etims-api" />
             </div>
             <div className="md:col-span-2">
               <label className="label">VSDC Auth Token</label>

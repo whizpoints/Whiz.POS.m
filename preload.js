@@ -177,6 +177,10 @@ contextBridge.exposeInMainWorld('electron', {
   getLogs: () => ipcRenderer.invoke('get-logs'),
 
   checkMpesaPayment: (params) => ipcRenderer.invoke('check-mpesa-payment', params),
+  
+  sendMpesaStk: (params) => ipcRenderer.invoke('send-mpesa-stk', params),
+  
+  queryMpesaStk: (params) => ipcRenderer.invoke('query-mpesa-stk', params),
 
   completeAtomicSale: (saleData, paymentData) => ipcRenderer.invoke('complete-atomic-sale', saleData, paymentData),
 

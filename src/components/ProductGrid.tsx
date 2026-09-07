@@ -179,11 +179,6 @@ export default function ProductGrid() {
               <h3 className="font-medium text-gray-800 text-sm mb-1">{product.name}</h3>
               <div className="flex items-center justify-between">
                 <p className="text-lg font-bold text-blue-600">KES {product.price}</p>
-                {product.stock !== undefined && product.stock !== null && (
-                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {product.stock > 0 ? `${product.stock} in stock` : 'No stock'}
-                  </span>
-                )}
               </div>
             </div>
             <button 

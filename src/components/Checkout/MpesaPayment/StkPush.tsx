@@ -38,24 +38,46 @@ export default function StkPush({ totalAmount }: Props) {
     setStatus('sending');
     
     try {
-      const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
-      console.log(`[STK Push] Initiating push to ${cloudUrl}/api/mpesa/stkpush for businessId ${activeBusinessId}`);
+      if (window.electron && window.electron.sendMpesaStk) {
+        // Direct Terminal STK Push via Electron IPC
+        const config = businessSetup?.settings || {};
+        const res = await window.electron.sendMpesaStk({
+          amount: totalAmount,
+          phone: validPhone,
+          config: {
+            passkey: config.mpesaPasskey || 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919', // sandbox default
+            shortcode: config.mpesaPaybill || '174379',
+            consumerKey: config.mpesaConsumerKey || 'YOUR_APP_CONSUMER_KEY',
+            consumerSecret: config.mpesaConsumerSecret || 'YOUR_APP_CONSUMER_SECRET'
+          }
+        });
 
-      const res = await fetch(`${cloudUrl}/api/mpesa/stkpush`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: validPhone, amount: totalAmount, businessId: activeBusinessId, locationId: (businessSetup as any)?.locationId })
-      });
-      
-      const data = await res.json();
-      console.log(`[STK Push] Response received:`, data);
-      
-      if (data.success) {
-        setStatus('sent');
-        toast(`STK Push sent to ${validPhone}. Waiting for customer PIN.`, 'success');
+        if (res.success) {
+          setStatus('sent');
+          toast(`STK Push sent to ${validPhone}. Waiting for customer PIN.`, 'success');
+          // In a real flow, you'd start polling queryMpesaStk here
+        } else {
+          setStatus('idle');
+          toast(res.error || 'Failed to send STK Push', 'error');
+        }
       } else {
-        setStatus('idle');
-        toast(data.error || data.message || 'Failed to send STK Push', 'error');
+        // Fallback to Cloud URL if running in Web browser
+        const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+        const res = await fetch(`${cloudUrl}/api/mpesa/stkpush`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: validPhone, amount: totalAmount, businessId: activeBusinessId, locationId: (businessSetup as any)?.locationId })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          setStatus('sent');
+          toast(`STK Push sent to ${validPhone}. Waiting for customer PIN.`, 'success');
+        } else {
+          setStatus('idle');
+          toast(data.error || data.message || 'Failed to send STK Push', 'error');
+        }
       }
       
       setTimeout(() => setStatus('idle'), 15000);

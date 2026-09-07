@@ -214,7 +214,8 @@ router.post('/', async (req: any, res: any) => {
       suppliers,
       transactions,
       stockMovements,
-      businessSetup
+      businessSetup,
+      documents
     } = req.body;
 
     let targetLocationId: string | null = null;
@@ -410,7 +411,7 @@ router.post('/', async (req: any, res: any) => {
                   if (existing) {
                       await db.updateTable('Receipt')
 // @ts-ignore
-.set({ status: safeStatus as any, updatedAt: (t.updatedAt ? new Date(t.updatedAt) : new Date()).toISOString() }).where('id', '=', existing.id).execute();
+.set({ status: safeStatus as any }).where('id', '=', existing.id).execute();
                   } else {
                       const receiptId = String(t.id);
                       await db.insertInto('Receipt')
@@ -422,8 +423,7 @@ router.post('/', async (req: any, res: any) => {
                             receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
                             paymentMethod: String(t.paymentMethod || 'CASH'), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
                             mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null, status: safeStatus as any,
-                            createdAt: t.timestamp ? new Date(t.timestamp).toISOString() : undefined,
-                            updatedAt: (t.updatedAt ? new Date(t.updatedAt) : new Date()).toISOString()
+                            createdAt: t.timestamp ? new Date(t.timestamp).toISOString() : undefined
                                                }).execute();
                       const createdReceipt = { id: receiptId };
                       

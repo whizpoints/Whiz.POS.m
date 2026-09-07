@@ -290,7 +290,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { locations, activeLocationId, setActiveLocationId, isLoading } = useBranchContext();
+  const { locations, activeLocationId, setActiveLocationId, isLoading, isLocked } = useBranchContext();
 
   let user: any = {};
   try {
@@ -429,7 +429,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
 
             <div className="topbar-actions ml-auto flex shrink-0">
               <div className="flex items-center gap-2 mr-2">
-                {!isLoading && (
+                {!isLoading && !isLocked && (
                   <select
                     value={activeLocationId}
                     onChange={(e) => setActiveLocationId(e.target.value)}
@@ -440,6 +440,11 @@ function DashboardLayout({ children }: { children: ReactNode }) {
                       <option key={loc.id} value={loc.id}>{loc.name}</option>
                     ))}
                   </select>
+                )}
+                {!isLoading && isLocked && locations.find(l => l.id === activeLocationId) && (
+                  <div className="border rounded-lg bg-gray-100 p-1 md:p-2 text-[11px] md:text-sm text-gray-600 truncate max-w-[120px] font-medium" title="You are assigned to this branch">
+                    {locations.find(l => l.id === activeLocationId)?.name}
+                  </div>
                 )}
               </div>
               <div className="search-box hidden md:flex items-center">

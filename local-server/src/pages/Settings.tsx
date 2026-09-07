@@ -191,31 +191,149 @@ function ApiKeyRow({ label, keyStr, status, badge }: { label: string; keyStr: st
 }
 
 function SecurityPanel({ profile, fetchProfile }: any) {
+  const isAlreadyLinked = !!(profile?.settings?.backOfficeApiKey && profile?.settings?.cloudLocationId);
+
   const [url, setUrl] = useState(profile?.settings?.backOfficeUrl || 'https://api.whizpoint.app');
   const [apiKey, setApiKey] = useState(profile?.settings?.backOfficeApiKey || '');
-  const [isSaving, setIsSaving] = useState(false);
+  const [pairingCode, setPairingCode] = useState('');
+  const [step, setStep] = useState<'input' | 'pairing' | 'linked'>(isAlreadyLinked ? 'linked' : 'input');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [cloudInfo, setCloudInfo] = useState<any>(null);
+  const [error, setError] = useState('');
 
-  const handleSave = async () => {
-    setIsSaving(true);
+  // Step 1: User enters API Key → we validate it against the cloud
+  const handleVerifyApiKey = async () => {
+    if (!apiKey.trim()) {
+      toast.error('Please enter your API Key');
+      return;
+    }
+    setIsVerifying(true);
+    setError('');
+    try {
+      // First, verify the API key is valid by hitting the cloud
+      const res = await fetch(`${url}/api/business/locations`, {
+        headers: { 'x-api-key': apiKey.trim() }
+      });
+      if (!res.ok) {
+        setError('Invalid API Key. Please check it on your Back Office under Outlets & Devices.');
+        setIsVerifying(false);
+        return;
+      }
+      const data = await res.json();
+      if (!data.locations || data.locations.length === 0) {
+        setError('No branches found for this API Key. Please create a branch on the Back Office first.');
+        setIsVerifying(false);
+        return;
+      }
+      toast.success('API Key verified! Now enter the 6-digit Pairing Code from your Back Office.');
+      setStep('pairing');
+    } catch (err) {
+      console.error(err);
+      setError(`Could not reach Back Office at ${url}. Check URL and internet connection.`);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Step 2: User enters pairing code → validate it
+  const handleValidatePairing = async () => {
+    if (pairingCode.length !== 6) {
+      toast.error('Pairing code must be 6 digits');
+      return;
+    }
+    setIsConfirming(true);
+    setError('');
+    try {
+      // Validate the pairing code
+      const res = await fetch(`${url}/api/auth/validate-pairing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: apiKey.trim(), pairingCode: pairingCode.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Invalid or expired Pairing Code. Please generate a new one on the Back Office.');
+        setIsConfirming(false);
+        return;
+      }
+
+      // Pairing validated! Now confirm (burn the code)
+      const confirmRes = await fetch(`${url}/api/auth/confirm-pairing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: apiKey.trim(), pairingCode: pairingCode.trim() })
+      });
+      const confirmData = await confirmRes.json();
+      if (!confirmRes.ok || !confirmData.success) {
+        setError('Handshake failed. Please try again.');
+        setIsConfirming(false);
+        return;
+      }
+
+      // Save everything to local server profile
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      await fetch(`${API_BASE_URL}/api/business/profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          settings: {
+            ...profile?.settings,
+            backOfficeUrl: url,
+            backOfficeApiKey: apiKey.trim(),
+            cloudBusinessId: data.businessId,
+            cloudLocationId: data.locationId,
+            cloudBusinessName: data.businessName,
+            cloudLocationName: data.locationName,
+            cloudEmail: data.email,
+            linkedAt: new Date().toISOString()
+          }
+        })
+      });
+
+      setCloudInfo(data);
+      setStep('linked');
+      fetchProfile();
+      toast.success(`✅ Server linked to "${data.locationName}" (${data.businessName})`);
+    } catch (err) {
+      console.error(err);
+      setError('Network error. Please check your connection.');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  // Unlink server
+  const handleUnlink = async () => {
+    if (!confirm('Are you sure you want to unlink this server from the Back Office?')) return;
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();
-      const res = await fetch(`${API_BASE_URL}/api/business/profile`, {
+      await fetch(`${API_BASE_URL}/api/business/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ settings: { ...profile?.settings, backOfficeUrl: url, backOfficeApiKey: apiKey } })
+        body: JSON.stringify({
+          settings: {
+            ...profile?.settings,
+            backOfficeApiKey: null,
+            cloudBusinessId: null,
+            cloudLocationId: null,
+            cloudBusinessName: null,
+            cloudLocationName: null,
+            cloudEmail: null,
+            linkedAt: null
+          }
+        })
       });
-      if (res.ok) {
-        toast.success('Server link saved successfully');
-        fetchProfile();
-      } else {
-        toast.error('Failed to save settings');
-      }
+      setStep('input');
+      setApiKey('');
+      setPairingCode('');
+      setCloudInfo(null);
+      fetchProfile();
+      toast.success('Server unlinked from Back Office');
     } catch (err) {
-      console.error(err);
-      toast.error('Error saving settings');
-    } finally {
-      setIsSaving(false);
+      toast.error('Failed to unlink');
     }
   };
 
@@ -224,47 +342,144 @@ function SecurityPanel({ profile, fetchProfile }: any) {
       <SectionHeader
         eyebrow="Server Link"
         title="Connect to Back Office"
-        description="Link this local server to your online WhizPOS back office for cloud synchronization."
+        description="Link this local server to your online WhizPOS back office using a secure 2FA handshake."
         icon={<Globe className="w-5 h-5" />}
         gradient="linear-gradient(135deg, rgba(59,130,246,0.25), rgba(168,85,247,0.18))"
       />
 
-      <div className="glass-panel p-5 space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-[color:var(--text-secondary)]">Back Office URL</label>
-          <div className="relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
-            <input
-              type="text"
-              className="input pl-9 w-full"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://api.whizpoint.app"
-            />
+      {/* Already Linked State */}
+      {step === 'linked' && (
+        <div className="glass-panel p-5 space-y-4">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+            <CheckCircle2 className="w-6 h-6 text-green-500 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-green-700">Server Linked Successfully</div>
+              <div className="text-xs text-[color:var(--text-muted)]">
+                Connected to <span className="font-semibold text-[color:var(--text-primary)]">{profile?.settings?.cloudLocationName || cloudInfo?.locationName || 'Branch'}</span> — {profile?.settings?.cloudBusinessName || cloudInfo?.businessName || 'Business'}
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-[color:var(--text-secondary)]">Production API Key</label>
-          <div className="relative">
-            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
-            <input
-              type="password"
-              className="input pl-9 w-full font-mono text-sm"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk_live_..."
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg bg-[color:var(--bg-secondary)] border border-[color:var(--border)]">
+              <div className="text-[10px] font-bold uppercase text-[color:var(--text-muted)] mb-0.5">Branch</div>
+              <div className="text-sm font-semibold text-[color:var(--text-primary)] truncate">{profile?.settings?.cloudLocationName || cloudInfo?.locationName || '—'}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-[color:var(--bg-secondary)] border border-[color:var(--border)]">
+              <div className="text-[10px] font-bold uppercase text-[color:var(--text-muted)] mb-0.5">Business</div>
+              <div className="text-sm font-semibold text-[color:var(--text-primary)] truncate">{profile?.settings?.cloudBusinessName || cloudInfo?.businessName || '—'}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-[color:var(--bg-secondary)] border border-[color:var(--border)]">
+              <div className="text-[10px] font-bold uppercase text-[color:var(--text-muted)] mb-0.5">Back Office</div>
+              <div className="text-sm font-mono text-[color:var(--text-secondary)] truncate text-xs">{url}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-[color:var(--bg-secondary)] border border-[color:var(--border)]">
+              <div className="text-[10px] font-bold uppercase text-[color:var(--text-muted)] mb-0.5">Linked</div>
+              <div className="text-sm text-[color:var(--text-secondary)] truncate">{profile?.settings?.linkedAt ? new Date(profile.settings.linkedAt).toLocaleDateString() : 'Active'}</div>
+            </div>
           </div>
-        </div>
 
-        <div className="pt-2">
-          <button onClick={handleSave} disabled={isSaving} className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2">
-            <Save className="w-4 h-4" />
-            {isSaving ? 'Saving...' : 'Save Connection Details'}
+          <button onClick={handleUnlink} className="btn btn-ghost text-red-500 hover:bg-red-500/10 inline-flex items-center gap-2 text-sm">
+            <Trash2 className="w-4 h-4" />
+            Unlink Server
           </button>
         </div>
-      </div>
+      )}
+
+      {/* Step 1: Enter URL + API Key */}
+      {step === 'input' && (
+        <div className="glass-panel p-5 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[color:var(--text-secondary)]">Back Office URL</label>
+            <div className="relative">
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
+              <input
+                type="text"
+                className="input pl-9 w-full"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://api.whizpoint.app"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[color:var(--text-secondary)]">Business API Key</label>
+            <p className="text-xs text-[color:var(--text-muted)]">
+              Get this from your Back Office → Outlets & Devices → Generate Pairing Code
+            </p>
+            <div className="relative">
+              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
+              <input
+                type="password"
+                className="input pl-9 w-full font-mono text-sm"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Paste your API Key here"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-600">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="pt-2">
+            <button onClick={handleVerifyApiKey} disabled={isVerifying || !apiKey.trim()} className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2">
+              {isVerifying ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              {isVerifying ? 'Verifying...' : 'Verify API Key'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Enter Pairing Code */}
+      {step === 'pairing' && (
+        <div className="glass-panel p-5 space-y-4">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+            <Lock className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+            <div>
+              <div className="text-sm font-bold text-blue-700">API Key Verified ✓</div>
+              <div className="text-xs text-[color:var(--text-muted)]">
+                Now enter the <span className="font-bold">6-digit Pairing Code</span> shown on your Back Office (Outlets & Devices page). The code expires in 15 minutes.
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[color:var(--text-secondary)]">Pairing Code</label>
+            <input
+              type="text"
+              className="input w-full text-center text-3xl font-mono tracking-[0.4em] py-4"
+              maxLength={6}
+              value={pairingCode}
+              onChange={(e) => setPairingCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="000000"
+              autoFocus
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-600">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <button onClick={() => { setStep('input'); setError(''); setPairingCode(''); }} className="btn btn-ghost">
+              ← Back
+            </button>
+            <button onClick={handleValidatePairing} disabled={isConfirming || pairingCode.length !== 6} className="btn btn-primary flex-1 inline-flex items-center justify-center gap-2">
+              {isConfirming ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {isConfirming ? 'Linking...' : 'Complete Handshake'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

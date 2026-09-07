@@ -539,6 +539,38 @@ ipcMain.handle('check-mpesa-payment', async (event, { amount, expectedName }) =>
   }
 });
 
+const mpesaDaraja = require('./mpesa-daraja.cjs');
+
+ipcMain.handle('send-mpesa-stk', async (event, { amount, phone, config }) => {
+    try {
+        const result = await mpesaDaraja.sendStkPush({
+            amount, phone,
+            passkey: config.passkey,
+            shortcode: config.shortcode,
+            consumerKey: config.consumerKey,
+            consumerSecret: config.consumerSecret
+        });
+        return result;
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+
+ipcMain.handle('query-mpesa-stk', async (event, { checkoutRequestId, config }) => {
+    try {
+        const result = await mpesaDaraja.queryStkPush({
+            checkoutRequestId,
+            passkey: config.passkey,
+            shortcode: config.shortcode,
+            consumerKey: config.consumerKey,
+            consumerSecret: config.consumerSecret
+        });
+        return result;
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+
 async function runCloudSync() {
     try {
         const configPath = path.join(userDataPath, 'server-config.json');
@@ -1552,7 +1584,7 @@ app.whenReady().then(async () => {
       if (!isReprint && !finalTransaction.kraInvoiceNo) {
           try {
               const products = await readJsonFileFallback('products.json');
-              const kraResult = await kraService.submitInvoice(finalTransaction, products);
+              const kraResult = await kraService.submitInvoice(finalTransaction, products, businessSetup);
               
               if (kraResult && kraResult.kraInvoiceNo) {
                   finalTransaction.kraInvoiceNo = kraResult.kraInvoiceNo;

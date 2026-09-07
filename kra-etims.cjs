@@ -17,7 +17,10 @@ class KRAETimsService {
         this.tisVersion = '7.1.0';
         
         // Defaults to be overridden by config
-        this.apiUrl = process.env.KRA_ETIMS_URL || 'https://sandbox.kra.go.ke/etims/api'; // Sandbox fallback
+        this.apiUrl = process.env.KRA_ETIMS_URL || 'https://etims-api-sbx.kra.go.ke/etims-api'; // Sandbox fallback
+        this.productionUrl = 'https://etims-api.kra.go.ke/etims-api';
+        this.qrBaseUrl = process.env.KRA_QR_BASE_URL || 'https://etims-sbx.kra.go.ke/common/link/etims/receipt/indexEtimsReceiptData?Data=';
+        this.productionQrBaseUrl = 'https://etims.kra.go.ke/common/link/etims/receipt/indexEtimsReceiptData?Data=';
         this.pin = process.env.KRA_PIN || '';
         this.branchId = process.env.KRA_BRANCH_ID || '00';
         this.cmcKey = process.env.KRA_CMC_KEY || ''; // Communication key
@@ -123,46 +126,57 @@ class KRAETimsService {
     /**
      * Submit Invoice to KRA eTIMS API
      */
-    async submitInvoice(transaction, products) {
-        if (!this.pin || !this.cmcKey) {
+    async submitInvoice(transaction, products, businessSetup) {
+        // Extract settings from businessSetup if provided, fallback to class defaults
+        const settings = businessSetup?.settings || {};
+        // Support both local-server naming (kraPin/kraToken) and webportal naming (etimsPin/etimsToken)
+        const kraPin = settings.etimsPin || settings.kraPin || this.pin;
+        const kraToken = settings.etimsToken || settings.kraToken || this.cmcKey;
+        const branchId = settings.etimsBranch || settings.etimsBranchId || this.branchId || '00';
+        const deviceSerial = settings.etimsSerial || settings.etimsDeviceSerial || 'WHIZPOS-V7.1.0';
+        const etimsUrl = settings.etimsUrl || this.apiUrl; // e.g. https://etims-api-sbx.kra.go.ke/etims-api
+        const qrBase = etimsUrl.includes('-sbx') ? this.qrBaseUrl : this.productionQrBaseUrl;
+
+        if (!kraPin || !kraToken) {
             console.warn('[KRA] eTIMS credentials missing. Queueing invoice locally.');
             return this.queueInvoice(transaction, products);
         }
 
         const payload = this.formatInvoicePayload(transaction, products);
-        const headers = this._getHeaders(payload);
+        payload.tin = kraPin;
+        payload.bhfId = branchId;
 
         try {
-            console.log(`[KRA] Submitting Invoice ${payload.invcNo}...`);
-            // Actual fetch to be implemented when URL is provided
-            /*
-            const response = await fetch(`${this.apiUrl}/trnsSales/saveSales`, {
+            console.log(`[KRA] Submitting Invoice ${payload.invcNo} to ${etimsUrl}...`);
+            
+            const response = await fetch(`${etimsUrl}/trnsSales/saveSales`, {
                 method: 'POST',
-                headers: headers,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'tin': kraPin,
+                    'bhfId': branchId,
+                    'cmcKey': kraToken
+                },
                 body: JSON.stringify(payload)
             });
             
             const result = await response.json();
+            console.log(`[KRA] Response for ${payload.invcNo}:`, JSON.stringify(result));
             
-            if (result.resultCd === '000') { // Success code
+            if (result.resultCd === '000') {
+                // Build the QR code URL using the KRA QR base + internal receipt data
+                const qrData = result.data?.intrlData || result.data?.rcptNo || payload.invcNo;
                 return {
                     success: true,
-                    kraInvoiceNo: result.data.rcptNo,
-                    qrCode: result.data.intrlData, // QR String
-                    signature: result.data.rcptSign
+                    kraInvoiceNo: result.data?.rcptNo || `KRA-${payload.invcNo}`,
+                    qrCode: `${qrBase}${encodeURIComponent(qrData)}`,
+                    signature: result.data?.rcptSign || '',
+                    scuInvcNo: result.data?.scuInvcNo || '',
+                    scuReceipt: result.data || {}
                 };
             } else {
-                throw new Error(`KRA Error: ${result.resultMsg}`);
+                throw new Error(`KRA Error ${result.resultCd}: ${result.resultMsg}`);
             }
-            */
-
-            // SIMULATED SUCCESS FOR CORE IMPLEMENTATION
-            return {
-                success: true,
-                kraInvoiceNo: `KRA-${payload.invcNo}`,
-                qrCode: `https://itax.kra.go.ke/KRA-Portal/invoice?id=${payload.invcNo}`,
-                signature: crypto.randomBytes(16).toString('hex').toUpperCase()
-            };
 
         } catch (error) {
             console.error(`[KRA] Failed to submit invoice ${payload.invcNo}:`, error.message);
