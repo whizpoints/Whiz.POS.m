@@ -257,10 +257,10 @@ router.post('/setup', async (req, res) => {
       const token = authHeader.split(' ')[1];
       const payload = jwt.verify(token, JWT_SECRET) as any;
       
-      const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+      const user = await prisma.user.findUnique({ where: { id: payload.userId }, include: { business: true } });
       if (!user) return res.status(404).json({ error: 'User not found' });
       
-      res.json({ id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId });
+      res.json({ id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId, businessName: user.business?.name, businessLogo: user.business?.logoUrl });
     } catch (error) {
       console.error('/me error:', error);
       res.status(401).json({ error: 'Invalid token' });

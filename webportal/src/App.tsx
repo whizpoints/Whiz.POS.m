@@ -417,10 +417,12 @@ function DashboardLayout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-avatar">{user?.name ? user.name.slice(0,2).toUpperCase() : 'AM'}</div>
+          <div className="user-avatar overflow-hidden p-0 flex items-center justify-center bg-gray-100 text-gray-700">
+            {user?.businessLogo ? <img src={user.businessLogo} alt="Logo" className="w-full h-full object-cover" /> : (user?.businessName ? user.businessName.slice(0,2).toUpperCase() : (user?.name ? user.name.slice(0,2).toUpperCase() : 'BU'))}
+          </div>
           <div className="user-meta">
-            <div className="user-name">{user?.name || 'Business Account'}</div>
-            <div className="user-role">{user?.role || 'Admin'}</div>
+            <div className="user-name font-medium">{user?.businessName || 'Business Account'}</div>
+            <div className="user-role text-xs text-slate-500">{user?.name || 'Staff'}</div>
           </div>
           <button className="btn btn-icon btn-ghost" title="Logout" onClick={handleLogout}>
             <LogIn className="rotate-180" />
@@ -483,19 +485,24 @@ function DashboardLayout({ children }: { children: ReactNode }) {
               <div className="relative">
                 <button 
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="user-avatar border-0 cursor-pointer hover:opacity-80 transition-opacity w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm flex" 
+                  className="user-avatar border-0 cursor-pointer hover:opacity-80 transition-opacity w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm flex overflow-hidden p-0 items-center justify-center bg-gray-100 text-gray-700" 
                   title="Account Settings"
                 >
-                  {user?.name ? user.name.slice(0,2).toUpperCase() : 'AD'}
+                  {user?.businessLogo ? <img src={user.businessLogo} alt="Logo" className="w-full h-full object-cover" /> : (user?.businessName ? user.businessName.slice(0,2).toUpperCase() : (user?.name ? user.name.slice(0,2).toUpperCase() : 'AD'))}
                 </button>
                 
                 {userMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)}></div>
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 animate-in fade-in slide-in-from-top-2">
-                      <div className="px-4 py-2 border-b border-slate-100 mb-1">
-                        <div className="font-medium text-slate-800 text-sm truncate">{user?.name || 'Admin'}</div>
-                        <div className="text-xs text-slate-500 truncate">{user?.email || 'admin@business.com'}</div>
+                      <div className="px-4 py-2 border-b border-slate-100 mb-1 flex items-center gap-2">
+                        {user?.businessLogo && (
+                          <img src={user.businessLogo} alt="Logo" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-medium text-slate-800 text-sm truncate">{user?.businessName || user?.name || 'Business Account'}</div>
+                          <div className="text-xs text-slate-500 truncate">{user?.email || 'admin@business.com'}</div>
+                        </div>
                       </div>
                       <button 
                         onClick={() => { setUserMenuOpen(false); navigate('/dashboard/settings'); }}

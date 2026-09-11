@@ -208,9 +208,10 @@ router.post('/setup', async (req, res) => {
       const payload = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret')) as any;
       
       const user = await db.selectFrom('User').selectAll().where('id', '=', payload.userId).executeTakeFirst();
+      const business = user ? await db.selectFrom('Business').selectAll().where('id', '=', user.businessId).executeTakeFirst() : null;
       if (!user) return res.status(404).json({ error: 'User not found' });
       
-      res.json({ id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId });
+      res.json({ id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId, businessName: business?.name, businessLogo: business?.logoUrl });
     } catch (error) {
       console.error('/me error:', error);
       res.status(401).json({ error: 'Invalid token' });
