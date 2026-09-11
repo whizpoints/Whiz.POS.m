@@ -296,11 +296,32 @@ function DashboardLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { locations, activeLocationId, setActiveLocationId, isLoading, isLocked } = useBranchContext();
 
-  let user: any = {};
-  try {
-    const uStr = localStorage.getItem('whiz-user');
-    if (uStr && uStr !== 'undefined') user = JSON.parse(uStr);
-  } catch(e) {}
+    const [user, setUser] = useState<any>(() => {
+    try {
+      const uStr = localStorage.getItem('whiz-user');
+      if (uStr && uStr !== 'undefined') return JSON.parse(uStr);
+    } catch(e) {}
+    return {};
+  });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = localStorage.getItem('whiz-token');
+        if (!token) return;
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+        const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUser((prev: any) => ({ ...prev, ...data }));
+          localStorage.setItem('whiz-user', JSON.stringify({ ...user, ...data }));
+        }
+      } catch (err) {}
+    };
+    fetchUser();
+  }, []);
 
 
   const handleLogout = () => {

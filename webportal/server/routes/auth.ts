@@ -114,7 +114,7 @@ router.post('/register', async (req, res) => {
       // We still proceed, but the user will have to request a resend later
     }
 
-    res.json({ token, business, user: { id: user.id, name: user.name, role: user.role, businessId: user.businessId } });
+    res.json({ token, business, user: { id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId } });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -248,6 +248,25 @@ router.post('/setup', async (req, res) => {
   }
 });
 
+  // Get Current Logged-in User
+  router.get('/me', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+      
+      const token = authHeader.split(' ')[1];
+      const payload = jwt.verify(token, JWT_SECRET) as any;
+      
+      const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      
+      res.json({ id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId });
+    } catch (error) {
+      console.error('/me error:', error);
+      res.status(401).json({ error: 'Invalid token' });
+    }
+  });
+
 // Login
 router.post('/login', async (req, res) => {
   try {
@@ -269,7 +288,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role }, JWT_SECRET, { expiresIn: '3h' });
 
-    res.json({ token, user: { id: user.id, name: user.name, role: user.role, businessId: user.businessId }, business: user.business });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId }, business: user.business });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
