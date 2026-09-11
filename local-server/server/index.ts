@@ -37,6 +37,7 @@ import { wafMiddleware } from './middleware/waf.js';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 5050;
 
 // Enable CORS for all origins dynamically (needed for Electron desktop POS clients with credentials)

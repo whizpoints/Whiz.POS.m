@@ -18,7 +18,7 @@ const getIpData = (ip: string): IpData => {
 };
 
 export const wafMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const xff = req.headers['x-forwarded-for']; let ip = req.ip || req.socket.remoteAddress || 'unknown'; if (xff) { ip = typeof xff === 'string' ? xff.split(',')[0].trim() : xff[0].split(',')[0].trim(); }
   const data = getIpData(ip);
 
   // Check if blocked
