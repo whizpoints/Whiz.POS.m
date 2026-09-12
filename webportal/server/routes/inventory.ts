@@ -92,7 +92,11 @@ router.post('/', async (req: any, res: any) => {
        });
     }
 
-    res.json(product);
+    const io = req.app.get('io');
+      if (io && req.user && req.user.businessId) {
+        io.to(`business_${req.user.businessId}`).emit('cloud_transaction_created', { type: 'INVENTORY_UPDATE', timestamp: new Date().toISOString(), businessId: req.user.businessId });
+      }
+      res.json(product);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -133,7 +137,11 @@ router.put('/:id', async (req: any, res: any) => {
       }
     }
 
-    res.json({ success: true });
+    const io = req.app.get('io');
+      if (io && req.user && req.user.businessId) {
+        io.to(`business_${req.user.businessId}`).emit('cloud_transaction_created', { type: 'INVENTORY_UPDATE', timestamp: new Date().toISOString(), businessId: req.user.businessId });
+      }
+      res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -147,7 +155,11 @@ router.delete('/:id', async (req: any, res: any) => {
     await prisma.product.deleteMany({
       where: { id, businessId }
     });
-    res.json({ success: true });
+    const io = req.app.get('io');
+      if (io && req.user && req.user.businessId) {
+        io.to(`business_${req.user.businessId}`).emit('cloud_transaction_created', { type: 'INVENTORY_UPDATE', timestamp: new Date().toISOString(), businessId: req.user.businessId });
+      }
+      res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }

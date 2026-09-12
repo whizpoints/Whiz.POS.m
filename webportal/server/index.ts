@@ -1,4 +1,6 @@
 import express from 'express';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 import cors from 'cors';
@@ -32,6 +34,43 @@ import { wafMiddleware } from './middleware/waf.js';
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+// Socket.io setup for Webportal
+io.on('connection', (socket) => {
+  console.log('[WebPortal Socket] Client connected:', socket.id);
+  
+  // Clients (local-server or web clients) can join a specific business room
+  socket.on('join_business', (businessId) => {
+    socket.join(`business_${businessId}`);
+    console.log(`[WebPortal Socket] ${socket.id} joined business_${businessId}`);
+  });
+
+  // When a cloud transaction occurs, it can be emitted to this room
+  socket.on('cloud_transaction_created', (data) => {
+    // Broadcast downwards to local servers listening
+    socket.to(`business_${data.businessId}`).emit('downward_sync_event', data);
+  });
+  
+  // When local server syncs up, broadcast upwards to web portal dashboards
+  socket.on('local_transaction_synced', (data) => {
+    socket.to(`business_${data.businessId}`).emit('dashboard_update', data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('[WebPortal Socket] Client disconnected:', socket.id);
+  });
+});
+
+// Expose io to the app for use in routes
+app.set('io', io);
+
 const PORT = process.env.PORT || 5050;
 
 // Enable CORS for all origins dynamically (needed for Electron desktop POS clients with credentials)
@@ -201,7 +240,7 @@ setInterval(async () => {
   }
 }, 60000); // Run every 60 seconds
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   if (PORT == 3000) {
     console.log(`🚀 Cloud Web App (Back Office) running in ${process.env.NODE_ENV} mode on port ${PORT}`);
     console.log(`🚀 Cloud Web App (Back Office) Dev Url: https://api.whizpoint.app`);

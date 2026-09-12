@@ -10,6 +10,7 @@ import OnScreenKeyboard from './components/OnScreenKeyboard';
 import ErrorBoundary from './components/ErrorBoundary';
 import AutoLogoutModal from './components/AutoLogoutModal';
 import { useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
 import { useAutoLogout } from './hooks/useAutoLogout';
 import { CheckCircle2 } from 'lucide-react';
 import { Modal } from './components/ui/modal';
@@ -65,6 +66,39 @@ function App() {
             console.log('Received new mobile receipt:', receipt);
             usePosStore.getState().addMobileReceipt(receipt);
         });
+    }
+  }, []);
+
+  // Setup Socket.io Real-Time Sync
+  useEffect(() => {
+    const state = usePosStore.getState();
+    const rawUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
+    let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
+    
+    if (apiUrl) {
+      const socket = io(apiUrl, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+      });
+
+      socket.on('connect', () => {
+        console.log('[Socket] Connected to POS Server for real-time sync');
+      });
+
+      // Receive downward sync from Cloud or other POS terminals
+      socket.on('cloud_sync_received', (data) => {
+        console.log('[Socket] Received real-time sync data:', data);
+        usePosStore.getState().pullDeltaFromServer(); // Trigger a pull to fetch new data
+      });
+
+      socket.on('stock_updated', (data) => {
+        console.log('[Socket] Stock updated remotely:', data);
+        usePosStore.getState().pullDeltaFromServer();
+      });
+
+      return () => {
+        socket.disconnect();
+      };
     }
   }, []);
 

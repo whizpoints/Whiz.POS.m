@@ -1,6 +1,10 @@
 // @ts-nocheck
 import 'dotenv/config';
 import express from 'express';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import { io as ClientIO } from 'socket.io-client';
+
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -37,6 +41,64 @@ import { wafMiddleware } from './middleware/waf.js';
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+
+// 1. Local Socket.io Server (for POS Desktop Apps)
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('[Local Socket] POS Client connected:', socket.id);
+  
+  socket.on('stock_deducted', (data) => {
+    // Broadcast stock updates to other local POS terminals
+    socket.broadcast.emit('stock_updated', data);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('[Local Socket] POS Client disconnected:', socket.id);
+  });
+});
+app.set('io', io);
+
+// 2. Cloud Socket.io Client (Connects to Web Portal)
+const CLOUD_URL = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+let cloudSocket;
+try {
+  cloudSocket = ClientIO(CLOUD_URL, {
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 5000,
+  });
+
+  cloudSocket.on('connect', async () => {
+    console.log('[Cloud Socket] Connected to Cloud Server');
+    try {
+      // Find business ID to join room
+      const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
+      if (location && location.businessId) {
+        cloudSocket.emit('join_business', location.businessId);
+      }
+    } catch (err) {}
+  });
+
+  cloudSocket.on('downward_sync_event', (data) => {
+    console.log('[Cloud Socket] Received downward sync event:', data);
+    // Notify local POS apps immediately
+    io.emit('cloud_sync_received', data);
+  });
+
+  cloudSocket.on('disconnect', () => {
+    console.log('[Cloud Socket] Disconnected from Cloud Server');
+  });
+} catch(e) {
+  console.error('[Cloud Socket] Initialization failed', e);
+}
+
 const PORT = process.env.PORT || 5050;
 
 // Enable CORS for all origins dynamically (needed for Electron desktop POS clients with credentials)
@@ -140,16 +202,50 @@ app.use((req, res, next) => {
 // -----------------------------------------
 setInterval(async () => {
   try {
-    // 1. Fetch pending receipts/stock movements from SQLite
-    // 2. Send to https://api.whizpoint.app/api/sync/up
-    // 3. Mark as synced locally
-    // console.log('[Sync Engine] Background sync completed.');
-  } catch (err) {
-    console.error('[Sync Engine] Background sync failed:', err);
-  }
-}, 60000); // Run every 60 seconds
+    const CLOUD_API = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+    const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
+    if (!location || !location.apiKey) return;
 
-app.listen(Number(PORT), '0.0.0.0', () => {
+    // 1. Fetch pending receipts from SQLite
+    const pendingReceipts = await db.selectFrom('Receipt')
+      .selectAll()
+      .where('synced', '=', 0) // Assume synced column is integer 0 or 1
+      .execute();
+      
+    if (pendingReceipts.length === 0) return;
+    
+    // Fetch items for pending receipts
+    for (const receipt of pendingReceipts) {
+      receipt.items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', '=', receipt.id).execute();
+    }
+
+    // 2. Send to Cloud REST API
+    const res = await fetch(`${CLOUD_API}/api/sync/sales`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${location.apiKey}` // Or x-api-key based on auth logic
+      },
+      body: JSON.stringify({ receipts: pendingReceipts })
+    });
+    
+    if (res.ok) {
+      // 3. Mark as synced locally
+      for (const receipt of pendingReceipts) {
+        await db.updateTable('Receipt').set({ synced: 1 }).where('id', '=', receipt.id).execute();
+      }
+      console.log(`[Sync Engine] Successfully synced ${pendingReceipts.length} receipts to cloud.`);
+      
+      if (cloudSocket && cloudSocket.connected) {
+         cloudSocket.emit('local_transaction_synced', { businessId: location.businessId, count: pendingReceipts.length });
+      }
+    }
+  } catch (err) {
+    // console.error('[Sync Engine] Background sync failed:', err.message);
+  }
+}, 60000); // Run every 60 seconds // Run every 60 seconds
+
+server.listen(Number(PORT), '0.0.0.0', () => {
   if (Number(PORT) === 3000) {
     console.log(`🚀 Cloud Web App (Back Office) running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   } else {

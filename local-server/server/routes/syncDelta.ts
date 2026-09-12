@@ -614,6 +614,13 @@ router.post('/', async (req: any, res: any) => {
         console.error('Failed to write sync log', err);
       }
 
+      
+      const io = req.app.get('io');
+      if (io) {
+        // Broadcast to all connected local POS terminals that data has changed
+        io.emit('stock_updated', { timestamp: new Date().toISOString() });
+      }
+
       res.json({
         success: true,
         timestamp: new Date().toISOString(),
