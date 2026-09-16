@@ -71,8 +71,9 @@ io.on('connection', (socket) => {
 
 // Expose io to the app for use in routes
 app.set('io', io);
-
-const PORT = process.env.PORT || 5050;
+// Run on 5050 in Vite dev mode so Vite can occupy 3000
+const isViteDev = process.argv.includes('--dev');
+const PORT = isViteDev ? 5050 : (process.env.PORT || 3000);
 
 // Enable CORS for all origins dynamically (needed for Electron desktop POS clients with credentials)
 app.use(cors({

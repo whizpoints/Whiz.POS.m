@@ -5,11 +5,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    port: 3000,
     allowedHosts: ['api.whizpoint.app', 'localhost', '127.0.0.1'],
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5050',
         changeOrigin: true,
       }
     }

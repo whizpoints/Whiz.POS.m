@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, Building2, ArrowRight, Eye, EyeOff, Search, User, LogOut, CheckCircle2, ShieldCheck, Activity, CreditCard, PieChart } from 'lucide-react';
+import { Mail, Lock, Building2, ArrowRight, Eye, EyeOff, LogOut, CheckCircle2, ShieldCheck, Activity, CreditCard, PieChart } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function AuthPage() {
