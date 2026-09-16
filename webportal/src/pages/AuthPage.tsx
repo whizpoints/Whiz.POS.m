@@ -8,6 +8,7 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -112,12 +113,11 @@ export default function AuthPage() {
   };
 
   const handleLogout = () => {
-    if (window.confirm('Are you sure you want to sign out of your WhizPOS account?')) {
-      localStorage.removeItem('whiz-token');
-      localStorage.removeItem('whiz-user');
-      setActiveSession(null);
-      toast("You've been signed out successfully.", { icon: '👋' });
-    }
+    localStorage.removeItem('whiz-token');
+    localStorage.removeItem('whiz-user');
+    setActiveSession(null);
+    setShowLogoutConfirm(false);
+    toast("You've been signed out successfully.", { icon: '👋' });
   };
 
   // Modern UI Colors based on Prompt Guidelines
@@ -306,7 +306,7 @@ export default function AuthPage() {
                   )}
 
                   <button 
-                     onClick={handleLogout} 
+                     onClick={() => setShowLogoutConfirm(true)} 
                      className="w-full bg-white text-red-600 font-semibold text-[15px] h-[54px] rounded-[14px] hover:bg-red-50 transition-all flex items-center justify-center gap-2 active:scale-[0.98] mt-2"
                   >
                       <LogOut className="w-4 h-4" />
@@ -508,6 +508,35 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
+
+      {/* Modern Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#07183F]/40 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm rounded-[24px] p-6 sm:p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-5 border border-red-100">
+              <LogOut className="w-7 h-7" />
+            </div>
+            <h3 className="text-xl font-black text-[#10182B] text-center mb-2">Sign out?</h3>
+            <p className="text-[#64748B] text-center text-[15px] font-medium mb-8">
+              Are you sure you want to sign out of your WhizPOS account?
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleLogout}
+                className="w-full bg-red-600 text-white font-semibold text-[15px] h-[50px] rounded-[14px] hover:bg-red-700 transition-all active:scale-[0.98] shadow-sm shadow-red-200"
+              >
+                Sign Out
+              </button>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="w-full bg-white text-[#10182B] font-semibold text-[15px] h-[50px] rounded-[14px] border border-[#E5EAF2] hover:bg-[#F7F9FC] transition-all active:scale-[0.98]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
