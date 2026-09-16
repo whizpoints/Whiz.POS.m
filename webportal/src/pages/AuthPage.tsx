@@ -16,17 +16,21 @@ export default function AuthPage() {
     password: ''
   });
 
+  const [activeSession, setActiveSession] = useState<any>(null);
+
   // Handle OAuth Redirect & Existing Sessions
   React.useEffect(() => {
     // Check if already logged in
     const existingToken = localStorage.getItem('whiz-token');
     const existingUser = localStorage.getItem('whiz-user');
     if (existingToken && existingUser) {
-      let userName = 'User';
-      try { userName = JSON.parse(existingUser).name || 'User'; } catch (e) {}
-      toast(`Already logged in as ${userName}. Redirecting to dashboard...`, { icon: '👋' });
-      navigate('/dashboard');
-      return;
+      try { 
+        const userObj = JSON.parse(existingUser);
+        setActiveSession(userObj);
+      } catch (e) {
+        localStorage.removeItem('whiz-token');
+        localStorage.removeItem('whiz-user');
+      }
     }
 
     const params = new URLSearchParams(window.location.search);
@@ -79,6 +83,40 @@ export default function AuthPage() {
       setIsLoading(false);
     }
   };
+
+  if (activeSession) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+         <div className="bg-white p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] max-w-md w-full text-center border border-slate-100">
+            <div className="w-20 h-20 bg-sky-50 text-sky-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Building2 className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Active Session</h2>
+            <p className="text-slate-500 mb-8 text-sm">
+               You are already signed in as <span className="font-bold text-slate-700">{activeSession.name || activeSession.email}</span>.
+            </p>
+            <div className="flex flex-col gap-3">
+               <button 
+                  onClick={() => navigate('/dashboard')} 
+                  className="w-full bg-sky-600 text-white font-bold py-3.5 rounded-xl hover:bg-sky-700 transition-all shadow-md shadow-sky-200"
+               >
+                   Continue to Dashboard
+               </button>
+               <button 
+                  onClick={() => {
+                   localStorage.removeItem('whiz-token');
+                   localStorage.removeItem('whiz-user');
+                   setActiveSession(null);
+                  }} 
+                  className="w-full bg-white text-slate-600 font-bold py-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all"
+               >
+                   Use another account
+               </button>
+            </div>
+         </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex bg-white font-sans selection:bg-sky-500/30 selection:text-sky-900">
