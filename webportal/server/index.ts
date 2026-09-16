@@ -87,6 +87,31 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Apply Security WAF & Rate-Limiter Middleware
 app.use(wafMiddleware);
 
+// Global Suspension Check Middleware
+app.use(async (req, res, next) => {
+  if (req.path.startsWith('/api/') && req.headers.authorization && !req.path.includes('/auth') && !req.path.includes('/admin')) {
+     const token = req.headers.authorization.split(' ')[1];
+     try {
+       const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+       const jwt = await import('jsonwebtoken');
+       const decoded = jwt.default.verify(token, JWT_SECRET) as any;
+       if (decoded.businessId) {
+         const b = await prisma.business.findUnique({ where: { id: decoded.businessId }, select: { settings: true } });
+         if (b && b.settings) {
+           let settings = b.settings as any;
+           if (typeof settings === 'string') settings = JSON.parse(settings);
+           if (settings.isSuspended) {
+             return res.status(403).json({ error: 'ACCOUNT_SUSPENDED', message: 'Your business account has been suspended.' });
+           }
+         }
+       }
+     } catch(e) {
+        // Let the individual routes handle invalid tokens
+     }
+  }
+  next();
+});
+
 // (Static files are served later below)
 
 // API Routes

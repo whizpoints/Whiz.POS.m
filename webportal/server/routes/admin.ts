@@ -70,4 +70,39 @@ router.delete('/businesses/:id', requireSuperAdmin, async (req, res) => {
     }
 });
 
+// TOGGLE Suspend a business
+router.post('/businesses/:id/suspend', requireSuperAdmin, async (req, res) => {
+    try {
+        const businessId = req.params.id;
+        const { suspend } = req.body;
+        
+        if (req.user.businessId === businessId) {
+            return res.status(400).json({ error: 'Cannot suspend your own business' });
+        }
+
+        const business = await prisma.business.findUnique({ where: { id: businessId } });
+        if (!business) return res.status(404).json({ error: 'Business not found' });
+        
+        let settings = business.settings as any || {};
+        if (typeof settings === 'string') settings = JSON.parse(settings);
+        
+        settings.isSuspended = suspend;
+
+        await prisma.business.update({ 
+            where: { id: businessId }, 
+            data: { settings } 
+        });
+        
+        // If suspended, emit a global disconnect event to kick them out instantly
+        if (suspend && req.app.get('io')) {
+            req.app.get('io').to(`business_${businessId}`).emit('account_suspended');
+        }
+
+        res.json({ success: true, message: `Business ${suspend ? 'suspended' : 'reactivated'} successfully` });
+    } catch (error) {
+        console.error('Suspend business error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;

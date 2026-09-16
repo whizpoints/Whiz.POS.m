@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, Building2, ArrowRight, Eye, EyeOff, LogOut, CheckCircle2, ShieldCheck, Activity, CreditCard, PieChart } from 'lucide-react';
+import { Mail, Lock, Building2, ArrowRight, Eye, EyeOff, LogOut, CheckCircle2, ShieldCheck, Activity, CreditCard, PieChart, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function AuthPage() {
@@ -10,6 +10,8 @@ export default function AuthPage() {
   const [isSwitching, setIsSwitching] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
+  const isSuspended = searchParams.get('suspended') === 'true';
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -226,6 +228,20 @@ export default function AuthPage() {
 
         <div className="w-full max-w-[440px] mx-auto pt-16 lg:pt-0 pb-8">
           
+          {isSuspended && (
+            <div className="mb-6 p-4 bg-[#FF2A55]/10 border border-[#FF2A55]/20 rounded-[16px] flex items-start gap-3 animate-in fade-in slide-in-from-top-4">
+              <div className="w-8 h-8 rounded-full bg-[#FF2A55]/20 flex items-center justify-center shrink-0 mt-0.5">
+                <AlertTriangle className="w-4 h-4 text-[#FF2A55]" />
+              </div>
+              <div>
+                <h3 className="text-[#FF2A55] font-bold text-sm">Account Suspended</h3>
+                <p className="text-[#64748B] text-[13px] mt-1 leading-snug">
+                  Your business account has been suspended by the platform administrator. You have been automatically signed out. Please contact support to resolve this issue.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* 1. ALREADY SIGNED IN STATE */}
           {activeSession ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">

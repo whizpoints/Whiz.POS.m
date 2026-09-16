@@ -10,6 +10,26 @@ document.addEventListener('wheel', (_event) => {
   }
 }, { passive: false });
 
+// Global Fetch Interceptor for Account Suspension
+const originalFetch = window.fetch;
+window.fetch = async (...args) => {
+  const response = await originalFetch(...args);
+  if (response.status === 403) {
+    try {
+      const cloned = response.clone();
+      const data = await cloned.json();
+      if (data?.error === 'ACCOUNT_SUSPENDED') {
+        localStorage.removeItem('whiz-token');
+        localStorage.removeItem('whiz-user');
+        window.location.href = '/auth?suspended=true';
+      }
+    } catch (e) {
+      // Ignore if not JSON
+    }
+  }
+  return response;
+};
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
