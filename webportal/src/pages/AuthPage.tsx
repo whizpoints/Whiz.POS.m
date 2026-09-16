@@ -84,39 +84,7 @@ export default function AuthPage() {
     }
   };
 
-  if (activeSession) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-         <div className="bg-white p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] max-w-md w-full text-center border border-slate-100">
-            <div className="w-20 h-20 bg-sky-50 text-sky-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Building2 className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Active Session</h2>
-            <p className="text-slate-500 mb-8 text-sm">
-               You are already signed in as <span className="font-bold text-slate-700">{activeSession.name || activeSession.email}</span>.
-            </p>
-            <div className="flex flex-col gap-3">
-               <button 
-                  onClick={() => navigate('/dashboard')} 
-                  className="w-full bg-sky-600 text-white font-bold py-3.5 rounded-xl hover:bg-sky-700 transition-all shadow-md shadow-sky-200"
-               >
-                   Continue to Dashboard
-               </button>
-               <button 
-                  onClick={() => {
-                   localStorage.removeItem('whiz-token');
-                   localStorage.removeItem('whiz-user');
-                   setActiveSession(null);
-                  }} 
-                  className="w-full bg-white text-slate-600 font-bold py-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all"
-               >
-                   Use another account
-               </button>
-            </div>
-         </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen w-full flex bg-white font-sans selection:bg-sky-500/30 selection:text-sky-900">
@@ -186,14 +154,47 @@ export default function AuthPage() {
 
         <div className="w-full max-w-[420px] mx-auto pt-16 lg:pt-0">
           
-          <div className="mb-10">
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 tracking-tight">
-              {isLogin ? 'Welcome back' : 'Create account'}
-            </h2>
-            <p className="text-slate-500 font-medium text-base">
-              {isLogin ? 'Enter your details to access your dashboard.' : 'Start managing your retail empire today.'}
-            </p>
-          </div>
+          {activeSession ? (
+            <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <div className="w-20 h-20 bg-sky-50 text-sky-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-sky-100">
+                   <Building2 className="w-10 h-10" />
+               </div>
+               <h2 className="text-3xl font-black text-slate-900 mb-3 tracking-tight">Active Session</h2>
+               <p className="text-slate-500 font-medium text-base mb-10">
+                  You are signed in as <span className="font-bold text-slate-800">{activeSession.email}</span>
+                  {activeSession.role && <span className="inline-block ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-xs font-bold uppercase tracking-wider">{activeSession.role}</span>}
+               </p>
+
+               <div className="flex flex-col gap-4">
+                  <button 
+                     onClick={() => navigate('/dashboard')} 
+                     className="w-full bg-sky-600 text-white font-bold py-4 rounded-xl hover:bg-sky-700 transition-all shadow-[0_8px_20px_rgba(2,132,199,0.2)] hover:shadow-[0_12px_25px_rgba(2,132,199,0.3)] hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                  >
+                      <span>Continue to Dashboard</span>
+                      <ArrowRight className="w-5 h-5" />
+                  </button>
+                  <button 
+                     onClick={() => {
+                      localStorage.removeItem('whiz-token');
+                      localStorage.removeItem('whiz-user');
+                      setActiveSession(null);
+                     }} 
+                     className="w-full bg-white text-slate-600 font-bold py-4 rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all hover:-translate-y-0.5"
+                  >
+                      Sign in with another account
+                  </button>
+               </div>
+            </div>
+          ) : (
+            <>
+            <div className="mb-10">
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 tracking-tight">
+                {isLogin ? 'Welcome back' : 'Create account'}
+              </h2>
+              <p className="text-slate-500 font-medium text-base">
+                {isLogin ? 'Enter your details to access your dashboard.' : 'Start managing your retail empire today.'}
+              </p>
+            </div>
 
           {/* Ultra Modern Mode Switcher */}
           <div className="flex p-1 bg-slate-100/70 rounded-[1.25rem] mb-8 border border-slate-200/50 relative">
@@ -339,6 +340,8 @@ export default function AuthPage() {
           <div className="mt-12 text-center text-[13px] text-slate-500 font-medium">
             By proceeding, you agree to our <Link to="/terms" className="font-bold text-slate-900 hover:text-sky-600 transition-colors">Terms of Service</Link> and <Link to="/privacy" className="font-bold text-slate-900 hover:text-sky-600 transition-colors">Privacy Policy</Link>.
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
