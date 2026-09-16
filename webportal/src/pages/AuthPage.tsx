@@ -37,13 +37,18 @@ export default function AuthPage() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const userStr = params.get('user');
-    if (token && userStr) {
-      try {
-        localStorage.setItem('whiz-token', token);
-        localStorage.setItem('whiz-user', userStr);
-        toast.success('Successfully logged in!');
-        navigate('/dashboard');
-      } catch (e) {
+      if (token && userStr) {
+        try {
+          localStorage.setItem('whiz-token', token);
+          localStorage.setItem('whiz-user', userStr);
+          toast.success('Successfully logged in!');
+          const parsed = JSON.parse(userStr);
+          if (parsed?.isSuperAdmin) {
+            navigate('/admin');
+          } else {
+            navigate('/dashboard');
+          }
+        } catch (e) {
         console.error(e);
       }
     }
@@ -77,7 +82,11 @@ export default function AuthPage() {
         toast.success('Successfully logged in with Google!', { icon: '👏' });
         
         window.removeEventListener('message', messageListener);
-        navigate('/dashboard');
+        if (user?.isSuperAdmin) {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       }
     };
     
@@ -103,7 +112,11 @@ export default function AuthPage() {
         localStorage.setItem('whiz-token', data.token);
         localStorage.setItem('whiz-user', JSON.stringify(data.user));
         toast.success(isLogin ? 'Successfully logged in!' : 'Workspace created successfully!', { icon: '👏' });
-        navigate('/dashboard');
+        if (data.user?.isSuperAdmin) {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         toast.error(data.error || 'Authentication failed');
       }
@@ -293,7 +306,7 @@ export default function AuthPage() {
                {/* Actions */}
                <div className="flex flex-col gap-3">
                   <button 
-                     onClick={() => navigate('/dashboard')} 
+                     onClick={() => activeSession?.isSuperAdmin ? navigate('/admin') : navigate('/dashboard')} 
                      className="w-full text-white font-semibold text-[15px] h-[54px] rounded-[14px] transition-all flex items-center justify-center gap-2 shadow-[0_8px_16px_rgba(10,158,245,0.2)] hover:shadow-[0_12px_24px_rgba(10,158,245,0.3)] hover:-translate-y-0.5 active:scale-[0.98]"
                      style={{ backgroundColor: colors.primaryBlue }}
                   >
