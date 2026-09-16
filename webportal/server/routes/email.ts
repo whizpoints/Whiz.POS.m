@@ -152,7 +152,7 @@ router.post('/test', authenticate, async (req: any, res: any) => {
     
     const fullHtml = generateEmailHtml(businessName, logoUrl, contentHtml, settings.emailFrom);
     const mailOptions = {
-      from: `"${businessName}" <${settings.emailFrom}>`,
+      from: `"${businessName} via WhizPOS" <notifications@whizpoint.app>`,
       to: settings.emailFrom,
       replyTo: settings.emailReplyTo || settings.emailFrom,
       subject: 'WhizPOS - Test Email Configuration',
@@ -238,7 +238,7 @@ router.post('/send-receipt', authenticate, async (req: any, res: any) => {
     </div>
     `;
 
-    const mailOptions = { from: `"${businessName}" <${settings.emailFrom}>`, to: recipientEmail, replyTo: settings.emailReplyTo || settings.emailFrom, subject: `Receipt #${transaction.receiptNumber} from ${businessName}`, html: generateEmailHtml(businessName, logoUrl, htmlContent, settings.emailFrom) };
+    const mailOptions = { from: `"${businessName} via WhizPOS" <receipts@whizpoint.app>`, to: recipientEmail, replyTo: settings.emailReplyTo || settings.emailFrom, subject: `Receipt #${transaction.receiptNumber} from ${businessName}`, html: generateEmailHtml(businessName, logoUrl, htmlContent, settings.emailFrom) };
 
     await dispatchEmail(transporter, settings, mailOptions);
     res.json({ success: true, message: 'Receipt sent successfully' });
@@ -278,7 +278,7 @@ router.post('/send-custom', authenticate, async (req: any, res: any) => {
     }
 
     const mailOptions = {
-      from: `"${businessName}" <${settings.emailFrom}>`,
+      from: `"${businessName} via WhizPOS" <notifications@whizpoint.app>`,
       to,
       replyTo: settings.emailReplyTo || settings.emailFrom,
       subject: subject || (isRichTemplate ? `${richPayload.document?.type.replace(/_/g, ' ')} from ${businessName}` : 'Message'),

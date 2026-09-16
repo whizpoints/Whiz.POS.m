@@ -14,7 +14,7 @@ const transporter = nodemailer.createTransport({
 
 export const sendReceiptEmail = async (toEmail: string, customerName: string, receiptNumber: string, totalAmount: number, receiptUrl: string, businessEmail: string) => {
   const mailOptions = {
-    from: `"${process.env.BREVO_FROM_NAME}" <${process.env.BREVO_RECEIPTS_FROM_EMAIL}>`,
+    from: `"WhizPOS Receipts" <receipts@whizpoint.app>`,
     to: toEmail,
     replyTo: businessEmail,
     subject: `Your Receipt #${receiptNumber}`,

@@ -92,7 +92,7 @@ router.post('/register', async (req, res) => {
     
     try {
       await transporter.sendMail({
-        from: '"Whiz POS" <noreply@whizpoint.app>',
+        from: '"WhizPOS Accounts" <noreply@whizpoint.app>',
         to: email,
         subject: 'Verify your Whiz POS Account',
         html: `
@@ -194,8 +194,8 @@ router.post('/resend-verification', async (req, res) => {
       data: { verificationToken }
     });
 
-    const fromName = process.env.BREVO_FROM_NAME || 'Whiz POS';
-    const fromEmail = process.env.BREVO_FROM_EMAIL || 'support@whizpoint.app';
+    const fromName = 'WhizPOS Support';
+    const fromEmail = 'support@whizpoint.app';
     const baseUrl = process.env.VITE_API_BASE_URL || (req.headers.origin || 'https://backoffice.whizpoint.app');
 
     try {
@@ -286,7 +286,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const superAdmins = (process.env.SUPER_ADMIN_EMAILS || 'admin@pos.whizpoint.app').split(',').map(e => e.trim());
+    const superAdmins = (process.env.SUPER_ADMIN_EMAILS || 'admin@whizpoint.app').split(',').map(e => e.trim());
     const isSuperAdmin = superAdmins.includes(user.email);
 
     const token = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role, isSuperAdmin }, JWT_SECRET, { expiresIn: '3h' });
@@ -583,7 +583,7 @@ router.get('/google/callback', async (req, res) => {
       ));
     }
 
-    const superAdmins = (process.env.SUPER_ADMIN_EMAILS || 'admin@pos.whizpoint.app').split(',').map(e => e.trim());
+    const superAdmins = (process.env.SUPER_ADMIN_EMAILS || 'admin@whizpoint.app').split(',').map(e => e.trim());
     const isSuperAdmin = superAdmins.includes(user.email);
 
     // 4. Generate JWT
