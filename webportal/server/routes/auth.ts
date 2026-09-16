@@ -595,8 +595,27 @@ router.get('/google/callback', async (req, res) => {
       businessId: user.businessId
     };
 
-    // 5. Redirect back to correct frontend
-    res.redirect(`${frontendOrigin}/auth?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(userPayload))}`);
+    // 5. Send back HTML that will postMessage to the popup opener and close, or redirect if no opener
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head><title>Authenticating...</title></head>
+      <body>
+        <script>
+          const token = "${token}";
+          const user = ${JSON.stringify(userPayload)};
+          
+          if (window.opener) {
+            window.opener.postMessage({ type: 'OAUTH_SUCCESS', token, user }, '*');
+            window.close();
+          } else {
+            window.location.href = "${frontendOrigin}/auth?token=" + encodeURIComponent(token) + "&user=" + encodeURIComponent(JSON.stringify(user));
+          }
+        </script>
+      </body>
+      </html>
+    `;
+    res.send(html);
 
   } catch (error) {
     console.error('OAuth error:', error);
