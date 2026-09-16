@@ -360,6 +360,15 @@ function DashboardLayout({ children }: { children: ReactNode }) {
     },
   ];
 
+  if (user?.isSuperAdmin) {
+    navGroups.push({
+      label: 'God Mode',
+      items: [
+        { to: '/admin', icon: <ShieldCheck className="text-[#00F0FF]" />, label: 'Platform Admin' },
+      ],
+    });
+  }
+
   const breadcrumb = (() => {
     const path = location.pathname;
     const crumbs: { label: string; to?: string }[] = [{ label: 'Back Office', to: '/dashboard' }];

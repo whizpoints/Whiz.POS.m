@@ -286,9 +286,12 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role }, JWT_SECRET, { expiresIn: '3h' });
+    const superAdmins = (process.env.SUPER_ADMIN_EMAILS || 'admin@pos.whizpoint.app').split(',').map(e => e.trim());
+    const isSuperAdmin = superAdmins.includes(user.email);
 
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId }, business: user.business });
+    const token = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role, isSuperAdmin }, JWT_SECRET, { expiresIn: '3h' });
+
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId, isSuperAdmin }, business: user.business });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -580,9 +583,12 @@ router.get('/google/callback', async (req, res) => {
       ));
     }
 
+    const superAdmins = (process.env.SUPER_ADMIN_EMAILS || 'admin@pos.whizpoint.app').split(',').map(e => e.trim());
+    const isSuperAdmin = superAdmins.includes(user.email);
+
     // 4. Generate JWT
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role, businessId: user.businessId },
+      { userId: user.id, email: user.email, role: user.role, businessId: user.businessId, isSuperAdmin },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -592,7 +598,8 @@ router.get('/google/callback', async (req, res) => {
       email: user.email,
       name: user.name,
       role: user.role,
-      businessId: user.businessId
+      businessId: user.businessId,
+      isSuperAdmin
     };
 
     // 5. Send back HTML that will postMessage to the popup opener and close, or redirect if no opener

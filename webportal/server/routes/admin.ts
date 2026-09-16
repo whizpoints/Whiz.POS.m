@@ -17,8 +17,8 @@ const requireSuperAdmin = async (req: any, res: any, next: any) => {
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, JWT_SECRET) as any;
         
-        if (decoded.role !== 'ADMIN') {
-            return res.status(403).json({ error: 'Forbidden' });
+        if (!decoded.isSuperAdmin) {
+            return res.status(403).json({ error: 'Forbidden: Super Admin Access Required' });
         }
         
         req.user = decoded;
