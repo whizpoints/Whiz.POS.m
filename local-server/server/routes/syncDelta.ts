@@ -128,10 +128,7 @@ router.get('/', async (req: any, res: any) => {
     if (locationId) stockQuery = stockQuery.where('locationId', '=', String(locationId));
     if (outletId) stockQuery = stockQuery.where((eb) => eb.or([ eb('outletId', '=', String(outletId)), eb('outletId', 'is', null) ]));
 
-    const [
-      users, products, categories, rawInventory, stockMovements, customers, suppliers, 
-      businessData, outlets, rawOutlets
-    ] = await Promise.all([
+    const [ users, products, categories, rawInventory, stockMovements, customers, suppliers, businessData, outlets, rawOutlets ] = await Promise.all([
       usersQuery.execute(),
       productsQuery.execute(),
       db.selectFrom('Category').selectAll().where('businessId', '=', businessId).where('updatedAt', '>', sinceDate.toISOString()).execute(),
@@ -207,16 +204,7 @@ router.get('/', async (req: any, res: any) => {
 router.post('/', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const {
-      users,
-      products,
-      customers,
-      suppliers,
-      transactions,
-      stockMovements,
-      businessSetup,
-      documents
-    } = req.body;
+    const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, businessSetup, documents } = req.body;
 
     let targetLocationId: string | null = null;
     let targetOutletId: string | null = null;
@@ -397,6 +385,43 @@ router.post('/', async (req: any, res: any) => {
           }
        }
     }
+
+      // 3.5 Product Inventory (Absolute from Cloud)
+      if (inventory && Array.isArray(inventory)) {
+         for (const inv of inventory) {
+            if (!inv.productId) continue;
+            
+            const existing = await db.selectFrom('ProductInventory')
+                .selectAll()
+                .where('productId', '=', inv.productId)
+                .where('locationId', 'is', inv.locationId || null)
+                .where('outletId', 'is', inv.outletId || null)
+                .executeTakeFirst();
+            
+            if (resolveConflict(inv, existing)) {
+                if (existing) {
+                    await db.updateTable('ProductInventory')
+                        // @ts-ignore
+                        .set({ stock: Number(inv.stock) || 0, updatedAt: (inv.updatedAt ? new Date(inv.updatedAt) : new Date()).toISOString() })
+                        .where('id', '=', existing.id).execute();
+                } else {
+                    await db.insertInto('ProductInventory')
+                        // @ts-ignore
+                        .values({
+                            id: inv.id || randomUUID(),
+                            productId: inv.productId,
+                            locationId: inv.locationId || targetLocationId || null,
+                            outletId: inv.outletId || targetOutletId || null,
+                            stock: Number(inv.stock) || 0,
+                            updatedAt: (inv.updatedAt ? new Date(inv.updatedAt) : new Date()).toISOString()
+                        }).execute();
+                }
+                results.inventory++;
+            } else {
+                results.skipped++;
+            }
+         }
+      }
 
     // 4. Transactions (Sales)
     if (transactions && Array.isArray(transactions)) {

@@ -1,5 +1,6 @@
-import { Building2, Monitor, Server, Link as LinkIcon, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Copy, Building2, Monitor, Server, Link as LinkIcon, RefreshCw, ShieldCheck } from 'lucide-react';
 import OutletsManager from '../components/Settings/OutletsManager';
+import LocationManager from '../components/Settings/LocationManager';
 import TerminalManager from '../components/Settings/TerminalManager';
 import { useBranchContext } from '../context/BranchContext';
 import { useState } from 'react';
@@ -9,6 +10,12 @@ export default function OutletsDevices() {
   const { activeLocationId } = useBranchContext();
   const [isGenerating, setIsGenerating] = useState(false);
   const [pairingData, setPairingData] = useState<{ pairingCode: string, apiKey: string } | null>(null);
+
+  const handleCopy = (text: string, type: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(type + ' copied to clipboard!');
+  };
+
 
   const generatePairingCode = async () => {
     if (!activeLocationId || activeLocationId === 'ALL') {
@@ -61,6 +68,10 @@ export default function OutletsDevices() {
       </div>
 
       <div className="space-y-8">
+        <div className="glass-panel p-6 rounded-2xl border border-slate-200 mb-8">
+          <LocationManager />
+        </div>
+
         {/* Active Outlets Section */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -107,13 +118,23 @@ export default function OutletsDevices() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl animate-in slide-in-from-top-4">
                   <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="text-xs font-bold text-slate-500 uppercase mb-1">Permanent API Key</div>
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="text-xs font-bold text-slate-500 uppercase">Permanent API Key</div>
+                      <button onClick={() => handleCopy(pairingData.apiKey, 'API Key')} className="text-sky-500 hover:text-sky-600 bg-sky-50 hover:bg-sky-100 p-1 rounded-md transition-colors">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <div className="font-mono text-sm text-slate-800 break-all bg-slate-50 p-2 rounded-lg border border-slate-100">
                       {pairingData.apiKey}
                     </div>
                   </div>
                   <div className="bg-white p-4 rounded-xl border border-sky-200 shadow-sm shadow-sky-500/10">
-                    <div className="text-xs font-bold text-sky-600 uppercase mb-1">Temporary Pairing Code</div>
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="text-xs font-bold text-sky-600 uppercase">Temporary Pairing Code</div>
+                      <button onClick={() => handleCopy(pairingData.pairingCode, 'Pairing Code')} className="text-sky-500 hover:text-sky-600 bg-sky-50 hover:bg-sky-100 p-1 rounded-md transition-colors">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <div className="font-mono text-3xl tracking-[0.25em] text-slate-900 font-black">
                       {pairingData.pairingCode}
                     </div>

@@ -212,7 +212,7 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
           {/* --- CLIENT --- */}
           <div className="px-8 py-6">
              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                {isLetter ? 'To:' : 'Bill To:'}
+                {type === 'QUOTATION' ? 'Quote To:' : (type === 'INVOICE' ? 'Invoice To:' : 'To:')}
              </h3>
              <div className="text-base font-bold text-slate-800">{data.clientCompany}</div>
              <div className="text-slate-600 text-sm whitespace-pre-line">
@@ -225,6 +225,11 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
           {/* --- CONTENT: TRANSACTIONAL --- */}
           {isTransactional && (
             <div className="px-8 flex-1">
+              {data.subject && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-1">{data.subject}</h4>
+                </div>
+              )}
               <table className="w-full text-left border-collapse">
                  <thead>
                     <tr className="border-b-2 border-sky-900 text-sm">

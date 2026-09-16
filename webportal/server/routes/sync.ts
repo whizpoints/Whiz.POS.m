@@ -12,15 +12,20 @@ const authenticate = async (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
   const apiKey = req.headers['x-api-key'];
 
-  if (apiKey) {
-    const business = await prisma.business.findFirst({ where: { apiKey } });
-    if (!business) {
+      if (apiKey) {
+      const business = await prisma.business.findFirst({ where: { apiKey } });
+      if (business) {
+        req.user = { businessId: business.id };
+        return next();
+      }
+      const storeLoc = await prisma.storeLocation.findFirst({ where: { apiKey } });
+      if (storeLoc) {
+        req.user = { businessId: storeLoc.businessId, locationId: storeLoc.id };
+        return next();
+      }
       console.log(`[Auth] Invalid API Key provided: ${apiKey}`);
       return res.status(401).json({ error: 'Invalid API Key' });
     }
-    req.user = { businessId: business.id };
-    return next();
-  }
 
   if (!authHeader) {
     console.log('[Auth] Missing authorization header or API key');

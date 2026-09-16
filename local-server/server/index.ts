@@ -203,8 +203,113 @@ app.use((req, res, next) => {
 setInterval(async () => {
   try {
     const CLOUD_API = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+    const business = await db.selectFrom('Business').selectAll().executeTakeFirst();
     const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
-    if (!location || !location.apiKey) return;
+    if (!business || !business.apiKey || !location) return;
+    const apiKey = business.apiKey;
+
+    // --- NEW: PUSH DELTA TO CLOUD ---
+    try {
+      const lastPushLog = await db.selectFrom('SyncLog')
+          .selectAll()
+          .where('type', '=', 'PUSH_DELTA')
+          .orderBy('createdAt', 'desc')
+          .executeTakeFirst();
+      
+      const pushSinceStr = lastPushLog ? new Date(lastPushLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
+      
+      const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements] = await Promise.all([
+         db.selectFrom('User').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+         db.selectFrom('Product').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+         db.selectFrom('Customer').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+         db.selectFrom('Supplier').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+         db.selectFrom('StockMovement').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+      ]);
+
+      if (localUsers.length > 0 || localProducts.length > 0 || localCustomers.length > 0 || localStockMovements.length > 0 || pushSinceStr === "1970-01-01T00:00:00.000Z") {
+          console.log(`[Sync Engine] Pushing ${localProducts.length} products, ${localUsers.length} users, ${localStockMovements.length} inventory logs to Cloud`);
+          
+          const businessSetup = business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {};
+          businessSetup.businessName = business.name;
+          businessSetup.locationId = location.id;
+
+          const pushRes = await fetch(`${CLOUD_API}/api/sync/delta`, {
+              method: 'POST',
+              headers: {
+                  'x-api-key': apiKey,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  users: localUsers,
+                  products: localProducts,
+                  customers: localCustomers,
+                  suppliers: localSuppliers,
+                  inventoryLogs: localStockMovements.map(sm => ({ ...sm, variance: sm.quantity })), // Map local quantity to cloud variance
+                  businessSetup
+              })
+          });
+
+          if (pushRes.ok) {
+              await db.insertInto('SyncLog').values({
+                  type: 'PUSH_DELTA',
+                  createdAt: new Date().toISOString()
+              }).execute();
+              console.log(`[Sync Engine] PUSH_DELTA successful.`);
+          }
+      }
+    } catch (e) {
+      console.error('[Sync Engine] PUSH_DELTA failed:', e.message);
+    }
+
+    // --- NEW: PULL DELTA FROM CLOUD ---
+    try {
+      const lastPullLog = await db.selectFrom('SyncLog')
+          .selectAll()
+          .where('type', '=', 'PULL_DELTA')
+          .orderBy('createdAt', 'desc')
+          .executeTakeFirst();
+      
+      const pullSinceStr = lastPullLog ? new Date(lastPullLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
+      
+      const pullRes = await fetch(`${CLOUD_API}/api/sync/delta?since=${encodeURIComponent(pullSinceStr)}&locationId=${location.id}`, {
+          headers: {
+              'x-api-key': apiKey,
+              'Authorization': `Bearer ${apiKey}`
+          }
+      });
+
+      if (pullRes.ok) {
+          const pullData = await pullRes.json();
+          if (pullData.success && pullData.data) {
+              const payload = { ...pullData.data };
+              
+              if (payload.businessSetup) {
+                  delete payload.businessSetup.lanAdminIp;
+                  delete payload.businessSetup.apiUrl;
+                  delete payload.businessSetup.apiKey; // prevent overwriting local apiKey
+              }
+
+              const localPostRes = await fetch(`http://127.0.0.1:${PORT}/api/sync/delta`, {
+                  method: 'POST',
+                  headers: {
+                      'x-api-key': apiKey,
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(payload)
+              });
+
+              if (localPostRes.ok) {
+                  await db.insertInto('SyncLog').values({
+                      type: 'PULL_DELTA',
+                      createdAt: pullData.timestamp || new Date().toISOString()
+                  }).execute();
+                  console.log(`[Sync Engine] PULL_DELTA successful.`);
+              }
+          }
+      }
+    } catch (e) {
+      console.error('[Sync Engine] PULL_DELTA failed:', e.message);
+    }
 
     // 1. Fetch pending receipts from SQLite
     const pendingReceipts = await db.selectFrom('Receipt')

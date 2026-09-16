@@ -8,7 +8,7 @@ export default function TerminalManager() {
 
   const fetchTerminals = async () => {
     try {
-      const res = await fetch('/api/terminals');
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || window.location.origin}/api/terminals`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('whiz-token') || ''}` } });
       if (res.ok) {
         const data = await res.json();
         setTerminals(data);
@@ -29,7 +29,7 @@ export default function TerminalManager() {
 
   const handleApprove = async (id: string) => {
     try {
-      const res = await fetch(`/api/terminals/${id}/approve`, { method: 'POST' });
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || window.location.origin}/api/terminals/${id}/approve`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('whiz-token') || ''}` }, method: 'POST' });
       if (res.ok) {
         toast.success('Terminal approved successfully!');
         fetchTerminals();
@@ -44,7 +44,7 @@ export default function TerminalManager() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this terminal?')) return;
     try {
-      const res = await fetch(`/api/terminals/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || window.location.origin}/api/terminals/${id}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('whiz-token') || ''}` }, method: 'DELETE' });
       if (res.ok) {
         toast.success('Terminal deleted successfully!');
         fetchTerminals();

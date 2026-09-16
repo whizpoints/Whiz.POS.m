@@ -395,7 +395,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
               <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
               <input
                 type="text"
-                className="input pl-9 w-full"
+                className="input !pl-10 w-full"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://api.whizpoint.app"
@@ -412,7 +412,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
               <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
               <input
                 type="password"
-                className="input pl-9 w-full font-mono text-sm"
+                className="input !pl-10 w-full font-mono text-sm"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="Paste your API Key here"

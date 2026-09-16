@@ -27,6 +27,7 @@ export default function AuthPage() {
   const [availableLocations, setAvailableLocations] = useState<any[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [isApiKeyVerified, setIsApiKeyVerified] = useState(false);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [businessName, setBusinessName] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
@@ -350,36 +351,62 @@ export default function AuthPage() {
                     <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400"><Cloud className="w-5 h-5" /></div>
                     <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Cloud Connection</h3>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Business API Key *</label>
-                    <div className="flex gap-2">
-                      <input type="text" value={apiKey} onChange={(e) => { setApiKey(e.target.value); setIsApiKeyVerified(false); }} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="whiz_..." />
-                      <button type="button" onClick={handleVerifyApiKey} disabled={loading || !apiKey} className="px-4 py-3 rounded-xl bg-blue-500 text-white font-semibold disabled:opacity-50">Verify</button>
-                    </div>
-                  </div>
                   
-                  {isApiKeyVerified && (
-                    <div className="space-y-1.5 animate-in fade-in mt-4">
-                      <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Select Branch (Location) *</label>
-                      {availableLocations.length > 0 ? (
-                        <select value={selectedLocationId} onChange={(e) => setSelectedLocationId(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }}>
-                          {availableLocations.map(loc => (
-                            <option key={loc.id} value={loc.id}>{loc.name}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="text-sm text-red-500 bg-red-50 p-3 rounded-xl">No branches found. Please create a branch in the Back Office first.</div>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mb-4">
+                    <input type="checkbox" id="offlineMode" checked={isOfflineMode} onChange={(e) => { setIsOfflineMode(e.target.checked); setApiKey(''); setSelectedLocationId(''); }} className="w-4 h-4 rounded text-blue-500 border-gray-300 focus:ring-blue-500" />
+                    <label htmlFor="offlineMode" className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>
+                      Local Offline Mode (Do not connect to Cloud)
+                    </label>
+                  </div>
 
-                  {isApiKeyVerified && (
-                    <div className="mt-4 p-4 rounded-xl border" style={{ borderColor: 'var(--border-glass)', background: 'var(--bg-tertiary)' }}>
-                      <div className="text-xs uppercase font-semibold text-gray-500 mb-2">Business Details (Auto-filled)</div>
-                      <div className="font-medium">{businessName}</div>
-                      {availableLocations.find(l => l.id === selectedLocationId)?.address && (
-                         <div className="text-sm text-gray-500 mt-1">{availableLocations.find(l => l.id === selectedLocationId)?.address}</div>
+                  {!isOfflineMode ? (
+                    <>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Business API Key *</label>
+                        <div className="flex gap-2">
+                          <input type="text" value={apiKey} onChange={(e) => { setApiKey(e.target.value); setIsApiKeyVerified(false); }} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="whiz_..." />
+                          <button type="button" onClick={handleVerifyApiKey} disabled={loading || !apiKey} className="px-4 py-3 rounded-xl bg-blue-500 text-white font-semibold disabled:opacity-50">Verify</button>
+                        </div>
+                      </div>
+                      
+                      {isApiKeyVerified && (
+                        <div className="space-y-1.5 animate-in fade-in mt-4">
+                          <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Select Branch (Location) *</label>
+                          {availableLocations.length > 0 ? (
+                            <select value={selectedLocationId} onChange={(e) => setSelectedLocationId(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }}>
+                              {availableLocations.map(loc => (
+                                <option key={loc.id} value={loc.id}>{loc.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="text-sm text-red-500 bg-red-50 p-3 rounded-xl">No branches found. Please create a branch in the Back Office first.</div>
+                          )}
+                        </div>
                       )}
+
+                      {isApiKeyVerified && (
+                        <div className="mt-4 p-4 rounded-xl border" style={{ borderColor: 'var(--border-glass)', background: 'var(--bg-tertiary)' }}>
+                          <div className="text-xs uppercase font-semibold text-gray-500 mb-2">Business Details (Auto-filled)</div>
+                          <div className="font-medium">{businessName}</div>
+                          {availableLocations.find(l => l.id === selectedLocationId)?.address && (
+                            <div className="text-sm text-gray-500 mt-1">{availableLocations.find(l => l.id === selectedLocationId)?.address}</div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="space-y-4 animate-in fade-in mt-4 p-4 rounded-xl border" style={{ borderColor: 'var(--border-glass)', background: 'var(--bg-tertiary)' }}>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Business Name *</label>
+                        <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="Enter Business Name" required />
+                      </div>
+                      <div className="space-y-1.5 mt-3">
+                        <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Branch Location Name</label>
+                        <input type="text" onChange={(e) => setBusinessInfo(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-300" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }} placeholder="e.g. Main Branch" />
+                      </div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        You can always link to the Cloud Web Portal later from the Settings page.
+                      </div>
                     </div>
                   )}
                 </div>
@@ -479,7 +506,7 @@ export default function AuthPage() {
                     type="button"
                     onClick={handleNextStep}
                     disabled={
-                      (setupStep === 1 && (!isApiKeyVerified || !selectedLocationId))
+                      (setupStep === 1 && (!isOfflineMode && (!isApiKeyVerified || !selectedLocationId))) || (setupStep === 1 && isOfflineMode && !businessName)
                     }
                     className="px-6 py-2.5 font-bold rounded-lg flex items-center gap-2 transition-all shadow-md text-white disabled:opacity-50"
                     style={{ background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)' }}

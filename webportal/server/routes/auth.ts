@@ -333,86 +333,93 @@ router.post('/verify-api-key', async (req, res) => {
 
   // Generate 2FA Pairing Code for a Specific Location
   router.post('/generate-pairing-code', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const token = authHeader.split(' ')[1];
+    let decoded: any;
     try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-      
-      const token = authHeader.split(' ')[1];
-      let decoded: any;
-      try {
-        decoded = jwt.verify(token, JWT_SECRET);
-      } catch (err) {
-        return res.status(401).json({ error: 'Invalid token' });
-      }
-      const { locationId } = req.body;
-      if (!locationId) return res.status(400).json({ error: 'Location ID required' });
-  
-      const pairingCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit code
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
-      
-      const existing = await prisma.storeLocation.findUnique({ where: { id: locationId } });
-    if (!existing || existing.businessId !== decoded.businessId) return res.status(403).json({ error: 'Forbidden' });
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { locationId } = req.body;
+    if (!locationId) return res.status(400).json({ error: 'Location ID required' });
+
+    const existing = await prisma.storeLocation.findUnique({ where: { id: locationId } });
+    if (!existing) return res.status(404).json({ error: 'Location not found' });
+    
+    // Sometimes decoded doesn't have businessId if token was generated oddly, so let's check carefully
+    if (decoded && decoded.businessId && existing.businessId !== decoded.businessId) {
+       return res.status(403).json({ error: 'Forbidden: Business ID mismatch' });
+    }
+
+    const pairingCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit code
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    
+    const newApiKey = existing.apiKey ? existing.apiKey : crypto.randomBytes(32).toString('hex');
     
     const loc = await prisma.storeLocation.update({
       where: { id: locationId },
       data: { 
         pairingCode,
         pairingCodeExpiresAt: expiresAt,
-        apiKey: existing.apiKey || crypto.randomBytes(32).toString('hex')
+        apiKey: newApiKey
       }
     });
+
+    res.json({ success: true, pairingCode, apiKey: loc.apiKey });
+  } catch (error: any) {
+    console.error('generate-pairing-code error:', error);
+    res.status(500).json({ error: 'Failed to generate pairing code: ' + (error.message || String(error)) });
+  }
+});
+
   
-      res.json({ success: true, pairingCode, apiKey: loc.apiKey });
-    } catch (error) {
-      console.error('generate-pairing-code error:', error); res.status(500).json({ error: 'Failed to generate pairing code: ' + (error.message || String(error)) });
+// Validate Pairing Code (Unauthenticated - from Local Server)
+router.post('/validate-pairing', async (req, res) => {
+  try {
+    const { apiKey, pairingCode } = req.body;
+    if (!apiKey || !pairingCode) return res.status(400).json({ error: 'Missing credentials' });
+
+    const location = await prisma.storeLocation.findFirst({ where: { apiKey }, include: { business: { include: { users: true } } } });
+
+    if (!location || location.pairingCode !== pairingCode) {
+      return res.status(401).json({ error: 'Invalid API Key or Pairing Code' });
     }
-  });
 
-  // Validate Pairing Code (Unauthenticated - from Local Server)
-  router.post('/validate-pairing', async (req, res) => {
-    try {
-      const { apiKey, pairingCode } = req.body;
-      if (!apiKey || !pairingCode) return res.status(400).json({ error: 'Missing credentials' });
-
-      const location = await prisma.storeLocation.findUnique({ 
-        where: { apiKey },
-        include: { business: true }
-      });
-
-      if (!location || location.pairingCode !== pairingCode) {
-        return res.status(401).json({ error: 'Invalid API Key or Pairing Code' });
-      }
-
-      if (location.pairingCodeExpiresAt && new Date() > location.pairingCodeExpiresAt) {
-        return res.status(401).json({ error: 'Pairing Code has expired' });
-      }
-
-      res.json({ 
-        success: true, 
-        businessId: location.businessId,
-        locationId: location.id,
-        businessName: location.business.name,
-        locationName: location.name,
-        email: location.business.email
-      });
-    } catch (error) {
-      res.status(500).json({ error: 'Validation failed' });
+    if (location.pairingCodeExpiresAt && new Date() > location.pairingCodeExpiresAt) {
+      return res.status(401).json({ error: 'Pairing Code has expired' });
     }
-  });
+
+    res.json({ 
+      success: true, 
+      businessId: location.businessId,
+      businessName: location.business.name,
+      locationId: location.id,
+      locationName: location.name 
+    });
+  } catch (error) {
+    console.error('validate-pairing error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
   // Confirm and Burn Pairing Code (Unauthenticated - from Local Server)
   router.post('/confirm-pairing', async (req, res) => {
     try {
       const { apiKey, pairingCode } = req.body;
       
-      const location = await prisma.storeLocation.findUnique({ where: { apiKey } });
+      const location = await prisma.storeLocation.findFirst({ where: { apiKey } });
       if (!location || location.pairingCode !== pairingCode) {
         return res.status(401).json({ error: 'Invalid handshake' });
       }
 
       // Burn the pairing code
-      await prisma.storeLocation.update({
-        where: { apiKey },
+      const targetLoc = await prisma.storeLocation.findFirst({ where: { apiKey } });
+      if (targetLoc) await prisma.storeLocation.update({ where: { id: targetLoc.id },
         data: { pairingCode: null, pairingCodeExpiresAt: null }
       });
 

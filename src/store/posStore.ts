@@ -1372,7 +1372,8 @@ export const usePosStore = create<PosState>()(
         const state = get();
         let rawUrl = state.businessSetup?.lanAdminIp || state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
         let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
-        const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
+            const isCloud = apiUrl.includes('whizpoint.app');
+            const apiKey = isCloud ? (state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey) : state.businessSetup?.apiKey;
 
         // Read queue FRESH from store, not from stale snapshot
         const currentQueue = get().syncQueue;
@@ -1458,7 +1459,8 @@ export const usePosStore = create<PosState>()(
             const state = get();
               let rawUrl = state.businessSetup?.lanAdminIp || state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
             let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
-            const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
+            const isCloud = apiUrl.includes('whizpoint.app');
+            const apiKey = isCloud ? (state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey) : state.businessSetup?.apiKey;
 
             if (!apiUrl || !apiKey) {
                 // Silently skip if no API config
@@ -2355,3 +2357,4 @@ const serverData = await response.json();
 // Initial data will be loaded in the main App component.
 
 // Sync intervals are now managed in App.tsx to ensure proper lifecycle and state access
+

@@ -30,6 +30,12 @@ const authenticate = async (req: any, res: any, next: any) => {
         req.user = { businessId: business.id };
         return next();
       }
+
+      const storeLoc = await prisma.storeLocation.findFirst({ where: { apiKey } });
+      if (storeLoc) {
+        req.user = { businessId: storeLoc.businessId, locationId: storeLoc.id };
+        return next();
+      }
     } catch (dbErr) {}
     
     return res.status(401).json({ error: 'Invalid token or API key' });
@@ -180,6 +186,62 @@ router.get('/locations', async (req: any, res: any) => {
   } catch (error) {
     console.error('Fetch locations error:', error);
     res.status(500).json({ error: 'Failed to fetch locations' });
+  }
+});
+
+
+// Create Business Location
+router.post('/locations', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const { name, address } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    const location = await prisma.storeLocation.create({
+      data: { businessId, name, address }
+    });
+    res.json({ success: true, location });
+  } catch (error) {
+    console.error('Create location error:', error);
+    res.status(500).json({ error: 'Failed to create location' });
+  }
+});
+
+// Update Business Location
+router.put('/locations/:id', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const { id } = req.params;
+    const { name, address } = req.body;
+
+    const existing = await prisma.storeLocation.findUnique({ where: { id } });
+    if (!existing || existing.businessId !== businessId) return res.status(403).json({ error: 'Forbidden' });
+
+    const location = await prisma.storeLocation.update({
+      where: { id },
+      data: { name, address }
+    });
+    res.json({ success: true, location });
+  } catch (error) {
+    console.error('Update location error:', error);
+    res.status(500).json({ error: 'Failed to update location' });
+  }
+});
+
+// Delete Business Location
+router.delete('/locations/:id', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const { id } = req.params;
+
+    const existing = await prisma.storeLocation.findUnique({ where: { id } });
+    if (!existing || existing.businessId !== businessId) return res.status(403).json({ error: 'Forbidden' });
+
+    await prisma.storeLocation.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete location error:', error);
+    res.status(500).json({ error: 'Failed to delete location' });
   }
 });
 

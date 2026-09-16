@@ -834,6 +834,17 @@ export default function InvoiceGenerator() {
                   <DollarSign className="w-4 h-4" /> Line Items
                 </h3>
 
+                <div className="mb-6">
+                  <label className="text-xs text-slate-500 mb-1 block">Project / Subject Line (Optional)</label>
+                  <input
+                    type="text"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="e.g. Installation of Wi-Fi Network"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500 font-medium"
+                  />
+                </div>
+
                 <div className="space-y-3">
                     {/* Explicit Table Headers to make UI clear */}
                     <div className="flex gap-2 items-end px-2">
@@ -925,7 +936,7 @@ export default function InvoiceGenerator() {
                  <div className="space-y-4">
                     {/* Common Subject Line */}
                     <div>
-                      <label className="text-xs text-slate-500 mb-1 block">Subject Line</label>
+                      <label className="text-xs text-slate-500 mb-1 block">Project / Subject Line</label>
                       <input
                         type="text"
                         value={subject}

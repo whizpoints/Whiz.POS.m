@@ -7,9 +7,9 @@ class MpesaService {
     }
 
     async getAccessToken(consumerKey, consumerSecret) {
-        const auth = Buffer.from(\\:\\).toString('base64');
-        const res = await fetch(\\/oauth/v1/generate?grant_type=client_credentials\, {
-            headers: { 'Authorization': \Basic \\ }
+        const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+        const res = await fetch(`${this.baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
+            headers: { 'Authorization': `Basic ${auth}` }
         });
         if (!res.ok) throw new Error('Failed to authenticate with Daraja');
         const data = await res.json();
@@ -20,11 +20,11 @@ class MpesaService {
         try {
             const token = await this.getAccessToken(consumerKey, consumerSecret);
             const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
-            const password = Buffer.from(\\\\\).toString('base64');
+            const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
             // Safaricom requires phone numbers to start with 254
             let formattedPhone = phone.startsWith('+') ? phone.slice(1) : phone;
-            if (formattedPhone.startsWith('0')) formattedPhone = \254\\;
+            if (formattedPhone.startsWith('0')) formattedPhone = `254${formattedPhone.slice(1)}`;
 
             const payload = {
                 BusinessShortCode: shortcode,
@@ -40,10 +40,10 @@ class MpesaService {
                 TransactionDesc: 'POS Sale'
             };
 
-            const res = await fetch(\\/mpesa/stkpush/v1/processrequest\, {
+            const res = await fetch(`${this.baseUrl}/mpesa/stkpush/v1/processrequest`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': \Bearer \\,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(payload)
@@ -65,12 +65,12 @@ class MpesaService {
         try {
             const token = await this.getAccessToken(consumerKey, consumerSecret);
             const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
-            const password = Buffer.from(\\\\\).toString('base64');
+            const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
-            const res = await fetch(\\/mpesa/stkpushquery/v1/query\, {
+            const res = await fetch(`${this.baseUrl}/mpesa/stkpushquery/v1/query`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': \Bearer \\,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
