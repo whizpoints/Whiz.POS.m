@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Search, Eye, PowerOff, Building2, Play } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
 
 export default function AdminTenants() {
   const [searchQuery, setSearchQuery] = useState('');
   const [tenants, setTenants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
 
   const fetchTenants = async () => {
     try {
