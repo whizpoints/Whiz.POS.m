@@ -56,7 +56,7 @@ export default function AuthPage() {
     const top = window.screen.height / 2 - height / 2;
     
     // Open the OAuth popup
-    const popup = window.open(
+    window.open(
       authUrl,
       'Google Login',
       `width=${width},height=${height},left=${left},top=${top}`
