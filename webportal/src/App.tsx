@@ -34,6 +34,18 @@ import MpesaDocs from './pages/docs/MpesaDocs';
 import Documents from './pages/Documents';
 import { Toaster } from 'react-hot-toast';
 
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminOverview from './pages/admin/AdminOverview';
+import AdminTenants from './pages/admin/AdminTenants';
+
+function AdminWrapper({ children }: { children: ReactNode }) {
+  return (
+    <ProtectedRoute>
+      <AdminLayout>{children}</AdminLayout>
+    </ProtectedRoute>
+  );
+}
+
 function DashboardWrapper({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute>
@@ -202,6 +214,13 @@ function App() {
           <Route path="/dashboard/documents" element={<DashboardWrapper><Documents /></DashboardWrapper>} />
           <Route path="/dashboard/security" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
           <Route path="/dashboard/docs/mpesa" element={<DashboardWrapper><MpesaDocs /></DashboardWrapper>} />
+
+          {/* Super Admin Routes */}
+          <Route path="/admin" element={<Navigate to="/admin/overview" />} />
+          <Route path="/admin/overview" element={<AdminWrapper><AdminOverview /></AdminWrapper>} />
+          <Route path="/admin/tenants" element={<AdminWrapper><AdminTenants /></AdminWrapper>} />
+          <Route path="/admin/broadcasts" element={<AdminWrapper><div className="p-8 text-white">Broadcasts Module Coming Soon</div></AdminWrapper>} />
+          <Route path="/admin/security" element={<AdminWrapper><div className="p-8 text-white">Security & Backup Module Coming Soon</div></AdminWrapper>} />
 
           <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />
         </Routes>
