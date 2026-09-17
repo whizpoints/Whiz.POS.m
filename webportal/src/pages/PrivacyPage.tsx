@@ -1,9 +1,9 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-8 sm:p-12">
           <Link to="/auth" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-8">
@@ -11,67 +11,74 @@ export default function PrivacyPage() {
             Back to Login
           </Link>
           
-          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4 tracking-tight">Privacy Policy</h1>
-          <p className="text-slate-500 mb-8">Last Updated: September 2026</p>
+          <div className="flex items-center gap-4 mb-4">
+            <ShieldCheck className="w-10 h-10 text-emerald-600" />
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">Global Privacy Policy</h1>
+          </div>
+          <p className="text-slate-500 mb-8 font-medium border-b pb-8">Last Updated and Effective: September 2026</p>
           
-          <div className="prose prose-slate prose-a:text-blue-600 max-w-none space-y-6 text-slate-700">
-            <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-3">1. Information We Collect</h2>
-              <p>
-                When you use Whiz POS, we may collect the following types of information:
-              </p>
-              <ul className="list-disc pl-5 mt-2 space-y-1">
-                <li><strong>Account Information:</strong> Name, email address (via direct registration or OAuth providers like Google/Microsoft), business names, and authentication credentials.</li>
-                <li><strong>Operational Data:</strong> Inventory, sales, suppliers, and customer data that you input into the system while running your business operations.</li>
-                <li><strong>Technical & Security Data:</strong> IP addresses, browser types, request payloads, and login attempts. This data is rigorously analyzed by our Web Application Firewall (WAF) to prevent brute-force attacks and block malicious payloads.</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-3">2. How We Use Your Information</h2>
-              <p>
-                We use the collected data strictly for the provision and improvement of the Whiz POS services. Specifically:
-              </p>
-              <ul className="list-disc pl-5 mt-2 space-y-1">
-                <li>To authenticate you and authorize access to your specific business tenant.</li>
-                <li>To process transactions, generate reports, and facilitate your daily business operations.</li>
-                <li>To maintain system security, detect fraudulent activities, and proactively block cyber threats.</li>
-              </ul>
-              <p className="mt-2 font-medium">
-                Whiz POS does not sell, rent, or unauthorizedly distribute your business data to external third parties. The infrastructure and processing logic used to handle your data is strictly proprietary and originally developed by Whiz POS.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-3">3. Data Security and Proprietary Protections</h2>
-              <p>
-                We implement industry-standard security measures, including stringent password policies, automated IP blocking for malicious actors, and JWT-based authentication. 
-              </p>
-              <p className="mt-2">
-                Our security implementations, data architectures, and application logic are 100% proprietary. We do not utilize compromised, copied, or third-party unauthorized codebases to secure your data. Any claims suggesting our security architecture or data handling processes are derived from unauthorized external sources are completely unfounded and legally actionable.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-3">4. Data Retention and Deletion</h2>
-              <p>
-                We retain your data for as long as your account is active or as needed to provide you the Services. You have the right to request the deletion of your personal and business data, subject to certain legal obligations we may have to retain specific records (such as financial transactions).
-              </p>
-            </section>
+          <div className="prose prose-slate prose-a:text-emerald-600 max-w-none space-y-8 text-slate-700 text-sm leading-relaxed">
             
             <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-3">5. Third-Party Services</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">1. Introduction and Scope</h2>
               <p>
-                Our service integrates with authorized third-party providers (e.g., Google OAuth, Microsoft OAuth) for authentication purposes. While we interact with these providers via secure APIs, we are not responsible for their independent privacy practices.
+                Welcome to Whiz POS ("Company", "we", "our", "us"). We are committed to protecting your personal information and your right to privacy. This Global Privacy Policy governs the data collection, processing, and usage practices of the Whiz POS platform, encompassing all associated web applications, mobile applications, APIs, and cloud services (collectively, the "Services"). 
+              </p>
+              <p className="mt-2">
+                By accessing or using our Services, you entrust us with your business and personal information. We take this responsibility with the utmost seriousness. This document outlines explicitly what data we collect, how it is processed, and the rigorous measures we employ to secure it.
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-3">6. Changes to this Policy</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">2. Information We Collect</h2>
               <p>
-                We may update this Privacy Policy periodically. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date. Continued use of the Services after such modifications constitutes your acknowledgment of the modified Privacy Policy.
+                To provide you with secure and efficient point-of-sale services, we collect information that identifies, relates to, describes, or is reasonably capable of being associated with you or your business.
+              </p>
+              <ul className="list-disc pl-5 mt-4 space-y-2">
+                <li><strong>Identity and Business Data:</strong> First name, last name, business registration name, email addresses, phone numbers, and location details.</li>
+                <li><strong>Financial and Transactional Data:</strong> Records of products, inventory metrics, sales logs, receipts, tax configurations, and customer details that you actively input into the platform.</li>
+                <li><strong>System and Diagnostic Data:</strong> IP addresses, geographical location data, browser specifications, access timestamps, and interaction analytics. This data is strictly utilized for security monitoring and operational diagnostics.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">3. How We Process and Handle Your Data</h2>
+              <p>
+                We process your data strictly to fulfill our contractual obligations to you and to operate our business efficiently. We process data via secure, proprietary cloud infrastructure. To protect our systems from cyber reconnaissance, we do not publicly disclose the specific technical architectures, database engines, or backend frameworks utilized in our data processing centers. 
+              </p>
+              <p className="mt-4 font-bold text-slate-900">Your data is processed for the following purposes:</p>
+              <ul className="list-disc pl-5 mt-2 space-y-2">
+                <li><strong>Service Provisioning:</strong> To create, maintain, and authenticate your tenant workspace, ensuring total isolation of your business data from other platform users.</li>
+                <li><strong>Security Operations:</strong> To continuously monitor for fraudulent activity, unauthorized access attempts, and abnormal traffic patterns using automated security algorithms.</li>
+                <li><strong>Communication:</strong> To dispatch critical system alerts, transaction receipts, security notices, and administrative broadcasts.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">4. Data Sharing and Disclosure</h2>
+              <p>
+                Whiz POS operates strictly as a Software-as-a-Service (SaaS) provider. We are not data brokers. We do not sell, rent, trade, or otherwise commercially exploit your personal or business data. Information is only shared under the following strict conditions:
+              </p>
+              <ul className="list-disc pl-5 mt-2 space-y-2">
+                <li><strong>Legal Compliance:</strong> We will disclose data if compelled by a court of law, government request, or regulatory body to comply with legal obligations, particularly concerning anti-money laundering (AML) or fraud investigations.</li>
+                <li><strong>Service Execution:</strong> Data may be routed through secured, vetted infrastructure partners solely for the purpose of keeping the platform operational (e.g., automated email dispatch servers).</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">5. Security Measures and Protection</h2>
+              <p>
+                We employ robust, state-of-the-art security measures designed to protect the integrity and confidentiality of your data. This includes end-to-end cryptographic transmission protocols, continuous threat monitoring, and stringent access controls. However, no electronic transmission over the internet or information storage technology can be guaranteed to be 100% secure. You are equally responsible for safeguarding your account credentials.
               </p>
             </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">6. Data Retention Policy</h2>
+              <p>
+                We retain personal and operational data only for as long as necessary to fulfill the purposes outlined in this Privacy Policy, unless a longer retention period is required or permitted by law (such as for tax, accounting, or other legal requirements). Upon termination or deletion of your account, your data will be queued for secure, irrecoverable digital wiping from our primary processing centers.
+              </p>
+            </section>
+
           </div>
         </div>
       </div>
