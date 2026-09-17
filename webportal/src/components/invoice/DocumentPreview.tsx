@@ -246,7 +246,7 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
                  </thead>
                  <tbody>
                     {data.items.map((item, index) => (
-                      <tr key={item.id} className="border-b border-slate-100 text-sm">
+                      <tr key={item.id} className="border-b border-slate-100 text-sm break-inside-avoid">
                          <td className="py-3 text-slate-500 align-top">{index + 1}</td>
                          <td className="py-3 font-medium align-top whitespace-pre-wrap">{item.description}</td>
                          <td className="py-3 text-center align-top">{item.quantity} {item.unit ? <span className="text-slate-900 font-medium ml-0.5">{item.unit}</span> : ''}</td>

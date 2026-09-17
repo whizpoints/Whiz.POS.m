@@ -100,6 +100,43 @@ const [scale, setScale] = useState(0.8);
     }
   };
 
+  const applyPageBreakSpacers = (container: HTMLElement, paperSize: string) => {
+      const ratio = paperSize === 'a5' ? 1.4189 : 1.4142;
+      const pxPerPage = container.getBoundingClientRect().width * ratio;
+      const topMargin = 40; 
+      
+      const elements = container.querySelectorAll('.break-inside-avoid');
+      
+      for (let i = 0; i < elements.length; i++) {
+          const el = elements[i] as HTMLElement;
+          const containerRect = container.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          const top = elRect.top - containerRect.top;
+          const bottom = top + elRect.height;
+          
+          const pageTop = Math.floor(top / pxPerPage);
+          const pageBottom = Math.floor(bottom / pxPerPage);
+          
+          if (pageTop !== pageBottom) {
+              const spaceLeft = ((pageTop + 1) * pxPerPage) - top;
+              const currentMarginTop = parseFloat(window.getComputedStyle(el).marginTop) || 0;
+              el.style.marginTop = `${currentMarginTop + spaceLeft + topMargin}px`;
+              el.setAttribute('data-original-margin', currentMarginTop.toString());
+          }
+      }
+  };
+
+  const cleanupPageBreakSpacers = (container: HTMLElement) => {
+      const elements = container.querySelectorAll('.break-inside-avoid');
+      elements.forEach((el) => {
+          const htmlEl = el as HTMLElement;
+          if (htmlEl.hasAttribute('data-original-margin')) {
+              htmlEl.style.marginTop = `${htmlEl.getAttribute('data-original-margin')}px`;
+              htmlEl.removeAttribute('data-original-margin');
+          }
+      });
+  };
+
   const captureAndDownloadPDF = async () => {
     if (!previewRef.current) return;
 
@@ -151,6 +188,8 @@ const [scale, setScale] = useState(0.8);
         try {
           if (!previewRef.current) throw new Error("Preview not found");
           
+          applyPageBreakSpacers(previewRef.current, paperSize);
+
           const imgData = await toJpeg(previewRef.current, { quality: 0.85, pixelRatio: 1.5, useCORS: true, backgroundColor: '#ffffff' });
           const pdf = new jsPDF({
             orientation: 'portrait',
@@ -181,6 +220,8 @@ const [scale, setScale] = useState(0.8);
         } catch (err) {
           toast.error("Failed to generate PDF.", { id: toastId });
           throw err;
+        } finally {
+          if (previewRef.current) cleanupPageBreakSpacers(previewRef.current);
         }
       }
     } catch (error) {
@@ -237,6 +278,8 @@ const [scale, setScale] = useState(0.8);
       const { jsPDF } = await import('jspdf');
       const { getApiBaseUrl } = await import('../../lib/utils');
       
+      applyPageBreakSpacers(previewRef.current, paperSize);
+
       const imgData = await toJpeg(previewRef.current, { quality: 0.85, pixelRatio: 1.5, useCORS: true, backgroundColor: '#ffffff' });
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: paperSize });
         pdf.setProperties({
