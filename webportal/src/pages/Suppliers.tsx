@@ -39,7 +39,7 @@ export default function Suppliers() {
   }, [activeLocationId]);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this supplier?')) return;
+    
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;

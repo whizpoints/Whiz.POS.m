@@ -18,6 +18,7 @@ export default function AdminBroadcasts() {
 </div>`);
   const [isPreview, setIsPreview] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, targetLabel: string, count: number | null }>({ isOpen: false, targetLabel: '', count: null });
 
   const targets = [
     { id: 'ACTIVE_TENANTS', label: 'Active Businesses', desc: 'Owners of active, paying, or free businesses', icon: <Sparkles className="w-5 h-5" /> },
@@ -26,7 +27,7 @@ export default function AdminBroadcasts() {
     { id: 'TEST', label: 'Test Email', desc: 'Send a single preview to yourself first', icon: <ShieldAlert className="w-5 h-5" /> },
   ];
 
-  const handleSend = async () => {
+  const handleOpenConfirmModal = async () => {
     if (!subject.trim() || !htmlBody.trim()) {
       toast.error('Subject and Body are required.');
       return;
@@ -36,8 +37,25 @@ export default function AdminBroadcasts() {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to broadcast this to: ${targets.find(t => t.id === target)?.label}?`)) return;
+    const targetLabel = targets.find(t => t.id === target)?.label || '';
+    setConfirmModal({ isOpen: true, targetLabel, count: null });
 
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const res = await fetch(`/api/admin/broadcast/count?target=${target}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setConfirmModal({ isOpen: true, targetLabel, count: data.count });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const confirmBroadcast = async () => {
+    setConfirmModal({ isOpen: false, targetLabel: '', count: null });
     setIsSending(true);
     const toastId = toast.loading('Dispatching emails via Brevo...');
 
@@ -200,7 +218,7 @@ export default function AdminBroadcasts() {
 
           <div className="mt-6 flex justify-end">
             <button 
-              onClick={handleSend}
+              onClick={handleOpenConfirmModal}
               disabled={isSending}
               className="flex items-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black tracking-wide uppercase text-sm rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -214,6 +232,54 @@ export default function AdminBroadcasts() {
 
         </div>
       </div>
+
+      {/* Modern Broadcast Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmModal({ isOpen: false, targetLabel: '', count: null })} />
+          <div className="relative bg-[#0F1714] border border-emerald-500/30 shadow-[0_16px_64px_rgba(16,185,129,0.2)] rounded-3xl w-full max-w-sm p-6 overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500" />
+            
+            <div className="flex flex-col items-center text-center mt-4 mb-6">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-emerald-500/20 text-emerald-400 animate-pulse">
+                <Send className="w-8 h-8 ml-1" />
+              </div>
+              <h2 className="text-xl font-bold text-white tracking-tight mb-2">
+                Deploy Broadcast?
+              </h2>
+              <p className="text-sm text-slate-400 leading-relaxed mb-4">
+                You are about to send an email blast to <strong className="text-white">{confirmModal.targetLabel}</strong>.
+              </p>
+
+              <div className="w-full bg-black/40 border border-white/10 rounded-xl p-4 flex flex-col items-center justify-center mb-2">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-1">Total Recipients</span>
+                {confirmModal.count === null ? (
+                  <span className="text-xl font-black text-emerald-400 animate-pulse">Calculating...</span>
+                ) : (
+                  <span className="text-3xl font-black text-emerald-400">{confirmModal.count}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmModal({ isOpen: false, targetLabel: '', count: null })}
+                className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-sm transition-colors border border-white/5"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmBroadcast}
+                disabled={confirmModal.count === null || confirmModal.count === 0}
+                className="flex-1 py-3 rounded-xl font-bold text-sm text-black transition-colors shadow-lg hover:-translate-y-0.5 active:translate-y-0 bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+              >
+                Yes, Send It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

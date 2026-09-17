@@ -1,15 +1,31 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Package, Plus, Edit2, Trash2, ArrowRightLeft, FileUp, Download } from 'lucide-react';
+import { Search, Package, Plus, Edit2, Trash2, ArrowRightLeft, FileUp, Download, Filter, AlertCircle, Edit } from 'lucide-react';
 import { useBranchContext } from '../context/BranchContext';
 import { getApiBaseUrl } from '../lib/utils';
 import StockTransferModal from '../components/Inventory/StockTransferModal';
 import ProductModal from '../components/Inventory/ProductModal';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { Modal } from '../components/ui/modal';
 import toast from 'react-hot-toast';
 
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  cost: number;
+  stock: number;
+  category: string;
+  lowStockAlert: number;
+}
+
 export default function Inventory() {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [deleteModal, setDeleteModal] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -43,7 +59,7 @@ export default function Inventory() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();

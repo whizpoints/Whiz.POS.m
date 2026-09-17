@@ -147,6 +147,50 @@ router.post('/businesses/:id/impersonate', requireSuperAdmin, async (req, res) =
     }
 });
 
+// GET BROADCAST COUNT
+router.get('/broadcast/count', requireSuperAdmin, async (req, res) => {
+    try {
+        const target = req.query.target as string;
+        let count = 0;
+        
+        if (target === 'TEST') {
+            count = 1;
+        } else {
+            let whereClause = {};
+            if (target === 'ACTIVE_TENANTS') {
+                const activeBusinesses = await prisma.business.findMany();
+                const activeIds = activeBusinesses.filter(b => {
+                    let s = b.settings as any || {};
+                    if (typeof s === 'string') s = JSON.parse(s);
+                    return !s.isSuspended;
+                }).map(b => b.id);
+                whereClause = { businessId: { in: activeIds }, role: { in: ['OWNER', 'ADMIN'] } };
+            } else if (target === 'SUSPENDED_TENANTS') {
+                const allBusinesses = await prisma.business.findMany();
+                const suspendedIds = allBusinesses.filter(b => {
+                    let s = b.settings as any || {};
+                    if (typeof s === 'string') s = JSON.parse(s);
+                    return s.isSuspended;
+                }).map(b => b.id);
+                whereClause = { businessId: { in: suspendedIds }, role: { in: ['OWNER', 'ADMIN'] } };
+            } else if (target === 'ALL_USERS') {
+                whereClause = {};
+            }
+            
+            const users = await prisma.user.findMany({
+                where: whereClause,
+                select: { email: true },
+                distinct: ['email']
+            });
+            count = users.filter(u => u.email).length;
+        }
+        res.json({ count });
+    } catch (error) {
+        console.error('Count broadcast error:', error);
+        res.status(500).json({ error: 'Failed to count recipients.' });
+    }
+});
+
 // BROADCAST EMAILS
 router.post('/broadcast', requireSuperAdmin, async (req, res) => {
     try {
@@ -210,22 +254,24 @@ router.post('/broadcast', requireSuperAdmin, async (req, res) => {
         });
 
         const senderAlias = `${fromName} <${fromEmail}@whizpoint.app>`;
+        const replyToEmail = 'no-reply@whizpoint.app';
 
-        // To protect privacy, we BCC everyone so they don't see each other's emails.
-        // We use a dummy 'To' address or just send individually.
-        // Sending individually ensures highest deliverability and personalization potential.
-        // But for massive lists, BCC is safer to prevent SMTP timeouts.
-        // Brevo handles BCC very efficiently.
-        
-        const mailOptions = {
-            from: senderAlias,
-            to: `"WhizPoint Cloud" <${fromEmail}@whizpoint.app>`,
-            bcc: recipients,
-            subject: subject,
-            html: htmlBody
-        };
-
-        await transporter.sendMail(mailOptions);
+        // Send individually so the "To" field displays the recipient's actual email
+        for (const email of recipients) {
+            const mailOptions = {
+                from: senderAlias,
+                to: email,
+                replyTo: replyToEmail,
+                subject: subject,
+                html: htmlBody
+            };
+            
+            try {
+                await transporter.sendMail(mailOptions);
+            } catch (err) {
+                console.error(`Failed to send to ${email}:`, err);
+            }
+        }
 
         res.json({ success: true, message: `Broadcast sent successfully to ${recipients.length} recipients.` });
     } catch (error) {
