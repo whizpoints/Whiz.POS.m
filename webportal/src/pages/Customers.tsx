@@ -1,28 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Star, Edit2, Trash2, Mail, RefreshCw, Edit, Phone, User, AlertCircle } from 'lucide-react';
+import { Search, Plus, Star, Edit2, Trash2, Mail, RefreshCw } from 'lucide-react';
 import CustomerModal from '../components/Customers/CustomerModal';
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
-import { ConfirmModal } from '../components/ui/ConfirmModal';
-
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  loyaltyPoints?: number;
-  totalSpent?: number;
-}
 
 export default function Customers() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [deleteModal, setDeleteModal] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
   const [emailCustomer, setEmailCustomer] = useState<any>(null);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
@@ -50,7 +36,7 @@ export default function Customers() {
   };
 
   const handleDelete = async (id: string) => {
-    
+    if (!window.confirm('Are you sure you want to delete this customer?')) return;
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
