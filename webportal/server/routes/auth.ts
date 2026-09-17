@@ -67,7 +67,7 @@ router.post('/register', async (req, res) => {
           create: {
             email,
             password: hashedPassword,
-            name: 'Admin',
+            name: businessName,
             role: 'ADMIN'
           }
         },
