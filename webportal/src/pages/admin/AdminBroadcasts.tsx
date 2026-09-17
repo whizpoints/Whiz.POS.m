@@ -186,7 +186,7 @@ export default function AdminBroadcasts() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Body (HTML Supported)</label>
-              <p className="text-[10px] text-slate-500">Variables: <code className="text-emerald-400 bg-emerald-400/10 px-1 rounded">{{BusinessName}}</code> <code className="text-emerald-400 bg-emerald-400/10 px-1 rounded">{{Name}}</code></p>
+              <p className="text-[10px] text-slate-500">Variables: <code className="text-emerald-400 bg-emerald-400/10 px-1 rounded">{'{{BusinessName}}'}</code> <code className="text-emerald-400 bg-emerald-400/10 px-1 rounded">{'{{Name}}'}</code></p>
             </div>
             <div className="flex gap-2 bg-black/40 p-1 rounded-lg border border-white/5">
               <button 
