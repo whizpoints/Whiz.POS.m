@@ -196,10 +196,10 @@ router.post('/broadcast', requireSuperAdmin, async (req, res) => {
     try {
         const { target, fromName, fromEmail, subject, htmlBody, testEmail } = req.body;
         
-        let recipients: string[] = [];
+        let recipientsData: { email: string, name: string, businessName: string }[] = [];
         
         if (target === 'TEST' && testEmail) {
-            recipients = [testEmail];
+            recipientsData = [{ email: testEmail, name: 'Test User', businessName: 'WhizPoint Testing' }];
         } else {
             // Fetch all users based on target
             let whereClause = {};
@@ -231,14 +231,24 @@ router.post('/broadcast', requireSuperAdmin, async (req, res) => {
             
             const users = await prisma.user.findMany({
                 where: whereClause,
-                select: { email: true },
-                distinct: ['email']
+                select: { email: true, name: true, business: { select: { name: true } } }
             });
             
-            recipients = users.map(u => u.email).filter(e => e);
+            // Deduplicate by email
+            const uniqueUsers = new Map();
+            for (const u of users) {
+                if (u.email && !uniqueUsers.has(u.email)) {
+                    uniqueUsers.set(u.email, {
+                        email: u.email,
+                        name: u.name,
+                        businessName: u.business?.name || 'Valued Business'
+                    });
+                }
+            }
+            recipientsData = Array.from(uniqueUsers.values());
         }
 
-        if (recipients.length === 0) {
+        if (recipientsData.length === 0) {
             return res.status(400).json({ error: 'No recipients found for this target.' });
         }
 
@@ -257,23 +267,32 @@ router.post('/broadcast', requireSuperAdmin, async (req, res) => {
         const replyToEmail = 'no-reply@whizpoint.app';
 
         // Send individually so the "To" field displays the recipient's actual email
-        for (const email of recipients) {
+        for (const recipient of recipientsData) {
+            // Apply personalization tags
+            const personalizedBody = htmlBody
+                .replace(/\{\{BusinessName\}\}/gi, recipient.businessName)
+                .replace(/\{\{Name\}\}/gi, recipient.name);
+                
+            const personalizedSubject = subject
+                .replace(/\{\{BusinessName\}\}/gi, recipient.businessName)
+                .replace(/\{\{Name\}\}/gi, recipient.name);
+
             const mailOptions = {
                 from: senderAlias,
-                to: email,
+                to: recipient.email,
                 replyTo: replyToEmail,
-                subject: subject,
-                html: htmlBody
+                subject: personalizedSubject,
+                html: personalizedBody
             };
             
             try {
                 await transporter.sendMail(mailOptions);
             } catch (err) {
-                console.error(`Failed to send to ${email}:`, err);
+                console.error(`Failed to send to ${recipient.email}:`, err);
             }
         }
 
-        res.json({ success: true, message: `Broadcast sent successfully to ${recipients.length} recipients.` });
+        res.json({ success: true, message: `Broadcast sent successfully to ${recipientsData.length} recipients.` });
     } catch (error) {
         console.error('Broadcast error:', error);
         res.status(500).json({ error: 'Failed to send broadcast.' });

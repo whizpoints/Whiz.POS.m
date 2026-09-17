@@ -11,8 +11,8 @@ export default function AdminBroadcasts() {
   const [htmlBody, setHtmlBody] = useState(`<!-- Paste your HTML here -->
 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
   <h2 style="color: #4f46e5;">System Update</h2>
-  <p>Hello,</p>
-  <p>We are rolling out some exciting new features to your dashboard...</p>
+  <p>Hi {{Name}},</p>
+  <p>We are rolling out some exciting new features to the <strong>{{BusinessName}}</strong> dashboard...</p>
   <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
   <p style="font-size: 12px; color: #6b7280; text-align: center;">Whiz POS Cloud</p>
 </div>`);
@@ -184,7 +184,10 @@ export default function AdminBroadcasts() {
           </div>
 
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Email Body (HTML Supported)</label>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Body (HTML Supported)</label>
+              <p className="text-[10px] text-slate-500">Variables: <code className="text-emerald-400 bg-emerald-400/10 px-1 rounded">{{BusinessName}}</code> <code className="text-emerald-400 bg-emerald-400/10 px-1 rounded">{{Name}}</code></p>
+            </div>
             <div className="flex gap-2 bg-black/40 p-1 rounded-lg border border-white/5">
               <button 
                 onClick={() => setIsPreview(false)}
