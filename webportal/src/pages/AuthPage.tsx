@@ -291,9 +291,9 @@ export default function AuthPage() {
                           <Building2 className="w-6 h-6" />
                        </div>
                        <div className="flex-1">
-                          <div className="font-bold text-[#10182B] text-[15px]">Active Workspace</div>
+                          <div className="font-bold text-[#10182B] text-[15px]">{activeSession.name || 'Your Workspace'}</div>
                           <div className="text-[#64748B] text-[13px] flex items-center gap-2">
-                             Business • <span className="uppercase font-bold text-[#0A9EF5]">{activeSession.role}</span>
+                             Active Session • <span className="uppercase font-bold text-[#0A9EF5]">{activeSession.role}</span>
                           </div>
                        </div>
                        <div className="text-[#0A9EF5]">

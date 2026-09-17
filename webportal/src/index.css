@@ -1063,7 +1063,11 @@ h1, h2, h3, h4, h5, h6 {
 /* === PAGE LAYOUT === */
 .app-shell {
   min-height: 100vh;
-  background-color: var(--bg-primary);
+  background-color: var(--bg-secondary); /* Plain white */
+  background-image: 
+    linear-gradient(rgba(16, 185, 129, 0.04) 1px, transparent 1px), 
+    linear-gradient(90deg, rgba(16, 185, 129, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
   position: relative;
   overflow: hidden;
 }
