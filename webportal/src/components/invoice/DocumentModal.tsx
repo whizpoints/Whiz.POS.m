@@ -160,9 +160,22 @@ const [scale, setScale] = useState(0.8);
           
           const rect = previewRef.current.getBoundingClientRect();
           const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
           const pdfHeight = (rect.height * pdfWidth) / rect.width;
           
-          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+          let heightLeft = pdfHeight;
+          let position = 0;
+
+          pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+          heightLeft -= pageHeight;
+
+          while (heightLeft > 0) {
+            position = heightLeft - pdfHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+            heightLeft -= pageHeight;
+          }
+          
           pdf.save(`${type.toLowerCase()}-${data?.docNumber || 'document'}.pdf`);
           toast.success("PDF Downloaded!", { id: toastId });
         } catch (err) {
@@ -233,10 +246,23 @@ const [scale, setScale] = useState(0.8);
           keywords: `${type.toLowerCase()}, ${data?.docNumber}, pos, receipt, invoice, whizpos`,
           creator: 'WhizPoint Solutions Automation'
         });
-      const rect = previewRef.current.getBoundingClientRect();
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (rect.height * pdfWidth) / rect.width;
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        const rect = previewRef.current.getBoundingClientRect();
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const pdfHeight = (rect.height * pdfWidth) / rect.width;
+        
+        let heightLeft = pdfHeight;
+        let position = 0;
+
+        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+
+        while (heightLeft > 0) {
+          position = heightLeft - pdfHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+          heightLeft -= pageHeight;
+        }
       
       const pdfDataUri = pdf.output('datauristring');
       const filename = `${type.toLowerCase()}-${data?.docNumber || 'document'}.pdf`;
