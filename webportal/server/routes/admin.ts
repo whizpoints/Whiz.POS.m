@@ -105,4 +105,133 @@ router.post('/businesses/:id/suspend', requireSuperAdmin, async (req, res) => {
     }
 });
 
+// IMPERSONATE (Ghost Mode) - Login as business owner
+router.post('/businesses/:id/impersonate', requireSuperAdmin, async (req, res) => {
+    try {
+        const businessId = req.params.id;
+        
+        const business = await prisma.business.findUnique({ 
+            where: { id: businessId },
+            include: { users: true }
+        });
+        
+        if (!business) return res.status(404).json({ error: 'Business not found' });
+        
+        const owner = business.users.find(u => u.role === 'ADMIN' || u.role === 'OWNER') || business.users[0];
+        if (!owner) return res.status(404).json({ error: 'No users found in this business to impersonate' });
+
+        // Include original admin's email or ID in token to allow them to "switch back" if needed, 
+        // but for now we just give them a standard token with isSuperAdmin appended so they keep their god mode powers
+        const token = jwt.sign({ 
+            userId: owner.id, 
+            businessId: owner.businessId, 
+            role: owner.role,
+            isSuperAdmin: true // they keep their super admin status so they aren't permanently locked out of /admin
+        }, JWT_SECRET, { expiresIn: '1h' });
+
+        res.json({
+            token,
+            user: {
+                id: owner.id,
+                name: owner.name,
+                email: owner.email,
+                role: owner.role,
+                businessId: owner.businessId,
+                businessName: business.name,
+                isSuperAdmin: true
+            }
+        });
+    } catch (error) {
+        console.error('Impersonate business error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// BROADCAST EMAILS
+router.post('/broadcast', requireSuperAdmin, async (req, res) => {
+    try {
+        const { target, fromName, fromEmail, subject, htmlBody, testEmail } = req.body;
+        
+        let recipients: string[] = [];
+        
+        if (target === 'TEST' && testEmail) {
+            recipients = [testEmail];
+        } else {
+            // Fetch all users based on target
+            let whereClause = {};
+            if (target === 'ACTIVE_TENANTS') {
+                const activeBusinesses = await prisma.business.findMany();
+                // Filter businesses that are not suspended
+                const activeIds = activeBusinesses
+                    .filter(b => {
+                        let s = b.settings as any || {};
+                        if (typeof s === 'string') s = JSON.parse(s);
+                        return !s.isSuspended;
+                    })
+                    .map(b => b.id);
+                    
+                whereClause = { businessId: { in: activeIds }, role: { in: ['OWNER', 'ADMIN'] } };
+            } else if (target === 'SUSPENDED_TENANTS') {
+                const allBusinesses = await prisma.business.findMany();
+                const suspendedIds = allBusinesses
+                    .filter(b => {
+                        let s = b.settings as any || {};
+                        if (typeof s === 'string') s = JSON.parse(s);
+                        return s.isSuspended;
+                    })
+                    .map(b => b.id);
+                whereClause = { businessId: { in: suspendedIds }, role: { in: ['OWNER', 'ADMIN'] } };
+            } else if (target === 'ALL_USERS') {
+                whereClause = {}; // literally everyone
+            }
+            
+            const users = await prisma.user.findMany({
+                where: whereClause,
+                select: { email: true },
+                distinct: ['email']
+            });
+            
+            recipients = users.map(u => u.email).filter(e => e);
+        }
+
+        if (recipients.length === 0) {
+            return res.status(400).json({ error: 'No recipients found for this target.' });
+        }
+
+        const nodemailer = await import('nodemailer');
+        const transporter = nodemailer.createTransport({
+            host: process.env.BREVO_SMTP_SERVER,
+            port: Number(process.env.BREVO_SMTP_PORT) || 587,
+            secure: false,
+            auth: {
+                user: process.env.BREVO_SMTP_LOGIN,
+                pass: process.env.BREVO_SMTP_KEY,
+            },
+        });
+
+        const senderAlias = `${fromName} <${fromEmail}@whizpoint.app>`;
+
+        // To protect privacy, we BCC everyone so they don't see each other's emails.
+        // We use a dummy 'To' address or just send individually.
+        // Sending individually ensures highest deliverability and personalization potential.
+        // But for massive lists, BCC is safer to prevent SMTP timeouts.
+        // Brevo handles BCC very efficiently.
+        
+        const mailOptions = {
+            from: senderAlias,
+            to: `"WhizPoint Cloud" <${fromEmail}@whizpoint.app>`,
+            bcc: recipients,
+            subject: subject,
+            html: htmlBody
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.json({ success: true, message: `Broadcast sent successfully to ${recipients.length} recipients.` });
+    } catch (error) {
+        console.error('Broadcast error:', error);
+        res.status(500).json({ error: 'Failed to send broadcast.' });
+    }
+});
+
 export default router;

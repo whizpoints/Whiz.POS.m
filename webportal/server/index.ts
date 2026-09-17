@@ -95,7 +95,8 @@ app.use(async (req, res, next) => {
        const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
        const jwt = await import('jsonwebtoken');
        const decoded = jwt.default.verify(token, JWT_SECRET) as any;
-       if (decoded.businessId) {
+       
+       if (decoded.businessId && !decoded.isSuperAdmin) {
          const b = await prisma.business.findUnique({ where: { id: decoded.businessId }, select: { settings: true } });
          if (b && b.settings) {
            let settings = b.settings as any;

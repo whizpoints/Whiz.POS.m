@@ -26,22 +26,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = [
     { to: '/admin/overview', icon: <Activity className="w-5 h-5" />, label: 'Dashboard' },
-    { to: '/admin/tenants', icon: <Users className="w-5 h-5" />, label: 'Analytics' },
-    { to: '/admin/broadcasts', icon: <Radio className="w-5 h-5" />, label: 'Users' },
-    { to: '/admin/security', icon: <Database className="w-5 h-5" />, label: 'Settings' },
+    { to: '/admin/tenants', icon: <Users className="w-5 h-5" />, label: 'Tenants & Users' },
+    { to: '/admin/broadcasts', icon: <Radio className="w-5 h-5" />, label: 'Email Broadcasts' },
+    { to: '/admin/security', icon: <Database className="w-5 h-5" />, label: 'Security & Backups' },
   ];
 
   return (
-    <div className="min-h-screen bg-[#0A100D] text-slate-200 font-sans flex flex-col md:flex-row overflow-hidden relative">
+    <div className="min-h-screen bg-[#060B08] text-slate-200 font-sans flex flex-col md:flex-row overflow-hidden relative" style={{ backgroundColor: '#060B08' }}>
       
-      {/* Background Ambient Glow */}
+      {/* Background Ambient Glow for True Glassmorphism */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#0A9EF5]/10 rounded-full mix-blend-screen filter blur-[150px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-[#10B981]/10 rounded-full mix-blend-screen filter blur-[150px]" />
+        {/* Mesh Gradients */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#0A9EF5]/20 rounded-full mix-blend-screen filter blur-[100px]" />
+        <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] bg-[#8A55FF]/20 rounded-full mix-blend-screen filter blur-[120px]" />
+        <div className="absolute bottom-[-20%] left-[20%] w-[60%] h-[60%] bg-[#10B981]/20 rounded-full mix-blend-screen filter blur-[130px]" />
+        
+        {/* Subtle grid pattern */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
       </div>
 
       {/* Mobile Topbar */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-[#0A100D]/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50">
+      <div className="md:hidden flex items-center justify-between p-4 bg-[#0A100D]/60 backdrop-blur-2xl border-b border-white/10 sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]">G</div>
           <div className="text-white font-bold text-lg tracking-tight">Whiz<span className="text-emerald-400">Dash</span></div>
@@ -52,7 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       {/* Desktop Sidebar / Mobile Drawer */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white/[0.02] backdrop-blur-2xl border-r border-white/5 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white/[0.05] backdrop-blur-3xl border-r border-white/10 shadow-[8px_0_32px_rgba(0,0,0,0.3)] transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-8 hidden md:flex items-center gap-3 z-10 relative">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center font-bold text-white text-lg shadow-[0_0_20px_rgba(16,185,129,0.4)]">G</div>
           <div>

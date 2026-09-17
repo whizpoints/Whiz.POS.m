@@ -37,6 +37,7 @@ import { Toaster } from 'react-hot-toast';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminOverview from './pages/admin/AdminOverview';
 import AdminTenants from './pages/admin/AdminTenants';
+import AdminBroadcasts from './pages/admin/AdminBroadcasts';
 
 function AdminWrapper({ children }: { children: ReactNode }) {
   return (
@@ -219,7 +220,7 @@ function App() {
           <Route path="/admin" element={<Navigate to="/admin/overview" />} />
           <Route path="/admin/overview" element={<AdminWrapper><AdminOverview /></AdminWrapper>} />
           <Route path="/admin/tenants" element={<AdminWrapper><AdminTenants /></AdminWrapper>} />
-          <Route path="/admin/broadcasts" element={<AdminWrapper><div className="p-8 text-white">Broadcasts Module Coming Soon</div></AdminWrapper>} />
+          <Route path="/admin/broadcasts" element={<AdminWrapper><AdminBroadcasts /></AdminWrapper>} />
           <Route path="/admin/security" element={<AdminWrapper><div className="p-8 text-white">Security & Backup Module Coming Soon</div></AdminWrapper>} />
 
           <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />
