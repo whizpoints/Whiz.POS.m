@@ -184,7 +184,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const { users, products, customers, suppliers, transactions, stockMovements, businessSetup } = req.body;
+        const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, businessSetup, documents } = req.body;
         let targetLocationId = null;
         let targetOutletId = null;
         // Try to resolve from businessSetup in payload
@@ -368,6 +368,43 @@ router.post('/', async (req, res) => {
                 }
             }
         }
+        // 3.5 Product Inventory (Absolute from Cloud)
+        if (inventory && Array.isArray(inventory)) {
+            for (const inv of inventory) {
+                if (!inv.productId)
+                    continue;
+                const existing = await db.selectFrom('ProductInventory')
+                    .selectAll()
+                    .where('productId', '=', inv.productId)
+                    .where('locationId', 'is', inv.locationId || null)
+                    .where('outletId', 'is', inv.outletId || null)
+                    .executeTakeFirst();
+                if (resolveConflict(inv, existing)) {
+                    if (existing) {
+                        await db.updateTable('ProductInventory')
+                            // @ts-ignore
+                            .set({ stock: Number(inv.stock) || 0, updatedAt: (inv.updatedAt ? new Date(inv.updatedAt) : new Date()).toISOString() })
+                            .where('id', '=', existing.id).execute();
+                    }
+                    else {
+                        await db.insertInto('ProductInventory')
+                            // @ts-ignore
+                            .values({
+                            id: inv.id || randomUUID(),
+                            productId: inv.productId,
+                            locationId: inv.locationId || targetLocationId || null,
+                            outletId: inv.outletId || targetOutletId || null,
+                            stock: Number(inv.stock) || 0,
+                            updatedAt: (inv.updatedAt ? new Date(inv.updatedAt) : new Date()).toISOString()
+                        }).execute();
+                    }
+                    results.inventory++;
+                }
+                else {
+                    results.skipped++;
+                }
+            }
+        }
         // 4. Transactions (Sales)
         if (transactions && Array.isArray(transactions)) {
             for (const t of transactions) {
@@ -381,7 +418,7 @@ router.post('/', async (req, res) => {
                         if (existing) {
                             await db.updateTable('Receipt')
                                 // @ts-ignore
-                                .set({ status: safeStatus, updatedAt: (t.updatedAt ? new Date(t.updatedAt) : new Date()).toISOString() }).where('id', '=', existing.id).execute();
+                                .set({ status: safeStatus }).where('id', '=', existing.id).execute();
                         }
                         else {
                             const receiptId = String(t.id);
@@ -393,8 +430,7 @@ router.post('/', async (req, res) => {
                                 receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
                                 paymentMethod: String(t.paymentMethod || 'CASH'), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
                                 mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null, status: safeStatus,
-                                createdAt: t.timestamp ? new Date(t.timestamp).toISOString() : undefined,
-                                updatedAt: (t.updatedAt ? new Date(t.updatedAt) : new Date()).toISOString()
+                                createdAt: t.timestamp ? new Date(t.timestamp).toISOString() : undefined
                             }).execute();
                             const createdReceipt = { id: receiptId };
                             if (t.items && Array.isArray(t.items)) {
@@ -583,6 +619,11 @@ router.post('/', async (req, res) => {
         }
         catch (err) {
             console.error('Failed to write sync log', err);
+        }
+        const io = req.app.get('io');
+        if (io) {
+            // Broadcast to all connected local POS terminals that data has changed
+            io.emit('stock_updated', { timestamp: new Date().toISOString() });
         }
         res.json({
             success: true,

@@ -1,10 +1,15 @@
 // @ts-nocheck
 import 'dotenv/config';
 import express from 'express';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import { io as ClientIO } from 'socket.io-client';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import authRoutes from './routes/auth.js';
 import syncRoutes from './routes/sync.js';
 import syncDeltaRoutes from './routes/syncDelta.js';
@@ -26,8 +31,60 @@ import setupRoutes from './routes/setup.js';
 import documentsRoutes from './routes/documents.js';
 import staffRoutes from './routes/staff.js';
 import backupRoutes from './routes/backup.js';
+import { wafMiddleware } from './middleware/waf.js';
 dotenv.config();
 const app = express();
+const server = http.createServer(app);
+// 1. Local Socket.io Server (for POS Desktop Apps)
+const io = new SocketIOServer(server, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST']
+    }
+});
+io.on('connection', (socket) => {
+    console.log('[Local Socket] POS Client connected:', socket.id);
+    socket.on('stock_deducted', (data) => {
+        // Broadcast stock updates to other local POS terminals
+        socket.broadcast.emit('stock_updated', data);
+    });
+    socket.on('disconnect', () => {
+        console.log('[Local Socket] POS Client disconnected:', socket.id);
+    });
+});
+app.set('io', io);
+// 2. Cloud Socket.io Client (Connects to Web Portal)
+const CLOUD_URL = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+let cloudSocket;
+try {
+    cloudSocket = ClientIO(CLOUD_URL, {
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 5000,
+    });
+    cloudSocket.on('connect', async () => {
+        console.log('[Cloud Socket] Connected to Cloud Server');
+        try {
+            // Find business ID to join room
+            const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
+            if (location && location.businessId) {
+                cloudSocket.emit('join_business', location.businessId);
+            }
+        }
+        catch (err) { }
+    });
+    cloudSocket.on('downward_sync_event', (data) => {
+        console.log('[Cloud Socket] Received downward sync event:', data);
+        // Notify local POS apps immediately
+        io.emit('cloud_sync_received', data);
+    });
+    cloudSocket.on('disconnect', () => {
+        console.log('[Cloud Socket] Disconnected from Cloud Server');
+    });
+}
+catch (e) {
+    console.error('[Cloud Socket] Initialization failed', e);
+}
 const PORT = process.env.PORT || 5050;
 // Enable CORS for all origins dynamically (needed for Electron desktop POS clients with credentials)
 app.use(cors({
@@ -36,6 +93,8 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Apply Security WAF & Rate-Limiter Middleware
+app.use(wafMiddleware);
 // (Static files are served later below)
 // Serve local uploads
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -72,8 +131,6 @@ app.get('/api/health', (req, res) => {
 });
 // Serve React Frontend (Monolith Architecture)
 // Determine __dirname equivalent in ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 import fs from 'fs';
 const clientBuildPath = path.join(__dirname, '../dist');
 app.use((req, res, next) => {
@@ -116,16 +173,139 @@ app.use((req, res, next) => {
 // -----------------------------------------
 setInterval(async () => {
     try {
-        // 1. Fetch pending receipts/stock movements from SQLite
-        // 2. Send to https://api.whizpoint.app/api/sync/up
-        // 3. Mark as synced locally
-        // console.log('[Sync Engine] Background sync completed.');
+        const CLOUD_API = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+        const business = await db.selectFrom('Business').selectAll().executeTakeFirst();
+        const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
+        if (!business || !business.apiKey || !location)
+            return;
+        const apiKey = business.apiKey;
+        // --- NEW: PUSH DELTA TO CLOUD ---
+        try {
+            const lastPushLog = await db.selectFrom('SyncLog')
+                .selectAll()
+                .where('type', '=', 'PUSH_DELTA')
+                .orderBy('createdAt', 'desc')
+                .executeTakeFirst();
+            const pushSinceStr = lastPushLog ? new Date(lastPushLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
+            const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements] = await Promise.all([
+                db.selectFrom('User').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+                db.selectFrom('Product').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+                db.selectFrom('Customer').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+                db.selectFrom('Supplier').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+                db.selectFrom('StockMovement').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+            ]);
+            if (localUsers.length > 0 || localProducts.length > 0 || localCustomers.length > 0 || localStockMovements.length > 0 || pushSinceStr === "1970-01-01T00:00:00.000Z") {
+                console.log(`[Sync Engine] Pushing ${localProducts.length} products, ${localUsers.length} users, ${localStockMovements.length} inventory logs to Cloud`);
+                const businessSetup = business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {};
+                businessSetup.businessName = business.name;
+                businessSetup.locationId = location.id;
+                const pushRes = await fetch(`${CLOUD_API}/api/sync/delta`, {
+                    method: 'POST',
+                    headers: {
+                        'x-api-key': apiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        users: localUsers,
+                        products: localProducts,
+                        customers: localCustomers,
+                        suppliers: localSuppliers,
+                        inventoryLogs: localStockMovements.map(sm => ({ ...sm, variance: sm.quantity })), // Map local quantity to cloud variance
+                        businessSetup
+                    })
+                });
+                if (pushRes.ok) {
+                    await db.insertInto('SyncLog').values({
+                        type: 'PUSH_DELTA',
+                        createdAt: new Date().toISOString()
+                    }).execute();
+                    console.log(`[Sync Engine] PUSH_DELTA successful.`);
+                }
+            }
+        }
+        catch (e) {
+            console.error('[Sync Engine] PUSH_DELTA failed:', e.message);
+        }
+        // --- NEW: PULL DELTA FROM CLOUD ---
+        try {
+            const lastPullLog = await db.selectFrom('SyncLog')
+                .selectAll()
+                .where('type', '=', 'PULL_DELTA')
+                .orderBy('createdAt', 'desc')
+                .executeTakeFirst();
+            const pullSinceStr = lastPullLog ? new Date(lastPullLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
+            const pullRes = await fetch(`${CLOUD_API}/api/sync/delta?since=${encodeURIComponent(pullSinceStr)}&locationId=${location.id}`, {
+                headers: {
+                    'x-api-key': apiKey,
+                    'Authorization': `Bearer ${apiKey}`
+                }
+            });
+            if (pullRes.ok) {
+                const pullData = await pullRes.json();
+                if (pullData.success && pullData.data) {
+                    const payload = { ...pullData.data };
+                    if (payload.businessSetup) {
+                        delete payload.businessSetup.lanAdminIp;
+                        delete payload.businessSetup.apiUrl;
+                        delete payload.businessSetup.apiKey; // prevent overwriting local apiKey
+                    }
+                    const localPostRes = await fetch(`http://127.0.0.1:${PORT}/api/sync/delta`, {
+                        method: 'POST',
+                        headers: {
+                            'x-api-key': apiKey,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    if (localPostRes.ok) {
+                        await db.insertInto('SyncLog').values({
+                            type: 'PULL_DELTA',
+                            createdAt: pullData.timestamp || new Date().toISOString()
+                        }).execute();
+                        console.log(`[Sync Engine] PULL_DELTA successful.`);
+                    }
+                }
+            }
+        }
+        catch (e) {
+            console.error('[Sync Engine] PULL_DELTA failed:', e.message);
+        }
+        // 1. Fetch pending receipts from SQLite
+        const pendingReceipts = await db.selectFrom('Receipt')
+            .selectAll()
+            .where('synced', '=', 0) // Assume synced column is integer 0 or 1
+            .execute();
+        if (pendingReceipts.length === 0)
+            return;
+        // Fetch items for pending receipts
+        for (const receipt of pendingReceipts) {
+            receipt.items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', '=', receipt.id).execute();
+        }
+        // 2. Send to Cloud REST API
+        const res = await fetch(`${CLOUD_API}/api/sync/sales`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${location.apiKey}` // Or x-api-key based on auth logic
+            },
+            body: JSON.stringify({ receipts: pendingReceipts })
+        });
+        if (res.ok) {
+            // 3. Mark as synced locally
+            for (const receipt of pendingReceipts) {
+                await db.updateTable('Receipt').set({ synced: 1 }).where('id', '=', receipt.id).execute();
+            }
+            console.log(`[Sync Engine] Successfully synced ${pendingReceipts.length} receipts to cloud.`);
+            if (cloudSocket && cloudSocket.connected) {
+                cloudSocket.emit('local_transaction_synced', { businessId: location.businessId, count: pendingReceipts.length });
+            }
+        }
     }
     catch (err) {
-        console.error('[Sync Engine] Background sync failed:', err);
+        // console.error('[Sync Engine] Background sync failed:', err.message);
     }
-}, 60000); // Run every 60 seconds
-app.listen(Number(PORT), '0.0.0.0', () => {
+}, 60000); // Run every 60 seconds // Run every 60 seconds
+server.listen(Number(PORT), '0.0.0.0', () => {
     if (Number(PORT) === 3000) {
         console.log(`🚀 Cloud Web App (Back Office) running in ${process.env.NODE_ENV} mode on port ${PORT}`);
     }

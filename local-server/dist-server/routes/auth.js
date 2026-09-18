@@ -6,6 +6,7 @@ import db from '../db.js';
 import { randomUUID } from 'crypto';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import { validatePassword } from '../utils/security.js';
 const router = Router();
 // const prisma = new PrismaClient();
 const transporter = nodemailer.createTransport({
@@ -20,6 +21,10 @@ const transporter = nodemailer.createTransport({
 router.post('/register', async (req, res) => {
     try {
         const { businessName, email, password, kraPin, businessInfo, address, phone, apiKey, servedBy, receiptFooter, cloudBusinessId, cloudLocationId, printerType, mpesaPaybill, mpesaTill, mpesaAccount } = req.body;
+        const passwordValidation = validatePassword(password, businessName);
+        if (!passwordValidation.isValid) {
+            return res.status(400).json({ error: passwordValidation.message });
+        }
         const existingBusiness = await db.selectFrom('Business').selectAll().where('email', '=', email).executeTakeFirst();
         if (existingBusiness) {
             return res.status(400).json({ error: 'Business email already registered' });
@@ -60,9 +65,9 @@ router.post('/register', async (req, res) => {
             role: 'ADMIN'
         }).returningAll().executeTakeFirstOrThrow();
         await db.insertInto('StoreLocation').values({
-            id: randomUUID(),
+            id: cloudLocationId || randomUUID(),
             businessId: business.id,
-            name: 'Main Store',
+            name: businessName || 'Main Store',
             address: address || 'Local Setup'
         }).execute();
         business.users = [user];
@@ -165,10 +170,32 @@ router.post('/setup', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+// Get Current Logged-in User
+router.get('/me', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader)
+            return res.status(401).json({ error: 'No token provided' });
+        const token = authHeader.split(' ')[1];
+        const payload = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret'));
+        const user = await db.selectFrom('User').selectAll().where('id', '=', payload.userId).executeTakeFirst();
+        const business = user ? await db.selectFrom('Business').selectAll().where('id', '=', user.businessId).executeTakeFirst() : null;
+        if (!user)
+            return res.status(404).json({ error: 'User not found' });
+        res.json({ id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId, businessName: business?.name, businessLogo: business?.logoUrl });
+    }
+    catch (error) {
+        console.error('/me error:', error);
+        res.status(401).json({ error: 'Invalid token' });
+    }
+});
 // Login
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
+        if (!password || password.length < 8) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
         const user = await db.selectFrom('User').selectAll().where('email', '=', email).executeTakeFirst();
         if (user) {
             user.business = await db.selectFrom('Business').selectAll().where('id', '=', user.businessId).executeTakeFirst();
@@ -181,7 +208,7 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         const token = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role }, (process.env.JWT_SECRET || 'fallback_secret'), { expiresIn: '7d' });
-        res.json({ token, user: { id: user.id, name: user.name, role: user.role, businessId: user.businessId }, business: user.business });
+        res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId }, business: user.business });
     }
     catch (error) {
         console.error('Login error:', error);

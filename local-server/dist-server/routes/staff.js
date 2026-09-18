@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
 import jwt from 'jsonwebtoken';
+import { validatePassword } from '../utils/security.js';
 const router = express.Router();
 const authenticate = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -49,6 +50,12 @@ router.post('/', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { name, email, password, pin, role, outletId, locationId } = req.body;
+        if (password) {
+            const passwordValidation = validatePassword(password, name);
+            if (!passwordValidation.isValid) {
+                return res.status(400).json({ error: passwordValidation.message });
+            }
+        }
         const trimmedEmail = typeof email === 'string' ? email.trim() : '';
         const trimmedPin = typeof pin === 'string' ? pin.trim() : '';
         const trimmedName = typeof name === 'string' ? name.trim() : '';
@@ -154,7 +161,11 @@ router.put('/:id', async (req, res) => {
             updateData.pin = trimmedPin;
         if (hasValidEmail)
             updateData.email = trimmedEmail;
-        if (password && String(password).length >= 4) {
+        if (password) {
+            const passwordValidation = validatePassword(password, trimmedName);
+            if (!passwordValidation.isValid) {
+                return res.status(400).json({ error: passwordValidation.message });
+            }
             updateData.password = await bcrypt.hash(password, 10);
         }
         const user = await db.updateTable('User')

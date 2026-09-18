@@ -308,6 +308,16 @@ export default function OutletsDevices() {
           </div>
         </section>
       </div>
+
+      <ConfirmModal
+        isOpen={showUnlinkConfirm}
+        title="Unlink All Servers?"
+        message="Are you sure you want to unlink all edge servers from this branch? Connected offline POS nodes will immediately lose synchronization capabilities."
+        confirmText="Yes, Unlink Servers"
+        onConfirm={executeUnlink}
+        onCancel={() => setShowUnlinkConfirm(false)}
+        isDestructive={true}
+      />
     </div>
   );
 }

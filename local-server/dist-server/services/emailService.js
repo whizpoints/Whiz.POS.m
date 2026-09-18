@@ -1,15 +1,21 @@
-import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv';
 dotenv.config();
-const transporter = nodemailer.createTransport({
-    host: process.env.BREVO_SMTP_SERVER,
-    port: Number(process.env.BREVO_SMTP_PORT) || 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.BREVO_SMTP_LOGIN,
-        pass: process.env.BREVO_SMTP_KEY,
-    },
-});
+let transporter = null;
+const getTransporter = async () => {
+    if (!transporter) {
+        const nodemailer = await import('nodemailer');
+        transporter = nodemailer.createTransport({
+            host: process.env.BREVO_SMTP_SERVER,
+            port: Number(process.env.BREVO_SMTP_PORT) || 587,
+            secure: false, // true for 465, false for other ports
+            auth: {
+                user: process.env.BREVO_SMTP_LOGIN,
+                pass: process.env.BREVO_SMTP_KEY,
+            },
+        });
+    }
+    return transporter;
+};
 export const sendReceiptEmail = async (toEmail, customerName, receiptNumber, totalAmount, receiptUrl, businessEmail) => {
     const mailOptions = {
         from: `"${process.env.BREVO_FROM_NAME}" <${process.env.BREVO_RECEIPTS_FROM_EMAIL}>`,
@@ -32,7 +38,7 @@ export const sendReceiptEmail = async (toEmail, customerName, receiptNumber, tot
     `
     };
     try {
-        const info = await transporter.sendMail(mailOptions);
+        const info = await (await getTransporter()).sendMail(mailOptions);
         console.log('Receipt email sent: %s', info.messageId);
         return info;
     }

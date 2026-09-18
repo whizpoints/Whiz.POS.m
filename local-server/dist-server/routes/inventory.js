@@ -4,7 +4,6 @@ import db from '../db.js';
 import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
-import ExcelJS from 'exceljs';
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 // const prisma = new PrismaClient();
@@ -229,7 +228,7 @@ router.get('/template/products', async (req, res) => {
         const { businessId } = req.user;
         const categories = await db.selectFrom('Category').selectAll().where('businessId', '=', businessId).execute();
         const products = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
-        const workbook = new ExcelJS.Workbook();
+        const workbook = new (await import('exceljs')).default.Workbook();
         workbook.creator = 'Whiz POS Server';
         // MUST ADD PRODUCTS SHEET FIRST so it's the active sheet when opened
         const sheet = workbook.addWorksheet('Products', { views: [{ state: 'frozen', ySplit: 1 }] });
@@ -288,7 +287,7 @@ router.post('/import/products', upload.single('file'), async (req, res) => {
         const { businessId } = req.user;
         if (!req.file)
             return res.status(400).json({ error: 'No file uploaded' });
-        const workbook = new ExcelJS.Workbook();
+        const workbook = new (await import('exceljs')).default.Workbook();
         await workbook.xlsx.load(req.file.buffer);
         const sheet = workbook.getWorksheet('Products') || workbook.worksheets[0];
         let count = 0;
@@ -341,7 +340,7 @@ router.get('/template/reconciliation', async (req, res) => {
             }
             return prods;
         })();
-        const workbook = new ExcelJS.Workbook();
+        const workbook = new (await import('exceljs')).default.Workbook();
         const sheet = workbook.addWorksheet('Stock Audit', { views: [{ state: 'frozen', ySplit: 1 }] });
         sheet.columns = [
             { header: 'Product ID (DO NOT EDIT)', key: 'id', width: 30 },
@@ -394,7 +393,7 @@ router.post('/import/reconciliation', upload.single('file'), async (req, res) =>
         }
         if (!targetLocationId)
             return res.status(400).json({ error: 'No location found' });
-        const workbook = new ExcelJS.Workbook();
+        const workbook = new (await import('exceljs')).default.Workbook();
         await workbook.xlsx.load(req.file.buffer);
         const sheet = workbook.getWorksheet('Stock Audit') || workbook.worksheets[0];
         let count = 0;
