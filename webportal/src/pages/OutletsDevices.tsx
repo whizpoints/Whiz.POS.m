@@ -4,7 +4,7 @@ import LocationManager from '../components/Settings/LocationManager';
 import TerminalManager from '../components/Settings/TerminalManager';
 import BranchPerformanceChart from '../components/Settings/BranchPerformanceChart';
 import { useBranchContext } from '../context/BranchContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
 export default function OutletsDevices() {
