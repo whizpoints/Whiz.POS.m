@@ -225,7 +225,7 @@ function RealTimeClock() {
   );
 }
 
-function DashboardLayout({ children }: { children: ReactNode }) {
+  function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -273,7 +273,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
 
   const breadcrumb = (() => {
     const path = location.pathname;
-    const crumbs: { label: string; to?: string }[] = [{ label: 'Back Office', to: '/dashboard' }];
+    const crumbs: { label: string; to?: string }[] = [{ label: 'Local Server', to: '/dashboard' }];
     if (path.startsWith('/dashboard')) {
       const seg = path.replace('/dashboard', '').replace(/^\//, '');
       const labelMap: Record<string, string> = {
@@ -293,16 +293,23 @@ function DashboardLayout({ children }: { children: ReactNode }) {
   })();
 
   return (
-    <div className="app-shell flex">
+    <div className="app-shell flex h-screen overflow-hidden">
       <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <Link to="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <div className="sidebar-logo">
-              <img src="/logo.png" alt="Whiz POS" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <Link to="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity min-w-0">
+            <div className="sidebar-logo shrink-0">
+              <img src="/logo.png" alt="Logo" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             </div>
-            <div className="sidebar-brand">Whiz <span>POS</span></div>
+            <div className="sidebar-brand text-[15px] leading-tight break-words truncate font-black tracking-tight" title={user?.business?.name || user?.name || 'Local Server'}>
+              {user?.business?.name ? (
+                <span className="text-sky-500">{user.business.name.split(' ')[0]}</span>
+              ) : 'Local '}
+              <span className="text-slate-800">
+                {user?.business?.name ? user.business.name.split(' ').slice(1).join(' ') : 'Server'}
+              </span>
+            </div>
           </Link>
-          <button className="btn btn-icon btn-ghost ml-auto sidebar-toggle" onClick={() => setMobileOpen(false)}>
+          <button className="btn btn-icon btn-ghost ml-auto sidebar-toggle shrink-0" onClick={() => setMobileOpen(false)}>
             <X />
           </button>
         </div>
