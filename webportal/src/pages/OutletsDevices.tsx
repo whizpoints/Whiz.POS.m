@@ -7,15 +7,16 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 export default function OutletsDevices() {
-  const { activeLocationId } = useBranchContext();
+  const { activeLocationId, setActiveLocationId, locations } = useBranchContext();
   const [isGenerating, setIsGenerating] = useState(false);
   const [pairingData, setPairingData] = useState<{ pairingCode: string, apiKey: string } | null>(null);
+
+  const activeLocation = locations.find((l: any) => l.id === activeLocationId);
 
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
     toast.success(type + ' copied to clipboard!');
   };
-
 
   const generatePairingCode = async () => {
     if (!activeLocationId || activeLocationId === 'ALL') {
@@ -50,39 +51,63 @@ export default function OutletsDevices() {
     }
   };
 
+  // VIEW 1: MASTER LIST (ALL BRANCHES)
+  if (!activeLocationId || activeLocationId === 'ALL') {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-muted)] mb-1">
+              Global Overview
+            </div>
+            <h1 className="font-heading text-2xl sm:text-[1.7rem] font-black tracking-tight text-[color:var(--text-primary)] truncate flex items-center gap-2">
+              <Building2 className="w-6 h-6 text-[color:var(--accent-primary)]" />
+              Branch Management
+            </h1>
+            <p className="text-sm text-[color:var(--text-secondary)] mt-0.5">
+              Select a branch below to manage its local servers, active POS outlets, and device approvals.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <LocationManager />
+        </div>
+      </div>
+    );
+  }
+
+  // VIEW 2: BRANCH DRILL-DOWN (SPECIFIC BRANCH SELECTED)
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 p-6">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+    <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 p-6">
+      
+      {/* Back Button and Header */}
+      <div className="flex flex-col gap-4">
+        <button 
+          onClick={() => {
+            setActiveLocationId('ALL');
+            setPairingData(null);
+          }}
+          className="w-fit flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-sky-600 transition-colors bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"
+        >
+          &larr; Back to all branches
+        </button>
+        
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-muted)] mb-1">
-            Network Management
+            Managing Network For
           </div>
-          <h1 className="font-heading text-2xl sm:text-[1.7rem] font-black tracking-tight text-[color:var(--text-primary)] truncate flex items-center gap-2">
-            <Building2 className="w-6 h-6 text-[color:var(--accent-primary)]" />
-            Outlets & Devices
+          <h1 className="font-heading text-2xl sm:text-[1.7rem] font-black tracking-tight text-sky-600 truncate flex items-center gap-2">
+            <Server className="w-6 h-6" />
+            {activeLocation?.name || 'Selected Branch'} Server Node
           </h1>
           <p className="text-sm text-[color:var(--text-secondary)] mt-0.5">
-            Manage your physical locations and approve local POS terminals connecting to the cloud.
+            Manage local servers, outlets, and POS terminals linked exclusively to this branch.
           </p>
         </div>
       </div>
 
       <div className="space-y-8">
-        <div className="glass-panel p-6 rounded-2xl border border-slate-200 mb-8">
-          <LocationManager />
-        </div>
-
-        {/* Active Outlets Section */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Building2 className="w-5 h-5 text-[color:var(--text-primary)]" />
-            <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Active Outlets</h2>
-          </div>
-          <div className="glass-panel p-4 rounded-2xl">
-            <OutletsManager />
-          </div>
-        </section>
-
         {/* Local Server Pairing Section */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -109,11 +134,11 @@ export default function OutletsDevices() {
               {!pairingData ? (
                 <button
                   onClick={generatePairingCode}
-                  disabled={isGenerating || activeLocationId === 'ALL'}
+                  disabled={isGenerating}
                   className="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2.5 px-6 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50"
                 >
                   {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
-                  {activeLocationId === 'ALL' ? 'Select a Location First' : 'Generate Secure Handshake'}
+                  Generate Secure Handshake for this Server
                 </button>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl animate-in slide-in-from-top-4">
@@ -145,13 +170,27 @@ export default function OutletsDevices() {
           </div>
         </section>
 
+        {/* Active Outlets Section */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Building2 className="w-5 h-5 text-[color:var(--text-primary)]" />
+            <div>
+              <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Server Outlets</h2>
+              <p className="text-xs text-[color:var(--text-muted)]">Manage the sub-departments that belong to this local server.</p>
+            </div>
+          </div>
+          <div className="glass-panel p-4 rounded-2xl">
+            <OutletsManager />
+          </div>
+        </section>
+
         {/* Device Approvals Section */}
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Monitor className="w-5 h-5 text-[color:var(--text-primary)]" />
             <div>
               <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Pending Device Approvals</h2>
-              <p className="text-xs text-[color:var(--text-muted)]">Local POS terminals broadcasting connection requests.</p>
+              <p className="text-xs text-[color:var(--text-muted)]">Approve local POS terminals broadcasting to this server.</p>
             </div>
           </div>
           <div className="glass-panel p-4 rounded-2xl">

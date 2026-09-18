@@ -5,11 +5,12 @@ import LocationModal from './LocationModal';
 import toast from 'react-hot-toast';
 
 export default function LocationManager() {
-  const { locations, activeLocationId, isLoading } = useBranchContext();
+  const { locations, activeLocationId, setActiveLocationId, isLoading } = useBranchContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (locations.length <= 1) {
       toast.error('You must have at least one location.');
       return;
@@ -35,7 +36,8 @@ export default function LocationManager() {
     }
   };
 
-  const handleEdit = (loc: any) => {
+  const handleEdit = (loc: any, e: React.MouseEvent) => {
+    e.stopPropagation();
     setSelectedLocation(loc);
     setIsModalOpen(true);
   };
@@ -63,7 +65,11 @@ export default function LocationManager() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {locations.map(loc => (
-          <div key={loc.id} className={`glass-panel p-5 rounded-2xl border ${activeLocationId === loc.id ? 'border-sky-500 bg-sky-500/5' : 'border-slate-200'}`}>
+          <div 
+            key={loc.id} 
+            onClick={() => setActiveLocationId(loc.id)}
+            className={`glass-panel p-5 rounded-2xl border cursor-pointer hover:border-sky-400 hover:shadow-md transition-all ${activeLocationId === loc.id ? 'border-sky-500 bg-sky-500/5 shadow-md ring-1 ring-sky-500' : 'border-slate-200'}`}
+          >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
@@ -76,18 +82,25 @@ export default function LocationManager() {
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => handleEdit(loc)}
+                  onClick={(e) => handleEdit(loc, e)}
                   className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => handleDelete(loc.id)}
+                  onClick={(e) => handleDelete(loc.id, e)}
                   className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+            
+            {/* Show a "Manage Servers & Outlets" hint button */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+                <span className="text-xs font-semibold text-sky-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    Manage Servers & Outlets &rarr;
+                </span>
             </div>
           </div>
         ))}
