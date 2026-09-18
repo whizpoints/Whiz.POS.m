@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 export default function OutletsDevices() {
   const { activeLocationId, setActiveLocationId, locations } = useBranchContext();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState(false);
   const [pairingData, setPairingData] = useState<{ pairingCode: string, apiKey: string } | null>(null);
 
   useEffect(() => {
@@ -20,7 +21,40 @@ export default function OutletsDevices() {
 
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(type + ' copied to clipboard!');
+    toast.success(`${type} copied to clipboard!`);
+  };
+
+  const unlinkServers = async () => {
+    if (!activeLocationId || activeLocationId === 'ALL') return;
+    
+    if (!window.confirm('Are you sure you want to unlink ALL servers from this branch? Devices will immediately lose sync capabilities.')) {
+      return;
+    }
+    
+    setIsUnlinking(true);
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+      const res = await fetch(`${API_BASE_URL}/api/auth/unlink`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ locationId: activeLocationId })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success('All edge servers unlinked successfully! Please refresh to update.');
+        // In real app, we'd trigger a context refetch here
+      } else {
+        toast.error(data.error || 'Failed to unlink servers');
+      }
+    } catch (err: any) {
+      toast.error('An error occurred while unlinking servers');
+    } finally {
+      setIsUnlinking(false);
+    }
   };
 
   const generatePairingCode = async () => {
@@ -173,9 +207,14 @@ export default function OutletsDevices() {
                          {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Server className="w-4 h-4" />}
                          Link Another Server
                       </button>
-                      <button className="bg-white text-red-500 hover:bg-red-50 font-bold py-2.5 px-6 rounded-xl border border-red-100 shadow-sm transition-all">
-                         Unlink All Servers
-                      </button>
+                        <button 
+                          className="bg-white text-red-500 hover:bg-red-50 font-bold py-2.5 px-6 rounded-xl border border-red-100 shadow-sm transition-all flex items-center justify-center gap-2"
+                          onClick={unlinkServers}
+                          disabled={isUnlinking}
+                        >
+                           {isUnlinking ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
+                           Unlink All Servers
+                        </button>
                     </div>
                  </div>
               ) : (

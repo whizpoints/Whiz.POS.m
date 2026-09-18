@@ -1,11 +1,10 @@
+import prisma from '../db.js';
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { uploadAsset } from '../services/s3Service.js';
 
 const router = Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 // Use memory storage for multer to buffer the file directly to S3

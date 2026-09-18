@@ -1,10 +1,9 @@
+import prisma from '../db.js';
 import express from 'express';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
-import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Configure multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });

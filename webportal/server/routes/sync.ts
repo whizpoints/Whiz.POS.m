@@ -1,10 +1,9 @@
+import prisma from '../db.js';
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import * as jwt from 'jsonwebtoken';
 import { sendReceiptEmail } from '../services/emailService.js';
 
 const router = Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 // Middleware to authenticate sync requests

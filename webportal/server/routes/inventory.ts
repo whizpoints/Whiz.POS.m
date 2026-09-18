@@ -1,5 +1,5 @@
+import prisma from '../db.js';
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
@@ -8,7 +8,6 @@ import ExcelJS from 'exceljs';
 const upload = multer({ dest: 'uploads/' });
 
 const router = Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 const authenticate = (req: any, res: any, next: any) => {

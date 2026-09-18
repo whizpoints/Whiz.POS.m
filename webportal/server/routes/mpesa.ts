@@ -1,10 +1,9 @@
+import prisma from '../db.js';
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { MpesaCallbackUrlService } from '../services/mpesaUrls.js';
 import { generateSecurityCredential } from '../utils/crypto.js';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Helper to get OAuth Token
 async function getOAuthToken(consumerKey: string, consumerSecret: string, environment: string) {

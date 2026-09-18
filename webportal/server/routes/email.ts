@@ -1,8 +1,7 @@
+import prisma from '../db.js';
 import { buildTransactionalEmail } from '../utils/emailEngine.js';
 // @ts-nocheck
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
 import nodemailer from 'nodemailer';
 import { decrypt } from '../utils/crypto.js';
 import fs from 'fs';

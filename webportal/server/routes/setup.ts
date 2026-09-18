@@ -1,8 +1,7 @@
+import prisma from '../db.js';
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.post('/sync', async (req, res) => {
   const { outletId, cloudToken, business, users } = req.body;

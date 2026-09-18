@@ -1,5 +1,5 @@
+import prisma from '../db.js';
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
@@ -26,7 +26,6 @@ router.get('/proxy-image', async (req, res) => {
   }
 });
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 // Helper to authenticate

@@ -1,8 +1,7 @@
+import prisma from '../db.js';
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get stock movements for a business
 router.get('/:businessId', async (req, res) => {

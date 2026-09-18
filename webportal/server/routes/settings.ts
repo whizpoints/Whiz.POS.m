@@ -1,8 +1,7 @@
+import prisma from '../db.js';
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Get M-Pesa config
 router.get('/mpesa', async (req: any, res: any) => {

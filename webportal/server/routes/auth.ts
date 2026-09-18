@@ -1,13 +1,12 @@
+import prisma from '../db.js';
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { validatePassword } from '../utils/security.js';
 
 const router = Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 const smtpPort = parseInt(process.env.BREVO_SMTP_PORT || '465');
@@ -377,6 +376,46 @@ router.post('/verify-api-key', async (req, res) => {
   } catch (error: any) {
     console.error('generate-pairing-code error:', error);
     res.status(500).json({ error: 'Failed to generate pairing code: ' + (error.message || String(error)) });
+  }
+});
+
+// Unlink all servers from a Location
+router.post('/unlink', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const token = authHeader.split(' ')[1];
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { locationId } = req.body;
+    if (!locationId) return res.status(400).json({ error: 'Location ID required' });
+
+    const existing = await prisma.storeLocation.findUnique({ where: { id: locationId } });
+    if (!existing) return res.status(404).json({ error: 'Location not found' });
+    
+    if (decoded && decoded.businessId && existing.businessId !== decoded.businessId) {
+       return res.status(403).json({ error: 'Forbidden: Business ID mismatch' });
+    }
+
+    await prisma.storeLocation.update({
+      where: { id: locationId },
+      data: { 
+        pairingCode: null,
+        pairingCodeExpiresAt: null,
+        apiKey: null
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('unlink error:', error);
+    res.status(500).json({ error: 'Failed to unlink servers: ' + (error.message || String(error)) });
   }
 });
 

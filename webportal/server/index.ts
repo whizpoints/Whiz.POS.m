@@ -1,8 +1,7 @@
+import prisma from './db.js';
 import express from 'express';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';

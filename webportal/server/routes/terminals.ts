@@ -1,9 +1,8 @@
+import prisma from '../db.js';
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // POS Client calls this to request connection
 router.post('/register', async (req, res) => {
