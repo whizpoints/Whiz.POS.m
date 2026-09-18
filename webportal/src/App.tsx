@@ -32,6 +32,9 @@ import Reports from './pages/Reports';
 import MpesaReconciliation from './pages/MpesaReconciliation';
 import MpesaDocs from './pages/docs/MpesaDocs';
 import Documents from './pages/Documents';
+import { ToastContainer } from 'react-toastify';
+import { ConfirmProvider } from './context/ConfirmContext';
+import 'react-toastify/dist/ReactToastify.css';
 import { Toaster } from 'react-hot-toast';
 
 import AdminLayout from './pages/admin/AdminLayout';
@@ -162,7 +165,8 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 function App() {
   return (
     <ThemeProvider>
-      <Router>
+      <ConfirmProvider>
+        <Router>
         <Toaster 
           position="top-right" 
           toastOptions={{
@@ -224,8 +228,9 @@ function App() {
           <Route path="/admin/security" element={<AdminWrapper><div className="p-8 text-white">Security & Backup Module Coming Soon</div></AdminWrapper>} />
 
           <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />
-        </Routes>
-      </Router>
+          </Routes>
+        </Router>
+      </ConfirmProvider>
     </ThemeProvider>
   );
 }

@@ -3,11 +3,14 @@ import { MapPin, Plus, Trash2, Edit2 } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import LocationModal from './LocationModal';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export default function LocationManager() {
   const { locations, activeLocationId, setActiveLocationId, isLoading } = useBranchContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
+
+  const { confirm } = useConfirm();
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -16,7 +19,12 @@ export default function LocationManager() {
       return;
     }
     
-    if (!confirm('Are you sure you want to delete this branch? This will delete all connected outlets and data.')) return;
+    const confirmed = await confirm({
+      title: 'Delete Branch?',
+      message: 'Are you sure you want to delete this branch? This will delete all connected outlets and data.',
+      confirmText: 'Delete Branch'
+    });
+    if (!confirmed) return;
     
     try {
       const token = localStorage.getItem('whiz-token');
