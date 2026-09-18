@@ -19,6 +19,7 @@ import Outlets from './pages/Outlets';
 import OutletDetails from './pages/OutletDetails';
 import SyncLogs from './pages/SyncLogs';
 import { BranchProvider, useBranchContext } from './context/BranchContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 
 import Customers from './pages/Customers';
 import Sales from './pages/Sales';
@@ -123,7 +124,8 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 function App() {
   return (
     <ThemeProvider>
-      <Router>
+      <ConfirmProvider>
+        <Router>
         <Toaster 
           position="top-right" 
           toastOptions={{
@@ -178,6 +180,7 @@ function App() {
           <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />
         </Routes>
       </Router>
+      </ConfirmProvider>
     </ThemeProvider>
   );
 }

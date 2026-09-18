@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Layers, Plus, Edit, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../context/ConfirmContext';
 
 interface Category {
   id: string;
@@ -8,6 +9,7 @@ interface Category {
 }
 
 export default function Categories() {
+  const { confirm } = useConfirm();
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -56,7 +58,11 @@ export default function Categories() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this category?')) return;
+    const confirmed = await confirm({
+      title: 'Confirm Action',
+      message: 'Are you sure you want to delete this category?'
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/categories/${id}`, {
         method: 'DELETE',

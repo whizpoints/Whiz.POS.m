@@ -4,8 +4,10 @@ import { Server, Users, Package, ArrowLeft, Plus, Minus, Trash2, X } from 'lucid
 import toast from 'react-hot-toast';
 import { useBranchContext } from '../context/BranchContext';
 import BatchAssignModal from '../components/Outlets/BatchAssignModal';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function OutletDetails() {
+  const { confirm } = useConfirm();
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'inventory'>('overview');
   const [outlet, setOutlet] = useState<any>(null);
@@ -90,7 +92,11 @@ export default function OutletDetails() {
   };
 
   const removeUser = async (userId: string) => {
-    if (!confirm('Remove this user from the outlet?')) return;
+    const confirmed = await confirm({
+      title: 'Confirm Action',
+      message: 'Remove this user from the outlet?'
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/outlets/${id}/users/${userId}`, {
         method: 'DELETE',

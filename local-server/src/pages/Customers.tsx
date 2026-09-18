@@ -4,8 +4,10 @@ import { getApiBaseUrl } from '../lib/utils';
 import { Mail, RefreshCw } from 'lucide-react';
 import CustomerModal from '../components/Customers/CustomerModal';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function Customers() {
+  const { confirm } = useConfirm();
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,7 +39,11 @@ export default function Customers() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this customer?')) return;
+    const confirmed = await confirm({
+      title: 'Confirm Action',
+      message: 'Are you sure you want to delete this customer?'
+    });
+    if (!confirmed) return;
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();

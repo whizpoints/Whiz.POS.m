@@ -32,9 +32,7 @@ import Reports from './pages/Reports';
 import MpesaReconciliation from './pages/MpesaReconciliation';
 import MpesaDocs from './pages/docs/MpesaDocs';
 import Documents from './pages/Documents';
-import { ToastContainer } from 'react-toastify';
 import { ConfirmProvider } from './context/ConfirmContext';
-import 'react-toastify/dist/ReactToastify.css';
 import { Toaster } from 'react-hot-toast';
 
 import AdminLayout from './pages/admin/AdminLayout';

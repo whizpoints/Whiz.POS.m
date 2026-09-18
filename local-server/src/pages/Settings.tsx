@@ -1,3 +1,4 @@
+import { useConfirm } from '../context/ConfirmContext';
 import { useState, useEffect, type ReactNode } from 'react';
 import {
   Key, Copy, CheckCircle2, CreditCard, ShieldCheck, AlertTriangle,

@@ -42,8 +42,10 @@ const DOCUMENT_TYPES: { id: DocumentType; label: string; icon: any; category: 't
 
 
 import toast from 'react-hot-toast';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function InvoiceGenerator() {
+  const { confirm } = useConfirm();
   const { businessSetup, transactions, currentCashier, documentSettings, saveDocumentSettings, creditCustomers, saveCreditCustomer, documents, saveDocument, deleteDocument } = usePosStore();
 
   // Document State
@@ -269,9 +271,13 @@ export default function InvoiceGenerator() {
     setShowSavedDocs(false);
   };
 
-  const handleDeleteDocument = (id: string, e: React.MouseEvent) => {
+  const handleDeleteDocument = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this saved document?')) {
+    const confirmed = await confirm({
+      title: 'Confirm Action',
+      message: 'Are you sure you want to delete this saved document?'
+    });
+    if (confirmed) {
       deleteDocument(id);
       if (currentDocId === id) setCurrentDocId(null);
     }

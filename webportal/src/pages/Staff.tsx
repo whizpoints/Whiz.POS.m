@@ -4,8 +4,10 @@ import { useBranchContext } from '../context/BranchContext';
 import StaffModal from '../components/Staff/StaffModal';
 import toast from 'react-hot-toast';
 import { Trash2, Edit2 } from 'lucide-react';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function Staff() {
+  const { confirm } = useConfirm();
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { activeLocationId } = useBranchContext();
@@ -41,7 +43,11 @@ export default function Staff() {
   }, [activeLocationId]);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this staff member?')) return;
+    const confirmed = await confirm({
+      title: 'Confirm Action',
+      message: 'Are you sure you want to delete this staff member?'
+    });
+    if (!confirmed) return;
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;

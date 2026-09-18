@@ -6,8 +6,10 @@ import StockTransferModal from '../components/Inventory/StockTransferModal';
 import ProductModal from '../components/Inventory/ProductModal';
 import { Modal } from '../components/ui/modal';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function Inventory() {
+  const { confirm } = useConfirm();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
@@ -43,7 +45,11 @@ export default function Inventory() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    const confirmed = await confirm({
+      title: 'Confirm Action',
+      message: 'Are you sure you want to delete this product?'
+    });
+    if (!confirmed) return;
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();

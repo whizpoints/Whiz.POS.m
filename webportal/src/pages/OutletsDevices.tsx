@@ -6,8 +6,10 @@ import BranchPerformanceChart from '../components/Settings/BranchPerformanceChar
 import { useBranchContext } from '../context/BranchContext';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function OutletsDevices() {
+  const { confirm } = useConfirm();
   const { activeLocationId, setActiveLocationId, locations } = useBranchContext();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
@@ -27,9 +29,12 @@ export default function OutletsDevices() {
   const unlinkServers = async () => {
     if (!activeLocationId || activeLocationId === 'ALL') return;
     
-    if (!window.confirm('Are you sure you want to unlink ALL servers from this branch? Devices will immediately lose sync capabilities.')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Unlink All Servers?',
+      message: 'Are you sure you want to unlink ALL servers from this branch? Devices will immediately lose sync capabilities.',
+      confirmText: 'Yes, Unlink Servers'
+    });
+    if (!confirmed) return;
     
     setIsUnlinking(true);
     try {
@@ -308,19 +313,6 @@ export default function OutletsDevices() {
           </div>
         </section>
       </div>
-
-      <ConfirmModal
-        isOpen={showUnlinkConfirm}
-        title="Unlink All Servers?"
-        message="Are you sure you want to unlink all edge servers from this branch? Connected offline POS nodes will immediately lose synchronization capabilities."
-        confirmText="Yes, Unlink Servers"
-        onConfirm={executeUnlink}
-        onCancel={() => setShowUnlinkConfirm(false)}
-        isDestructive={true}
-      />
     </div>
   );
 }
-
-
-

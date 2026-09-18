@@ -4,8 +4,10 @@ import { useBranchContext } from '../context/BranchContext';
 import { getApiBaseUrl } from '../lib/utils';
 import SupplierModal from '../components/Suppliers/SupplierModal';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function Suppliers() {
+  const { confirm } = useConfirm();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { activeLocationId } = useBranchContext();
@@ -40,7 +42,11 @@ export default function Suppliers() {
   }, [activeLocationId]);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this supplier?')) return;
+    const confirmed = await confirm({
+      title: 'Confirm Action',
+      message: 'Are you sure you want to delete this supplier?'
+    });
+    if (!confirmed) return;
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();

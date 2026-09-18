@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Server, CheckCircle, XCircle, Clock, ChevronRight, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../context/ConfirmContext';
 
 interface Terminal {
   id: string;
@@ -21,6 +22,7 @@ interface Outlet {
 }
 
 export default function Outlets() {
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'terminals' | 'outlets'>('outlets');
   const [terminals, setTerminals] = useState<Terminal[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -91,7 +93,11 @@ export default function Outlets() {
   };
 
   const handleReject = async (id: string) => {
-    if (!confirm('Are you sure you want to reject this terminal?')) return;
+    const confirmed = await confirm({
+      title: 'Confirm Action',
+      message: 'Are you sure you want to reject this terminal?'
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/terminals/${id}/reject`, {
         method: 'POST',
@@ -108,7 +114,12 @@ export default function Outlets() {
   const handleDeleteOutlet = async (outletId: string, outletName: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to permanently delete the outlet "${outletName}"? This action cannot be undone.`)) {
+    const confirmed = await confirm({
+      title: 'Delete Outlet?',
+      message: `Are you sure you want to permanently delete the outlet "${outletName}"? This action cannot be undone.`,
+      confirmText: 'Delete Outlet'
+    });
+    if (!confirmed) {
       return;
     }
     try {

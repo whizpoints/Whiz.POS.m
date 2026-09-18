@@ -4,8 +4,10 @@ import { useBranchContext } from '../../context/BranchContext';
 import { getApiBaseUrl } from '../../lib/utils';
 import OutletModal from './OutletModal';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export default function OutletsManager() {
+  const { confirm } = useConfirm();
   const { activeLocationId } = useBranchContext();
   const [outlets, setOutlets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,11 @@ export default function OutletsManager() {
 
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this outlet?')) return;
+    const confirmed = await confirm({
+      title: 'Confirm Action',
+      message: 'Are you sure you want to delete this outlet?'
+    });
+    if (!confirmed) return;
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();
