@@ -3,6 +3,7 @@ import { Store, Plus, Trash2, Edit2 } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import OutletModal from './OutletModal';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export default function OutletsManager() {
   const { activeLocationId } = useBranchContext();
@@ -10,6 +11,8 @@ export default function OutletsManager() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOutlet, setSelectedOutlet] = useState<any>(null);
+
+  const { confirm } = useConfirm();
 
   const fetchOutlets = async () => {
     if (!activeLocationId) return;
@@ -34,7 +37,12 @@ export default function OutletsManager() {
 
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this outlet?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Outlet?',
+      message: 'Are you sure you want to delete this outlet?',
+      confirmText: 'Delete Outlet'
+    });
+    if (!confirmed) return;
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;

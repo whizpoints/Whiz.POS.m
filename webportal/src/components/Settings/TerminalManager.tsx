@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle2, Monitor, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export default function TerminalManager() {
   const [terminals, setTerminals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { confirm } = useConfirm();
 
   const fetchTerminals = async () => {
     try {
@@ -42,7 +44,12 @@ export default function TerminalManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this terminal?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Terminal?',
+      message: 'Are you sure you want to delete this terminal? It will lose connection.',
+      confirmText: 'Delete Terminal'
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || window.location.origin}/api/terminals/${id}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('whiz-token') || ''}` }, method: 'DELETE' });
       if (res.ok) {
