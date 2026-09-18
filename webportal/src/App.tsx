@@ -3,7 +3,7 @@ import { FileText,
   ShieldCheck, BarChart3, Menu, X, LogIn,
   Package, Users, UserCog, FileBarChart,
   Search, Sun, Moon, ChevronDown, Receipt, Warehouse, PieChart,
-  Sliders, Building2
+  Sliders, Building2, Clock
 } from 'lucide-react';
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react';
 
@@ -309,6 +309,23 @@ function PublicLayout({ children }: { children: ReactNode }) {
 /* ============================================================
    DASHBOARD LAYOUT (Back office)
 ============================================================ */
+
+function RealTimeClock() {
+  const [time, setTime] = useState(new Date());
+  
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  
+  return (
+    <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50/80 border border-slate-200/60 shadow-sm text-slate-700 font-mono text-[13px] tracking-wide backdrop-blur-sm mr-2 transition-all hover:bg-slate-100 hover:shadow">
+      <Clock className="w-3.5 h-3.5 text-sky-500" />
+      {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+    </div>
+  );
+}
+
 function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -415,20 +432,27 @@ function DashboardLayout({ children }: { children: ReactNode }) {
     <div className="app-shell flex h-screen overflow-hidden">
       <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <Link to="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <div className="sidebar-logo">
-              <img src="/logo.png" alt="Whiz POS" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <Link to="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity min-w-0">
+            <div className="sidebar-logo shrink-0">
+              <img src="/logo.png" alt="Logo" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             </div>
-            <div className="sidebar-brand">Whiz <span>POS</span></div>
+            <div className="sidebar-brand text-[15px] leading-tight break-words truncate font-black tracking-tight" title={user?.businessName || user?.name || 'Whiz POS'}>
+              {user?.businessName ? (
+                <span className="text-sky-500">{user.businessName.split(' ')[0]}</span>
+              ) : 'Whiz '}
+              <span className="text-slate-800">
+                {user?.businessName ? user.businessName.split(' ').slice(1).join(' ') : 'POS'}
+              </span>
+            </div>
           </Link>
-          <button className="btn btn-icon btn-ghost ml-auto sidebar-toggle" onClick={() => setMobileOpen(false)}>
+          <button className="btn btn-icon btn-ghost ml-auto sidebar-toggle shrink-0" onClick={() => setMobileOpen(false)}>
             <X />
           </button>
         </div>
 
         <nav className="sidebar-nav">
           {navGroups.map(group => (
-            <div key={group.label}>
+            <div key={group.label} className="nav-group">
               <div className="nav-section">{group.label}</div>
               {group.items.map(item => (
                 <NavLink
@@ -436,6 +460,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
                   to={item.to}
                   end={item.to === '/dashboard'}
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
                 >
                   {item.icon}
                   <span>{item.label}</span>
@@ -483,7 +508,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <div className="topbar-actions ml-auto flex shrink-0">
+            <div className="topbar-actions ml-auto flex shrink-0 items-center">
               <div className="flex items-center gap-2 mr-2">
                 {!isLoading && !isLocked && (
                   <select
@@ -510,6 +535,8 @@ function DashboardLayout({ children }: { children: ReactNode }) {
               <div className="hidden md:block">
                 <ThemeToggle />
               </div>
+              
+              <RealTimeClock />
               
               <div className="relative">
                 <button 
