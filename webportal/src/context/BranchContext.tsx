@@ -5,6 +5,8 @@ export interface StoreLocation {
   name: string;
   address?: string;
   createdAt?: string;
+  apiKey?: string;
+  pairingCode?: string;
 }
 
 interface BranchContextType {
