@@ -56,9 +56,9 @@ export default function LocationManager() {
         </div>
         <button
           onClick={handleCreate}
-          className="btn-primary flex items-center gap-2"
+          className="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-2.5 px-6 rounded-full flex items-center gap-2 shadow-[0_8px_20px_rgba(14,165,233,0.3)] hover:shadow-[0_8px_25px_rgba(14,165,233,0.4)] hover:-translate-y-0.5 transition-all duration-300"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-5 h-5" />
           Add Branch
         </button>
       </div>
@@ -68,12 +68,12 @@ export default function LocationManager() {
           <div 
             key={loc.id} 
             onClick={() => setActiveLocationId(loc.id)}
-            className={`glass-panel p-5 rounded-2xl border cursor-pointer hover:border-sky-400 hover:shadow-md transition-all ${activeLocationId === loc.id ? 'border-sky-500 bg-sky-500/5 shadow-md ring-1 ring-sky-500' : 'border-slate-200'}`}
+            className={`bg-white/60 backdrop-blur-xl p-6 rounded-[2rem] border cursor-pointer hover:-translate-y-1 transition-all duration-300 ${activeLocationId === loc.id ? 'border-sky-400 bg-sky-50 shadow-[0_12px_40px_rgba(14,165,233,0.15)] ring-1 ring-sky-400' : 'border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgba(14,165,233,0.1)] hover:border-sky-200'}`}
           >
             <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
-                  <MapPin className="w-5 h-5" />
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${activeLocationId === loc.id ? 'bg-sky-500 text-white shadow-sky-200' : 'bg-white text-slate-500 border border-slate-100'}`}>
+                  <MapPin className="w-6 h-6" />
                 </div>
                 <div>
                   <h4 className="font-semibold text-slate-800">{loc.name}</h4>
