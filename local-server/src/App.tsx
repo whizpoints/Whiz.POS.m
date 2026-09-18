@@ -3,7 +3,7 @@ import { FileText, Layers,
   ShieldCheck, BarChart3, Menu, X, LogIn,
   Package, Users, UserCog, FileBarChart,
   Search, Bell, Sun, Moon, ChevronDown, Receipt, Warehouse, PieChart,
-  Sliders, Server, Activity
+  Sliders, Server, Activity, Clock
 } from 'lucide-react';
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react';
 
@@ -209,6 +209,22 @@ function PublicLayout({ children }: { children: ReactNode }) {
 /* ============================================================
    DASHBOARD LAYOUT (Back office)
 ============================================================ */
+function RealTimeClock() {
+  const [time, setTime] = useState(new Date());
+  
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  
+  return (
+    <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50/80 border border-slate-200/60 shadow-sm text-slate-700 font-mono text-[13px] tracking-wide backdrop-blur-sm mr-2 transition-all hover:bg-slate-100 hover:shadow">
+      <Clock className="w-3.5 h-3.5 text-sky-500" />
+      {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+    </div>
+  );
+}
+
 function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -361,11 +377,12 @@ function DashboardLayout({ children }: { children: ReactNode }) {
                   </select>
                 )}
               </div>
-              <div className="search-box hidden md:flex">
-                <Search />
-                <input placeholder="Search sales, products..." />
-              </div>
-              <ThemeToggle />
+                <div className="search-bar hidden md:flex" style={{ '--icon-color': 'var(--text-muted)' } as any}>
+                  <Search />
+                  <input placeholder="Search sales, products..." />
+                </div>
+                <RealTimeClock />
+                <ThemeToggle />
               <button className="btn btn-icon btn-secondary relative" aria-label="Notifications">
                 <Bell />
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full" style={{ background: 'var(--accent-error)', boxShadow: '0 0 0 2px var(--bg-secondary)' }}></span>

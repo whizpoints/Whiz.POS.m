@@ -12,6 +12,10 @@ export default function OutletsDevices() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [pairingData, setPairingData] = useState<{ pairingCode: string, apiKey: string } | null>(null);
 
+  useEffect(() => {
+    setPairingData(null);
+  }, [activeLocationId]);
+
   const activeLocation = locations.find((l: any) => l.id === activeLocationId);
 
   const handleCopy = (text: string, type: string) => {
@@ -145,6 +149,11 @@ export default function OutletsDevices() {
                         A local server is currently paired to this branch. It is handling offline transactions and routing data to the cloud. You can link multiple server nodes using the same API key.
                       </p>
                       <div className="flex flex-wrap gap-4 text-sm">
+                        <div className="bg-white/60 px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
+                           <Server className="w-4 h-4 text-emerald-500" />
+                           <span className="text-slate-500 font-semibold">Node ID:</span> 
+                           <span className="text-slate-800 font-mono font-bold tracking-wider">SVR-{activeLocation.apiKey.substring(0, 6).toUpperCase()}</span>
+                        </div>
                         <div className="bg-white/60 px-3 py-1.5 rounded-lg border border-slate-200">
                            <span className="text-slate-500 font-semibold mr-2">Last Sync:</span> 
                            <span className="text-slate-800 font-mono">Just now</span>
