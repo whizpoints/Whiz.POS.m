@@ -54,11 +54,11 @@ function startBackendServer() {
   const isDev = !app.isPackaged;
   
   if (isDev) {
-    // In dev, we can run the server via tsx
-    serverProcess = spawn('npx', ['tsx', 'server/index.ts'], {
+    // In dev, we bypass `npx` overhead and call the local tsx directly
+    serverProcess = spawn('node', ['./node_modules/tsx/dist/cli.mjs', 'server/index.ts'], {
       cwd: path.join(__dirname, '..'),
       stdio: 'inherit',
-      shell: true,
+      shell: false,
       windowsHide: true,
       env: { ...process.env, PORT: '5050', DATABASE_URL: 'file:./db/local.db' }
     });

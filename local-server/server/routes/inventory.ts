@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
-import ExcelJS from 'exceljs';
+
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -244,7 +244,7 @@ router.get('/template/products', async (req: any, res: any) => {
     const categories = await db.selectFrom('Category').selectAll().where('businessId', '=', businessId).execute();
     const products = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
 
-    const workbook = new ExcelJS.Workbook();
+    const workbook = new (await import('exceljs')).default.Workbook();
     workbook.creator = 'Whiz POS Server';
 
     // MUST ADD PRODUCTS SHEET FIRST so it's the active sheet when opened
@@ -308,7 +308,7 @@ router.post('/import/products', upload.single('file'), async (req: any, res: any
     const { businessId } = req.user;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    const workbook = new ExcelJS.Workbook();
+    const workbook = new (await import('exceljs')).default.Workbook();
     await workbook.xlsx.load(req.file.buffer);
     const sheet = workbook.getWorksheet('Products') || workbook.worksheets[0];
 
@@ -368,7 +368,7 @@ router.get('/template/reconciliation', async (req: any, res: any) => {
       return prods;
     })();
 
-    const workbook = new ExcelJS.Workbook();
+    const workbook = new (await import('exceljs')).default.Workbook();
     const sheet = workbook.addWorksheet('Stock Audit', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.columns = [
       { header: 'Product ID (DO NOT EDIT)', key: 'id', width: 30 },
@@ -423,7 +423,7 @@ router.post('/import/reconciliation', upload.single('file'), async (req: any, re
     }
     if (!targetLocationId) return res.status(400).json({ error: 'No location found' });
 
-    const workbook = new ExcelJS.Workbook();
+    const workbook = new (await import('exceljs')).default.Workbook();
     await workbook.xlsx.load(req.file.buffer);
     const sheet = workbook.getWorksheet('Stock Audit') || workbook.worksheets[0];
 
