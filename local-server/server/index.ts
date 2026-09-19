@@ -15,6 +15,7 @@ const __dirname = path.dirname(__filename);
 
 
 import authRoutes from './routes/auth.js';
+import db from './db.js';
 import syncRoutes from './routes/sync.js';
 import syncDeltaRoutes from './routes/syncDelta.js';
 import dashboardRoutes from './routes/dashboard.js';
@@ -218,16 +219,23 @@ setInterval(async () => {
       
       const pushSinceStr = lastPushLog ? new Date(lastPushLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
       
-      const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements] = await Promise.all([
+      const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements, rawReceipts] = await Promise.all([
          db.selectFrom('User').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
          db.selectFrom('Product').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
          db.selectFrom('Customer').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
          db.selectFrom('Supplier').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
          db.selectFrom('StockMovement').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+         db.selectFrom('Receipt').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
       ]);
 
-      if (localUsers.length > 0 || localProducts.length > 0 || localCustomers.length > 0 || localStockMovements.length > 0 || pushSinceStr === "1970-01-01T00:00:00.000Z") {
-          console.log(`[Sync Engine] Pushing ${localProducts.length} products, ${localUsers.length} users, ${localStockMovements.length} inventory logs to Cloud`);
+      const localTransactions = [];
+      for (const r of rawReceipts) {
+          const items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', '=', r.id).execute();
+          localTransactions.push({ ...r, items });
+      }
+
+      if (localUsers.length > 0 || localProducts.length > 0 || localCustomers.length > 0 || localStockMovements.length > 0 || localTransactions.length > 0 || pushSinceStr === "1970-01-01T00:00:00.000Z") {
+          console.log(`[Sync Engine] Pushing ${localProducts.length} products, ${localUsers.length} users, ${localStockMovements.length} inventory logs, ${localTransactions.length} transactions to Cloud`);
           
           const businessSetup = business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {};
           businessSetup.businessName = business.name;
@@ -244,6 +252,7 @@ setInterval(async () => {
                   products: localProducts,
                   customers: localCustomers,
                   suppliers: localSuppliers,
+                  transactions: localTransactions,
                   inventoryLogs: localStockMovements.map(sm => ({ ...sm, variance: sm.quantity })), // Map local quantity to cloud variance
                   businessSetup
               })
@@ -251,6 +260,10 @@ setInterval(async () => {
 
           if (pushRes.ok) {
               await db.insertInto('SyncLog').values({
+                  id: require('crypto').randomUUID(),
+                  businessId: business.id,
+                  terminal: 'LocalServer',
+                  status: 'SUCCESS',
                   type: 'PUSH_DELTA',
                   createdAt: new Date().toISOString()
               }).execute();
@@ -300,6 +313,10 @@ setInterval(async () => {
 
               if (localPostRes.ok) {
                   await db.insertInto('SyncLog').values({
+                      id: require('crypto').randomUUID(),
+                      businessId: business.id,
+                      terminal: 'LocalServer',
+                      status: 'SUCCESS',
                       type: 'PULL_DELTA',
                       createdAt: pullData.timestamp || new Date().toISOString()
                   }).execute();
@@ -309,41 +326,6 @@ setInterval(async () => {
       }
     } catch (e) {
       console.error('[Sync Engine] PULL_DELTA failed:', e.message);
-    }
-
-    // 1. Fetch pending receipts from SQLite
-    const pendingReceipts = await db.selectFrom('Receipt')
-      .selectAll()
-      .where('synced', '=', 0) // Assume synced column is integer 0 or 1
-      .execute();
-      
-    if (pendingReceipts.length === 0) return;
-    
-    // Fetch items for pending receipts
-    for (const receipt of pendingReceipts) {
-      receipt.items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', '=', receipt.id).execute();
-    }
-
-    // 2. Send to Cloud REST API
-    const res = await fetch(`${CLOUD_API}/api/sync/sales`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${location.apiKey}` // Or x-api-key based on auth logic
-      },
-      body: JSON.stringify({ receipts: pendingReceipts })
-    });
-    
-    if (res.ok) {
-      // 3. Mark as synced locally
-      for (const receipt of pendingReceipts) {
-        await db.updateTable('Receipt').set({ synced: 1 }).where('id', '=', receipt.id).execute();
-      }
-      console.log(`[Sync Engine] Successfully synced ${pendingReceipts.length} receipts to cloud.`);
-      
-      if (cloudSocket && cloudSocket.connected) {
-         cloudSocket.emit('local_transaction_synced', { businessId: location.businessId, count: pendingReceipts.length });
-      }
     }
   } catch (err) {
     // console.error('[Sync Engine] Background sync failed:', err.message);

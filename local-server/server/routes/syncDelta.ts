@@ -255,6 +255,7 @@ router.post('/', async (req: any, res: any) => {
       suppliers: 0,
       transactions: 0,
       inventory: 0,
+      mpesaConfigs: 0,
       skipped: 0
     };
 
@@ -264,6 +265,58 @@ router.post('/', async (req: any, res: any) => {
       if (!incoming.updatedAt) return true; // If local has no timestamp, assume newer
       return new Date(incoming.updatedAt) > new Date(existing.updatedAt);
     };
+
+    // 0. MpesaConfigs
+    if (mpesaConfigs && Array.isArray(mpesaConfigs)) {
+       for (const mc of mpesaConfigs) {
+          const existing = await db.selectFrom('MpesaConfig').selectAll().where('id', '=', String(mc.id)).executeTakeFirst();
+          if (resolveConflict(mc, existing)) {
+              if (existing) {
+                  await db.updateTable('MpesaConfig').set({
+                      merchantType: mc.merchantType || 'BUY_GOODS',
+                      tillNumber: mc.tillNumber || null,
+                      paybillNumber: mc.paybillNumber || null,
+                      accountReference: mc.accountReference || null,
+                      environment: mc.environment || 'sandbox',
+                      consumerKey: mc.consumerKey || '',
+                      consumerSecret: mc.consumerSecret || '',
+                      passkey: mc.passkey || '',
+                      shortcode: mc.shortcode || '',
+                      initiatorName: mc.initiatorName || null,
+                      initiatorPassword: mc.initiatorPassword || null,
+                      stkEnabled: mc.stkEnabled !== false,
+                      c2bEnabled: mc.c2bEnabled !== false,
+                      updatedAt: mc.updatedAt ? new Date(mc.updatedAt).toISOString() : new Date().toISOString()
+                  }).where('id', '=', existing.id).execute();
+              } else {
+                  await db.insertInto('MpesaConfig').values({
+                      id: String(mc.id),
+                      businessId,
+                      locationId: mc.locationId || null,
+                      outletId: mc.outletId || null,
+                      merchantType: mc.merchantType || 'BUY_GOODS',
+                      tillNumber: mc.tillNumber || null,
+                      paybillNumber: mc.paybillNumber || null,
+                      accountReference: mc.accountReference || null,
+                      environment: mc.environment || 'sandbox',
+                      consumerKey: mc.consumerKey || '',
+                      consumerSecret: mc.consumerSecret || '',
+                      passkey: mc.passkey || '',
+                      shortcode: mc.shortcode || '',
+                      initiatorName: mc.initiatorName || null,
+                      initiatorPassword: mc.initiatorPassword || null,
+                      stkEnabled: mc.stkEnabled !== false,
+                      c2bEnabled: mc.c2bEnabled !== false,
+                      createdAt: mc.createdAt ? new Date(mc.createdAt).toISOString() : new Date().toISOString(),
+                      updatedAt: mc.updatedAt ? new Date(mc.updatedAt).toISOString() : new Date().toISOString()
+                  }).execute();
+              }
+              results.mpesaConfigs++;
+          } else {
+              results.skipped++;
+          }
+       }
+    }
 
     // 1. Users
     if (users && Array.isArray(users)) {

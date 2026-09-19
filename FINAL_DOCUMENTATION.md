@@ -1,560 +1,177 @@
 # Whiz POS - Complete System Documentation
 
 ## Table of Contents
-1. [System Overview](#system-overview)
-2. [Marketing & Documentation Website (`pos.whizpoint.app`)](#marketing--documentation-website-poswhizpointapp)
-   - [Landing Page](#landing-page)
-   - [Documentation Section](#documentation-section)
-   - [Contact & Sales Page](#contact--sales-page)
-   - [SEO & Performance](#seo--performance)
-3. [Back-Office System](#back-office-system)
-   - [Global Admin Portal](#global-admin-portal)
-   - [Business Admin Portal](#business-admin-portal)
-   - [Manager Portal](#manager-portal)
-   - [Cashier Portal](#cashier-portal)
-   - [Authentication & Account Management](#authentication--account-management)
-4. [Brevo Email Integration](#brevo-email-integration)
-5. [POS Integration](#pos-integration)
+1. [System Architecture (3-Tier Model)](#system-architecture-3-tier-model)
+2. [Tier 1: POS Desktop App (Client)](#tier-1-pos-desktop-app-client)
+3. [Tier 2: Local Server (Admin Server)](#tier-2-local-server-admin-server)
+4. [Tier 3: Web Portal (Cloud Back-Office)](#tier-3-web-portal-cloud-back-office)
+5. [Data Synchronization Flow](#data-synchronization-flow)
+6. [Multi-Outlet & Integrations Management](#multi-outlet--integrations-management)
+7. [Authentication & Account Management](#authentication--account-management)
 
 ---
 
-## System Overview
+## System Architecture (3-Tier Model)
 
-**Domains**:
-- **Marketing/Docs**: `pos.whizpoint.app` - Lives in `/website` directory, shares assets with POS
-- **Back-Office API**: `api.pos.whizpoint.app` - Multi-tenant backend
-- **POS Desktop App**: Existing Electron app
+Whiz POS uses a robust, offline-first 3-tier architecture designed to support businesses with multiple physical locations and outlets, while maintaining 100% uptime in the shop even without internet access.
 
----
+1. **POS Client (`Whiz_POS-master`)**: The frontend cashier interface.
+2. **Local Server (`local-server`)**: The local network hub acting as the point of truth for a specific physical shop/outlet.
+3. **Web Portal (`webportal`)**: The global cloud backend that aggregates data across all locations.
 
-## Marketing & Documentation Website (`pos.whizpoint.app`)
-
-### Directory Structure
-```
-/website
-├── index.html                 # Landing page
-├── docs/
-│   ├── index.html            # Docs landing
-│   ├── installation.html     # Installation guide
-│   ├── features.html         # Feature guide
-│   └── troubleshooting.html  # Troubleshooting
-├── contact.html              # Contact/Sales page
-├── assets/                   # Shared with main POS
-│   ├── logo.png
-│   ├── logo.ico
-│   ├── logo.svg
-│   └── images/
-└── styles/
-    └── main.css
-```
+**Key Domains**:
+- **Cloud Backend API**: `api.whizpoint.app` (Secure HTTPS tunnel routing to the central database)
+- **Marketing/Web**: `pos.whizpoint.app`
 
 ---
 
-### Landing Page (`/`)
+## Tier 1: POS Desktop App (Client)
 
-#### Hero Section
-- **Headline**: "Modern Point-of-Sale for Every Business"
-- **Subheadline**: "Fast, reliable, and packed with features to grow your sales"
-- **CTA Buttons**:
-  - Primary: "Get Started Free"
-  - Secondary: "View Demo"
-- **Visual**: Hero image of POS in use
+The POS Client is an Electron application that cashiers interact with. It is designed to be lightweight and fast.
 
-#### Feature Grid (6 Features)
-1. **Offline-First**: Works without internet, syncs when connected
-2. **Inventory Management**: Real-time stock tracking with low-stock alerts
-3. **Multiple Payment Methods**: Cash, M-Pesa, Credit
-4. **Sales Reports**: Daily, weekly, and monthly summaries
-5. **Multi-User Support**: Cashiers, managers, and admins with permissions
-6. **Credit Customers**: Track credit sales and payments
+### Core Responsibilities
+- **Offline Checkout**: Can process sales completely offline using its local SQLite database (`sqlite-db.cjs`).
+- **Local Data Caching**: Stores a local copy of users (cashiers), products, categories, and settings needed for immediate checkout.
+- **Queueing**: Puts transactions into a `pending_syncs` queue when offline, and pushes them to the Local Server once the local network is available.
 
-#### Social Proof
-- **Testimonials**: 3-5 customer quotes with photos
-- **Logos**: Show businesses using Whiz POS
-- **Stats**: "1000+ Businesses", "5000+ Daily Transactions"
-
-#### Footer
-- Navigation links
-- Contact info
-- Social media links
-- Privacy policy & Terms of service
+### Configuration
+The POS client discovers its Local Server automatically via mDNS or can be configured manually via the `NetworkClient` to point to the Local Server's IP address (e.g., `http://192.168.1.100:5050`).
 
 ---
 
-### Documentation Section (`/docs`)
+## Tier 2: Local Server (Admin Server)
 
-#### Sidebar Navigation (Persistent)
-```
-📚 Documentation
-├── Getting Started
-│   ├── Installation
-│   ├── Setup Wizard
-│   └── First Sale
-├── Features
-│   ├── Inventory Management
-│   ├── Transactions
-│   ├── Credit Customers
-│   ├── Expense Tracking
-│   ├── Reports
-│   └── Loyalty Program
-├── Back-Office
-│   ├── Dashboard
-│   ├── Syncing Data
-│   └── API Integration
-└── Help
-    ├── Troubleshooting
-    ├── FAQ
-    └── Contact Support
-```
+The Local Server is an Electron-packaged Node/Express application running a local SQLite database (via Prisma/Kysely). It sits in the physical shop (e.g., on a manager's computer or a dedicated back-office PC) and serves all POS terminals in that outlet.
 
-#### Documentation Page Structure
-- **Table of Contents** (right sidebar, auto-generated from headings)
-- **Content** (clean, scannable sections)
-- **Code Examples** (with syntax highlighting)
-- **Screenshots** (where applicable)
-- **Next/Previous** buttons
+### Core Responsibilities
+- **Shop Point of Truth**: Holds the master local inventory, local transactions, and handles local stock deductions.
+- **Terminal Aggregation**: Receives delta pushes from all POS clients in the shop via local LAN (`/api/sync/delta`).
+- **Hardware & Integrations**: Executes hardware-specific integrations that require local network access, such as:
+  - **M-Pesa STK Push**: Communicates with Daraja API using credentials assigned to this specific outlet.
+  - **KRA eTIMS**: Communicates with local VSDC middleware or KRA servers to sign invoices.
+- **Cloud Sync Engine**: Runs a background cron job every 60 seconds to push local changes to the Web Portal and pull global updates.
 
 ---
 
-### Contact & Sales Page (`/contact`)
+## Tier 3: Web Portal (Cloud Back-Office)
 
-#### Contact Form (Brevo Integration)
-**Fields**:
-- Full Name (required)
-- Email Address (required)
-- Business Name
-- Phone Number
-- Message (required)
+The Web Portal is the global cloud backend running on Node/Express with a PostgreSQL database. It is accessible by business owners and global admins.
 
-**On Submit**:
-1. Validates all fields
-2. Sends email via Brevo SMTP to `sales@pos.whizpoint.app`
-3. Saves inquiry to back-office database
-4. Shows success message: "Thank you! We'll get back to you within 24 hours."
-
-#### Additional Info
-- **Sales Email**: `sales@pos.whizpoint.app`
-- **Phone**: +254 700 000 000
-- **Business Hours**: Mon-Fri 8am-6pm EAT
-- **Address**: Whizpoint Solutions, Nairobi, Kenya
+### Core Responsibilities
+- **Multi-Tenant Management**: Separates data securely by `Business`.
+- **Multi-Location / Multi-Outlet**: Manages multiple `StoreLocation`s and `Outlet`s under a single business account.
+- **Global Catalog & Inventory**: Maintains the master product list and tracks inventory across all outlets globally.
+- **Reporting**: Aggregates all transactions (`Receipt` and `ReceiptItem`) across all servers to provide global financial reports.
+- **Central Configuration**: Allows the business owner to remotely configure M-Pesa (`MpesaConfig`) and eTIMS credentials for specific remote outlets.
 
 ---
 
-### SEO & Performance
+## Data Synchronization Flow
 
-#### Meta Tags (All Pages)
-```html
-<title>Whiz POS - Modern Point-of-Sale System</title>
-<meta name="description" content="Fast, reliable POS system with offline support, inventory management, and sales reports. Perfect for retail businesses.">
-<meta name="keywords" content="POS, point of sale, cash register, inventory management, retail software">
-<meta property="og:title" content="Whiz POS - Modern Point-of-Sale System">
-<meta property="og:description" content="Fast, reliable POS system with offline support">
-<meta property="og:image" content="https://pos.whizpoint.app/assets/og-image.png">
-```
+The sync process utilizes a "Delta Sync" pattern with Last-Write-Wins (LWW) conflict resolution based on `updatedAt` timestamps.
 
-#### Schema Markup (Landing Page)
-```html
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Whiz POS",
-  "applicationCategory": "BusinessApplication",
-  "operatingSystem": "Windows, macOS, Linux",
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "KES"
-  },
-  "aggregateRating": {
-    "@type": "AggregateRating",
-    "ratingValue": "4.8",
-    "reviewCount": "250"
-  }
-}
-</script>
-```
+### 1. POS Client ↔ Local Server
+- **Trigger**: Continuous (when LAN is available).
+- **Push**: POS pushes new transactions and stock deductions to the Local Server.
+- **Pull**: POS pulls new products, users, and settings from the Local Server.
 
-#### Core Web Vitals Optimization
-- **Lazy Loading**: Images and iframes
-- **Minification**: CSS, JS, HTML
-- **CDN**: Host assets on CDN for fast delivery
-- **Caching**: Browser caching for static assets
-- **Responsive Images**: `srcset` for different screen sizes
+### 2. Local Server ↔ Web Portal (Cloud)
+- **Trigger**: Background Cron Job (Every 60 Seconds).
+- **Push (Upward Sync)**: The Local Server packages all `transactions` (including line items), `inventoryLogs`, `users`, and `products` modified since the last successful push, and sends them to the Web Portal.
+- **Pull (Downward Sync)**: The Local Server requests all data modified globally since the last successful pull. This includes new global products, global user updates, and `MpesaConfig` updates targeted at its specific `outletId`.
 
 ---
 
-## Back-Office System
+## Multi-Outlet & Integrations Management
 
-### URL Pattern
-- **Global Admin**: `pos.whizpoint.app/admin`
-- **Business Portal**: `pos.whizpoint.app/dashboard`
+### The Hierarchy
+- **Business**: The overarching company account.
+- **StoreLocation**: A physical geographical area (e.g., "Nairobi CBD").
+- **Outlet**: A specific shop within a location (e.g., "Shop 1", "Shop 2").
 
----
-
-### Global Admin Portal
-
-#### Login
-- **URL**: `/admin/login`
-- **Credentials**: Global admin email (from `.env`)
-
-#### Pages
-
-##### 1. Dashboard (`/admin`)
-- **Stats Cards**:
-  - Total Businesses
-  - Active Businesses
-  - Total Users
-  - Total Transactions (system-wide)
-- **Charts**:
-  - New businesses per month (line chart)
-  - Active devices (bar chart)
-- **Recent Activity**: Last 10 business signups
-
-##### 2. Businesses Management (`/admin/businesses`)
-- **Table**:
-  - Business Name
-  - Email Prefix
-  - Registered Email
-  - Status (Active/Inactive)
-  - Created At
-  - Actions
-- **Actions**:
-  - View Details
-  - Edit Business
-  - Deactivate/Activate
-  - Regenerate API Key
-- **Create New Business** Button: Opens modal with form
-
-##### 3. Sales Inquiries (`/admin/inquiries`)
-- **Table**:
-  - Name
-  - Email
-  - Business Name
-  - Message Preview
-  - Status (New/Replied/Closed)
-  - Date
-- **Actions**:
-  - View Inquiry
-  - Reply (uses Brevo to send email)
-  - Mark as Closed
-- **Reply Modal**:
-  - Pre-filled "To" (inquirer's email)
-  - Subject line
-  - Rich text editor
-  - Send button
-
-##### 4. Global Admins (`/admin/users`)
-- **Table**:
-  - Name
-  - Email
-  - Role
-  - Last Login
-  - Actions
-- **Actions**:
-  - Edit
-  - Reset Password
-  - Delete
-- **Add Admin** Button
+### How it Works
+1. When setting up a Local Server in a shop, the owner generates an **API Key** in the Web Portal assigned to a specific `Outlet`.
+2. This API Key is entered into the Local Server's setup screen.
+3. Every time the Local Server syncs with the Web Portal, it authenticates using this API Key, which the Web Portal resolves to the specific `businessId`, `locationId`, and `outletId`.
+4. **M-Pesa / eTIMS**: Because these integrations are inherently tied to physical locations (e.g., a specific Till Number for a specific shop), their configurations are tied to the `Outlet` level in the Web Portal database. The Web Portal pushes these credentials down to the correct Local Server during the Delta Pull.
 
 ---
 
-### Business Admin Portal
+## Detailed Data Matrix
 
-#### Login
-- **URL**: `/login`
-- **Email Format**: `{business-prefix}@pos.whizpoint.app` (e.g., `coffee_shop@pos.whizpoint.app`)
-- **Password**: Numeric PIN or text password (both supported)
+This section explicitly defines exactly what data is held by each portal to assist project engineers in planning changes.
 
-#### Pages
+### 1. Web Portal (Cloud - PostgreSQL via Prisma)
+*Acts as the Global Master Record for the entire business.*
+- **Business Setup**: `Business`, `StoreLocation`, `Outlet` (Defines the multi-tenant architecture).
+- **Users**: `User` (Contains all global admins, store managers, and cashiers across all locations).
+- **Catalog**: `Category`, `Product` (The master catalog shared across all locations).
+- **Inventory**: `ProductInventory` (Tracks stock levels globally, separated by `locationId` and `outletId`), `StockMovement` (Global audit log of all stock changes).
+- **Financials**: `Receipt`, `ReceiptItem` (Every sale made anywhere), `SavedDocument` (Global quotations/proforma invoices).
+- **CRM & Supply**: `Customer` (Global customer list), `Supplier` (Global vendor list).
+- **Integrations**: `MpesaConfig` (Master repository of Daraja API keys, separated by `outletId`), `MpesaTransaction` (Global ledger of all M-Pesa payments).
+- **Devices**: `Terminal` (Registry of all active POS machines).
 
-##### 1. Dashboard (`/dashboard`)
-- **Stats Cards**:
-  - Total Sales Today
-  - Total Sales This Week
-  - Total Sales This Month
-  - Current Stock Value
-  - Low Stock Items (count)
-- **Charts**:
-  - Sales Trend (last 7 days - line chart)
-  - Payment Methods (pie chart: Cash/M-Pesa/Credit)
-  - Top 5 Products (bar chart)
-- **Recent Transactions**: Last 10 transactions with quick actions
+### 2. Local Server (Shop Back-Office - SQLite via Kysely)
+*Acts as the Point of Truth for a specific Outlet.*
+- **Business Setup**: Cached subsets of `Business`, `StoreLocation`, `Outlet` relevant ONLY to the assigned API Key.
+- **Users**: Cached `User` records for cashiers/managers assigned to this location.
+- **Catalog**: Cached `Category`, `Product` pushed down from the Web Portal.
+- **Inventory**: `ProductInventory` (Master local stock levels), `StockMovement` (Local stock adjustments and sales deductions).
+- **Financials**: `Receipt`, `ReceiptItem` (Only transactions processed within this outlet), `SavedDocument` (Quotations generated locally).
+- **CRM & Supply**: `Customer`, `Supplier` (Local records, synced upward to become global).
+- **Integrations**: `MpesaConfig` (Cached from Web Portal to execute local STK pushes), `MpesaTransaction` (Local M-Pesa callbacks).
+- **Devices**: `Terminal` (Local POS machines connected to this server).
 
-##### 2. Transactions (`/transactions`)
-- **Filters**:
-  - Date Range (From/To)
-  - Cashier
-  - Payment Method
-  - Status (Completed/Pending/Refunded)
-- **Search**: By Transaction ID
-- **Table**:
-  - Transaction ID
-  - Date & Time
-  - Cashier
-  - Items (count)
-  - Total
-  - Payment Method
-  - Status
-  - Actions
-- **Actions**:
-  - View Details (modal with full transaction breakdown)
-  - Reprint Receipt
-  - Reverse Transaction (marks as refunded, restores inventory)
-  - Delete
-- **Bulk Actions**: Export to CSV, Export to PDF
-
-##### 3. Inventory Management (`/inventory`)
-- **Filters**:
-  - Category
-  - Stock Status (In Stock/Low Stock/Out of Stock)
-- **Search**: By Product Name
-- **Table**:
-  - Product Image
-  - Product Name
-  - Category
-  - Price
-  - Current Stock
-  - Min Stock
-  - Status
-  - Actions
-- **Actions**:
-  - Edit Product
-  - Delete Product
-  - View Inventory Log (for that product)
-- **Buttons**:
-  - Add Product
-  - Import Products (CSV)
-  - Export Products (CSV)
-- **Inventory Log Page** (`/inventory/logs`):
-  - All stock changes
-  - Product, Old Stock, New Stock, Variance
-  - Cashier, Timestamp, Reason
-
-##### 4. Users & Permissions (`/users`)
-- **Table**:
-  - Name
-  - Email (for back-office users) / PIN (for POS users)
-  - Role
-  - Status (Active/Inactive)
-  - Last Login
-  - Actions
-- **Roles**:
-  - **Admin**: Full access to everything
-  - **Manager**: Can view reports, manage inventory, view transactions
-  - **Cashier**: Can only use POS (no back-office access)
-- **Actions**:
-  - Edit User
-  - Reset PIN/Password
-  - Deactivate/Activate
-  - Delete
-- **Add User** Button:
-  - Name
-  - Email (for back-office)
-  - PIN (for POS, numeric only)
-  - Role
-
-##### 5. Credit Customers (`/customers`)
-- **Table**:
-  - Name
-  - Phone
-  - Total Credit
-  - Paid Amount
-  - Balance
-  - Last Updated
-  - Actions
-- **Actions**:
-  - View Details (full transaction history)
-  - Record Payment
-  - Edit Customer
-  - Delete Customer
-- **Add Customer** Button
-
-##### 6. Expenses (`/expenses`)
-- **Filters**:
-  - Date Range
-  - Category
-  - Cashier
-- **Table**:
-  - Date
-  - Description
-  - Category
-  - Amount
-  - Cashier
-  - Receipt (if uploaded)
-  - Actions
-- **Actions**:
-  - View Details
-  - Edit
-  - Delete
-- **Add Expense** Button
-- **Export to CSV/PDF**
-
-##### 7. Reports (`/reports`)
-- **Available Reports**:
-  1. **Daily Closing Report**: Cashier totals, payment breakdown, items sold
-  2. **Monthly Summary**: Aggregated data (total sales, tax, cashier totals)
-  3. **Tax Report**: Total tax collected per period
-  4. **Inventory Report**: Stock levels, low stock items, inventory value
-  5. **Cashier Performance**: Sales per cashier, transaction count
-- **Filters**: Date Range, Cashier (where applicable)
-- **Export**: All reports exportable to Excel (XLSX) and PDF
-
-##### 8. Settings (`/settings`)
-- **Business Profile**:
-  - Business Name
-  - Address
-  - Phone
-  - Email
-  - Logo Upload
-- **Tax & Currency**:
-  - Tax Rate (%)
-  - Currency (KES, USD, etc.)
-- **Receipt Settings**:
-  - Receipt Header
-  - Receipt Footer
-  - Show Print Preview
-- **POS API**:
-  - Current API Key (masked: `whiz_xxxx...xxxx`)
-  - Regenerate API Key Button (with confirmation)
-- **Notifications**:
-  - Low Stock Alerts (email)
-  - Daily Summary Email (yes/no)
+### 3. POS Client (Desktop App - local `sqlite-db.cjs`)
+*Acts as the Offline Checkout Interface.*
+- **Users**: Local cached `users` table for offline login PIN verification.
+- **Catalog**: Local cached `products` and `categories` tables for fast offline search and checkout.
+- **Settings**: Local `settings` (Receipt headers, tax rules, local printer configs).
+- **Financials**: Local `transactions` and `transaction_items` (Temporary storage before sync), `hold_orders` (Saved carts).
+- **Sync State**: `pending_syncs` (The queue table holding JSON payloads of transactions and stock deductions waiting to be pushed to the Local Server).
 
 ---
 
-### Manager Portal
-Same as Business Admin, but with restricted access:
-- ✅ Dashboard
-- ✅ Transactions (view only, no reverse/delete)
-- ✅ Inventory Management
-- ✅ Credit Customers
-- ✅ Expenses
-- ✅ Reports
-- ❌ Users & Permissions
-- ❌ Settings (except personal password change)
+## Exact Communication Protocols
+
+### 1. POS Client ↔ Local Server
+- **REST API (`/api/sync/delta`)**: 
+  - The POS Client uses `NetworkClient` to automatically discover the Local Server via **mDNS** (`whizpos-admin` service).
+  - PUSH: The POS empties its `pending_syncs` SQLite table by POSTing transactions and stock deductions to the Local Server.
+  - PULL: The POS GETs updated products and users from the Local Server.
+- **Socket.io (Port 5050)**: 
+  - The POS maintains an active WebSocket connection to the Local Server.
+  - When a cashier completes a sale, the POS emits `stock_deducted`.
+  - The Local Server broadcasts `stock_updated` to all other connected POS machines in the shop to ensure real-time inventory consistency locally without needing the internet.
+
+### 2. Local Server ↔ Web Portal
+- **REST API (`api.whizpoint.app/api/sync/delta`)**:
+  - A cron job (`setInterval`) runs every 60 seconds inside `local-server/server/index.ts`.
+  - **PUSH**: Queries the local SQLite database for `Receipt`, `ReceiptItem`, `User`, `Product`, `Customer`, `StockMovement` where `updatedAt > lastPushLog`. Sends JSON payload to Web Portal.
+  - **PULL**: Requests data where `updatedAt > lastPullLog`. The Web Portal returns global products, global users, and `MpesaConfigs`. The Local Server loops through this payload and upserts its local SQLite database.
+- **REST API (`api.whizpoint.app/api/sync/sales`)**: Secondary fallback endpoint for pushing transactions (currently deprecated in favor of the unified Delta Push).
+- **Cloud Socket.io (`https://api.whizpoint.app`)**:
+  - The Local Server maintains a persistent socket connection to the Web Portal, joining a room based on its `businessId`.
+  - Listens for `downward_sync_event` (triggered when a Web Portal admin updates a product or setting).
+  - Emits `local_transaction_synced` to notify the Web Portal dashboard to update live sales charts.
 
 ---
 
-### Cashier Portal
-No back-office access - only POS application access.
+## Authentication & Account Management
 
----
+### Web Portal (Cloud)
+- **URL**: `pos.whizpoint.app`
+- **Login**: Email and Password.
+- **Roles**: Global Admin (System Owner), Business Admin (Business Owner).
 
-### Authentication & Account Management
+### Local Server (Shop Back-Office)
+- **URL**: `http://localhost:5050` or LAN IP.
+- **Login**: Email and Password/PIN.
+- **Roles**: Store Manager, Admin.
+- **Note**: Authenticable users are synced down from the Web Portal.
 
-#### Login Page (`/login`)
-**Fields**:
-- Email Address
-- Password/PIN (input type toggles based on input - numeric keypad available for PINs)
-- Device Name (optional, for trusted devices)
-- "Remember this device" checkbox
-
-**Flow**:
-1. User enters email + password/PIN
-2. System checks if device is trusted
-   - **Trusted**: Logs in directly, issues JWT
-   - **Not Trusted**:
-     - Generates 6-digit OTP
-     - Sends OTP to registered email via Brevo
-     - Shows OTP input modal
-     - After OTP verification: trusts device, logs in
-
-#### Forgot Password (`/forgot-password`)
-**Fields**:
-- Email Address
-
-**Flow**:
-1. User enters email
-2. System checks if email exists
-3. Sends password reset link via Brevo
-4. Link expires after 1 hour
-5. Success message: "Password reset link sent to your email"
-
-#### Reset Password (`/reset-password?token=xxx`)
-**Fields**:
-- New Password
-- Confirm New Password
-
-**Rules**:
-- At least 6 characters
-- Numeric PINs allowed
-- Must match confirmation
-
-#### Change Password (Logged In)
-**Location**: User menu → Change Password
-
-**Fields**:
-- Current Password
-- New Password
-- Confirm New Password
-
-#### Change Email (Logged In)
-**Location**: User menu → Account Settings
-
-**Fields**:
-- New Email Address
-- Current Password
-
-**Flow**:
-1. User enters new email + password
-2. System sends verification link to new email
-3. User clicks link to confirm
-4. Email updated
-
----
-
-## Brevo Email Integration
-
-### Setup
-1. **API Key**: Store in `.env` as `BREVO_API_KEY`
-2. **Sender Email**: Verified in Brevo (e.g., `no-reply@pos.whizpoint.app`)
-
-### Email Types Sent
-
-#### 1. Sales Inquiry Notification
-- **To**: `sales@pos.whizpoint.app`
-- **From**: `no-reply@pos.whizpoint.app`
-- **Subject**: New Sales Inquiry from {Name}
-- **Body**: Full inquiry details
-
-#### 2. OTP Verification
-- **To**: User's email
-- **From**: `no-reply@pos.whizpoint.app`
-- **Subject**: Your Whiz POS Verification Code
-- **Body**: 6-digit OTP, expires in 10 minutes
-
-#### 3. Password Reset
-- **To**: User's email
-- **From**: `no-reply@pos.whizpoint.app`
-- **Subject**: Reset Your Whiz POS Password
-- **Body**: Reset link, expires in 1 hour
-
-#### 4. Email Change Confirmation
-- **To**: New email address
-- **From**: `no-reply@pos.whizpoint.app`
-- **Subject**: Confirm Your Email Change
-- **Body**: Confirmation link
-
-#### 5. Sales Inquiry Reply (From Admin)
-- **To**: Inquirer's email
-- **From**: `sales@pos.whizpoint.app`
-- **Subject**: Re: Your Inquiry About Whiz POS
-- **Body**: Admin's reply
-
----
-
-## POS Integration
-
-### Configuration in POS App
-**Business Setup Page**:
-- Back-Office URL: `https://api.pos.whizpoint.app`
-- API Key: (from business settings in back-office)
-
-### Sync Flow
-1. **POS is Online**: Auto-syncs every 5 minutes
-2. **Transaction Completed**: Syncs immediately
-3. **Product/Inventory Changed**: Syncs immediately
-4. **POS Comes Online**: Pulls all latest changes from back-office
-
-For full API details, see `API_INTEGRATION_GUIDE_FINAL.md`
+### POS Client
+- **Login**: Cashier PIN or Password.
+- **Roles**: Cashier.
+- **Note**: The POS authenticates against its local SQLite database, allowing login even when the internet is completely down.

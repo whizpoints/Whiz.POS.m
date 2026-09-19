@@ -57,7 +57,8 @@ router.get('/', async (req: any, res: any) => {
       customers,
       suppliers,
       transactions,
-      business
+      business,
+      mpesaConfigs
     ] = await Promise.all([
       prisma.user.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
       prisma.product.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
@@ -73,7 +74,8 @@ router.get('/', async (req: any, res: any) => {
       prisma.customer.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
       prisma.supplier.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
       prisma.receipt.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
-      prisma.business.findUnique({ where: { id: businessId } })
+      prisma.business.findUnique({ where: { id: businessId } }),
+      prisma.mpesaConfig.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } })
     ]);
 
     res.json({
@@ -86,6 +88,7 @@ router.get('/', async (req: any, res: any) => {
         customers,
         suppliers,
         transactions,
+        mpesaConfigs,
         businessSetup: business && business.updatedAt > sinceDate ? {
           ...(typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings),
           businessName: business.name
@@ -205,10 +208,9 @@ router.post('/', async (req: any, res: any) => {
         } else {
             results.skipped++;
         }
-
-        // Handle Inventory Stock removed - moving to inventoryLogs processing
       }
     }
+    
     // 2.5 Inventory Logs
     if (inventoryLogs && Array.isArray(inventoryLogs)) {
       for (const log of inventoryLogs) {
@@ -292,8 +294,9 @@ router.post('/', async (req: any, res: any) => {
                          data: { status: safeStatus as any, updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date() }
                       });
                   } else {
-                      await prisma.receipt.create({
+                      const createdReceipt = await prisma.receipt.create({
                          data: {
+                            id: t.id,
                             businessId, locationId: targetLocationId, outletId: targetOutletId || null,
                             receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
                             paymentMethod: String(t.paymentMethod || 'CASH'), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
@@ -302,6 +305,22 @@ router.post('/', async (req: any, res: any) => {
                             updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date()
                          }
                       });
+                      
+                      if (t.items && Array.isArray(t.items)) {
+                          const receiptItemsToCreate = t.items.map((item: any) => ({
+                              receiptId: createdReceipt.id,
+                              productName: item.productName || item.product?.name || 'Unknown Item',
+                              quantity: Number(item.quantity) || 1,
+                              unitPrice: Number(item.unitPrice || item.product?.price) || 0,
+                              totalPrice: Number(item.totalPrice || (Number(item.quantity) || 1) * (Number(item.unitPrice || item.product?.price) || 0))
+                          }));
+                          
+                          if (receiptItemsToCreate.length > 0) {
+                              await prisma.receiptItem.createMany({
+                                  data: receiptItemsToCreate
+                              });
+                          }
+                      }
                   }
                   results.transactions++;
               }
@@ -334,49 +353,7 @@ router.post('/', async (req: any, res: any) => {
        }
     }
     
-    
-    // 5. Saved Documents
-    if (documents && Array.isArray(documents)) {
-       for (const d of documents) {
-          if (!d.id) continue;
-          const existing = await prisma.savedDocument.findFirst({ where: { businessId, id: String(d.id) } });
-          if (resolveConflict(d, existing)) {
-              const data = {
-                  type: d.type || 'INVOICE',
-                  date: d.date ? new Date(d.date) : new Date(),
-                  dueDate: d.dueDate ? new Date(d.dueDate) : null,
-                  customerName: String(d.customerName || d.clientName || 'Walk-in'),
-                  customerEmail: d.customerEmail || d.clientEmail || null,
-                  customerPhone: d.customerPhone || null,
-                  customerAddress: d.customerAddress || d.clientAddress || null,
-                  items: JSON.stringify(d.items || []),
-                  subtotal: Number(d.subtotal) || 0,
-                  tax: Number(d.taxAmount) || 0,
-                  total: Number(d.total) || 0,
-                  notes: d.notes || null,
-                  status: d.status || 'DRAFT',
-                  metadata: JSON.stringify({
-                    docNumber: d.docNumber,
-                    subject: d.subject,
-                    bodyText: d.bodyText,
-                    partialAmount: d.partialAmount,
-                    settlementDate: d.settlementDate,
-                    daysNotice: d.daysNotice,
-                    paymentMode: d.paymentMode
-                  }),
-                  updatedAt: d.updatedAt ? new Date(d.updatedAt) : new Date()
-              };
-
-              if (existing) {
-                  await prisma.savedDocument.update({ where: { id: existing.id }, data });
-              } else {
-                  await prisma.savedDocument.create({ data: { ...data, id: String(d.id), businessId, createdAt: data.date } });
-              }
-          }
-       }
-    }
-
-      // Update business settings safely by merging
+    // Update business settings safely by merging
     if (businessSetup) {
        const b = await prisma.business.findUnique({ where: { id: businessId } });
        if (b) {
