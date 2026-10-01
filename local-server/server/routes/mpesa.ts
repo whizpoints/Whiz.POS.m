@@ -52,8 +52,8 @@ async function triggerTransactionStatus(config: any, receipt: string, businessId
         TransactionID: receipt,
         PartyA: config.shortcode,
         IdentifierType: "4",
-        ResultURL: `${baseDomain}/api/mpesa/callback/transaction-status/${businessId}`,
-        QueueTimeOutURL: `${baseDomain}/api/mpesa/callback/transaction-status/${businessId}`,
+        ResultURL: `${baseDomain}/api/callbacks/payments/callback/transaction-status/${businessId}`,
+        QueueTimeOutURL: `${baseDomain}/api/callbacks/payments/callback/transaction-status/${businessId}`,
         Remarks: "Status Check",
         Occasion: "Status"
       };
