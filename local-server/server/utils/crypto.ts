@@ -1,19 +1,21 @@
+import path from "path";
+import fs from "fs";
 import crypto from 'crypto';
 
 let cachedCertificate: string | null = null;
 
 export async function generateSecurityCredential(initiatorPassword: string): Promise<string> {
-    if (!cachedCertificate) {
+        if (!cachedCertificate) {
         try {
-            console.log('Fetching Safaricom Production Certificate dynamically...');
-            const response = await fetch('https://developer.safaricom.co.ke/certificates/ProductionCertificate.cer');
-            if (response.ok) {
-                cachedCertificate = await response.text();
-            } else {
-                console.error('Failed to fetch certificate. Status:', response.status);
+            const certPath = path.join(process.cwd(), 'server', 'utils', 'ProductionCertificate.cer');
+            let certString = fs.readFileSync(certPath, 'utf8');
+            if (!certString.includes('BEGIN CERTIFICATE')) {
+                const buffer = fs.readFileSync(certPath);
+                certString = '\n-----BEGIN CERTIFICATE-----\n' + buffer.toString('base64').match(/.{1,64}/g)?.join('\n') + '\n-----END CERTIFICATE-----\n';
             }
+            cachedCertificate = certString;
         } catch (err) {
-            console.error('Error fetching Safaricom certificate:', err);
+            console.error('Error reading Safaricom certificate from disk:', err);
         }
     }
 
