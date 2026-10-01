@@ -1,4 +1,4 @@
-let cachedStats: any = null;
+﻿let cachedStats: any = null;
 let isStatsLoaded = false;
 import { useState, useEffect } from 'react';
 import { Activity, Receipt, CreditCard, DollarSign, Store, TrendingUp } from 'lucide-react';

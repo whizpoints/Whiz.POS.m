@@ -215,7 +215,8 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
             transactionId: receipt,
             amount: parseFloat(amount),
             phoneNumber: phone.toString(),
-            status: 'UNLINKED'
+            status: 'UNLINKED',
+            isEnriched: !(config.initiatorName && config.initiatorPassword)
           },
           update: {}
         });
@@ -276,7 +277,8 @@ router.post('/callback/c2b/confirmation/:businessId', async (req: any, res: any)
         amount: parseFloat(TransAmount),
         phoneNumber: MSISDN,
         customerName,
-        status: 'UNLINKED'
+        status: 'UNLINKED',
+        isEnriched: !(config.initiatorName && config.initiatorPassword)
       },
       update: {}
     });
@@ -345,7 +347,7 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
         where: { 
           businessId,
           status: 'UNLINKED',
-          // isEnriched: true,
+          isEnriched: true,
           ...(q ? {
             OR: [
               { transactionId: { contains: q } },

@@ -217,6 +217,7 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
             amount: parseFloat(typeof amount !== 'undefined' ? amount : (typeof TransAmount !== 'undefined' ? TransAmount : '0')),
             phoneNumber: typeof phone !== 'undefined' ? phone.toString() : (typeof MSISDN !== 'undefined' ? MSISDN.toString() : ''),
             status: 'UNLINKED',
+              isEnriched: config.initiatorName && config.initiatorPassword ? 0 : 1,
             customerName: typeof customerName !== 'undefined' ? customerName : null
           }).execute();
         }
@@ -278,6 +279,7 @@ router.post('/callback/c2b/confirmation/:businessId', async (req: any, res: any)
             amount: parseFloat(typeof amount !== 'undefined' ? amount : (typeof TransAmount !== 'undefined' ? TransAmount : '0')),
             phoneNumber: typeof phone !== 'undefined' ? phone.toString() : (typeof MSISDN !== 'undefined' ? MSISDN.toString() : ''),
             status: 'UNLINKED',
+              isEnriched: config.initiatorName && config.initiatorPassword ? 0 : 1,
             customerName: typeof customerName !== 'undefined' ? customerName : null
           }).execute();
         }
