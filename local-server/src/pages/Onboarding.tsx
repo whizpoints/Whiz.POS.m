@@ -18,48 +18,88 @@ export default function Onboarding() {
   
   const [loading, setLoading] = useState(false);
 
-  // Step 1: Login to Cloud to fetch Outlets
-  const handleCloudLogin = async (e: React.FormEvent) => {
+  // --- NEW: Modern Browser Authorization Flow ---
+  const [pollIntervalId, setPollIntervalId] = useState<any>(null);
+
+  const handleLinkAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Authenticate against central cloud
-      const res = await fetch('https://api.whizpoint.app/api/auth/login', {
+      const CLOUD_API = (process.env.NODE_ENV === 'production' ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
+      
+      const res = await fetch(`${CLOUD_API}/api/pairing/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ type: 'SERVER', deviceInfo: { os: navigator.platform } })
       });
+      if (!res.ok) throw new Error('Failed to generate link request');
+      const data = await res.json();
+      
+      const connectUrl = `${CLOUD_API}/connect/server/${data.requestId}`;
+      
+      // Start polling
+      const pId = setInterval(() => checkCloudApproval(CLOUD_API, data.requestId, pId), 3000);
+      setPollIntervalId(pId);
+      
+      setStep(1.5 as any); // Hijack the step for "waiting" UI
+      
+      toast(`Please open the browser window that just popped up, or go to ${connectUrl}`, { duration: 10000 });
+      if ((window as any).electron && (window as any).electron.openExternal) {
+        (window as any).electron.openExternal(connectUrl);
+      } else {
+        window.open(connectUrl, '_blank');
+      }
+    } catch (err: any) {
+      toast.error('Cloud connection failed. Ensure you have internet.');
+      setLoading(false);
+    }
+  };
+
+  const checkCloudApproval = async (cloudApi: string, requestId: string, intervalId: any) => {
+    try {
+      const res = await fetch(`${cloudApi}/api/pairing/${requestId}/status`);
+      if (!res.ok) return;
       
       const data = await res.json();
-      if (res.ok) {
-        setCloudToken(data.token);
+      if (data.status === 'APPROVED' && data.credentials) {
+        clearInterval(intervalId);
         
-        // Fetch outlets available for this admin
-        const outRes = await fetch('https://api.whizpoint.app/api/outlets', {
-          headers: { 'Authorization': `Bearer ${data.token}` }
+        // Save the received API key directly to the server settings
+        const saveRes = await fetch('/api/settings/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            backOfficeUrl: cloudApi,
+            apiKey: data.credentials.apiKey,
+            cloudBusinessId: data.credentials.businessId,
+            syncMode: 'AUTO_REALTIME',
+            outletId: data.credentials.outletId,
+            serverId: data.credentials.serverId
+          })
         });
-        
-        if (outRes.ok) {
-          const outData = await outRes.json();
-          setOutlets(outData.outlets || []);
-          setStep(2);
+
+        // Trigger local DB seeding via /api/setup/sync
+        const syncRes = await fetch('/api/setup/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ outletId: data.credentials.outletId, cloudToken: data.credentials.apiKey })
+        });
+
+        if (saveRes.ok && syncRes.ok) {
+           toast.success('Successfully Linked to Cloud and Setup!');
+           setStep(3);
         } else {
-          // Fallback if cloud API differs
-          setOutlets([{ id: 'out_demo', name: 'Demo Outlet' }]);
-          setStep(2);
+           const errData = await saveRes.json().catch(() => ({}));
+           toast.error(errData.error || 'Failed to save configuration locally');
+           setStep(1);
         }
-      } else {
-        toast.error(data.error || 'Invalid cloud credentials');
+      } else if (data.status === 'EXPIRED') {
+        clearInterval(intervalId);
+        toast.error('Pairing request expired');
+        setStep(1);
       }
     } catch (err) {
-      console.error(err);
-      // Fallback for development if cloud is unreachable
-      toast.error('Could not reach Cloud Server. Simulating login for Dev Mode.');
-      setCloudToken('dev_token');
-      setOutlets([{ id: 'out_demo', name: 'Demo Outlet (Simulated)' }]);
-      setStep(2);
-    } finally {
-      setLoading(false);
+      // Keep polling
     }
   };
 
@@ -119,48 +159,48 @@ export default function Onboarding() {
           
           {/* Step 1: Cloud Auth */}
           {step === 1 && (
-            <form className="animate-in fade-in zoom-in duration-500" onSubmit={handleCloudLogin}>
+            <form className="animate-in fade-in zoom-in duration-500" onSubmit={handleLinkAccount}>
               <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-blue-500/10 mb-6">
                 <Server className="h-10 w-10 text-blue-400" />
               </div>
               <h3 className="text-2xl font-bold text-white mb-2 text-center">Connect to Cloud</h3>
               <p className="text-gray-400 mb-8 text-center leading-relaxed">
-                Log in with your Whiz POS Cloud Admin credentials to fetch your available outlets.
+                Link this local server with your Whiz POS Cloud Admin to synchronize your outlets and operations.
               </p>
               
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-                    placeholder="admin@yourbusiness.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
-
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center items-center gap-2 py-3.5 px-4 mt-8 border border-transparent rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center py-3.5 px-4 rounded-xl text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all font-semibold text-lg shadow-[0_0_20px_rgba(37,99,235,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Authenticate'}
+                {loading ? (
+                  <Loader2 className="animate-spin h-6 w-6" />
+                ) : (
+                  <>
+                    Link WHIZPOS Account
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </>
+                )}
               </button>
             </form>
+          )}
+
+          {/* Step 1.5: Waiting for Cloud Approval */}
+          {step === 1.5 && (
+            <div className="animate-in fade-in zoom-in duration-500 flex flex-col items-center justify-center text-center py-8">
+              <Loader2 className="w-16 h-16 text-blue-500 animate-spin mb-6" />
+              <h3 className="text-2xl font-bold text-white mb-2">Waiting for Approval</h3>
+              <p className="text-gray-400 max-w-sm">
+                A browser window has been opened. Please log in to your WHIZPOS cloud account and approve this server link.
+              </p>
+              <button onClick={() => {
+                if (pollIntervalId) clearInterval(pollIntervalId);
+                setStep(1);
+                setLoading(false);
+              }} className="mt-8 px-6 py-2 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors">
+                Cancel
+              </button>
+            </div>
           )}
 
           {/* Step 2: Select Outlet & Download */}

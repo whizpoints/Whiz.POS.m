@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MapPin, Plus, Trash2, Edit2 } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import LocationModal from './LocationModal';
+import ScopeManager from './ScopeManager';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../../context/ConfirmContext';
 
@@ -128,6 +129,8 @@ export default function LocationManager() {
           }}
         />
       )}
+
+      <ScopeManager />
     </div>
   );
 }

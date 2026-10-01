@@ -72,17 +72,22 @@ function App() {
   // Setup Socket.io Real-Time Sync
   useEffect(() => {
     const state = usePosStore.getState();
-    const rawUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
+    const rawUrl = state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
     let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
     
     if (apiUrl) {
       const socket = io(apiUrl, {
+        transports: ['websocket'],
         reconnection: true,
         reconnectionDelay: 1000,
       });
 
       socket.on('connect', () => {
         console.log('[Socket] Connected to POS Server for real-time sync');
+        const activeBusinessId = usePosStore.getState().businessSetup?.businessId || (usePosStore.getState().businessSetup as any)?.cloudBusinessId;
+        if (activeBusinessId) {
+          socket.emit('join_business', activeBusinessId);
+        }
       });
 
       // Receive downward sync from Cloud or other POS terminals
@@ -106,7 +111,7 @@ function App() {
   useEffect(() => {
     const syncInterval = setInterval(() => {
       const state = usePosStore.getState();
-      const rawUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
+      const rawUrl = state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
       let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
       const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
       

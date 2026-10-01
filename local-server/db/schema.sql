@@ -75,9 +75,11 @@ CREATE TABLE "StoreLocation" (
     "businessId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "address" TEXT,
+    "scopeId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "StoreLocation_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "StoreLocation_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "StoreLocation_scopeId_fkey" FOREIGN KEY ("scopeId") REFERENCES "InventoryScope" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -86,10 +88,12 @@ CREATE TABLE "Outlet" (
     "businessId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "scopeId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Outlet_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Outlet_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "StoreLocation" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "Outlet_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "StoreLocation" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Outlet_scopeId_fkey" FOREIGN KEY ("scopeId") REFERENCES "InventoryScope" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -99,6 +103,8 @@ CREATE TABLE "StockMovement" (
     "productId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
     "outletId" TEXT,
+    "serverId" TEXT,
+    "terminalId" TEXT,
     "type" TEXT NOT NULL,
     "quantity" INTEGER NOT NULL,
     "reference" TEXT,
@@ -108,7 +114,9 @@ CREATE TABLE "StockMovement" (
     CONSTRAINT "StockMovement_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "StockMovement_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "StockMovement_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "StoreLocation" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "StockMovement_outletId_fkey" FOREIGN KEY ("outletId") REFERENCES "Outlet" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "StockMovement_outletId_fkey" FOREIGN KEY ("outletId") REFERENCES "Outlet" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "StockMovement_serverId_fkey" FOREIGN KEY ("serverId") REFERENCES "Server" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "StockMovement_terminalId_fkey" FOREIGN KEY ("terminalId") REFERENCES "Terminal" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -134,12 +142,14 @@ CREATE TABLE "ProductInventory" (
     "productId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
     "outletId" TEXT,
+    "scopeId" TEXT,
     "stock" INTEGER NOT NULL DEFAULT 0,
     "reorderLevel" INTEGER NOT NULL DEFAULT 5,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "ProductInventory_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "ProductInventory_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "StoreLocation" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "ProductInventory_outletId_fkey" FOREIGN KEY ("outletId") REFERENCES "Outlet" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "ProductInventory_outletId_fkey" FOREIGN KEY ("outletId") REFERENCES "Outlet" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "ProductInventory_scopeId_fkey" FOREIGN KEY ("scopeId") REFERENCES "InventoryScope" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -180,6 +190,9 @@ CREATE TABLE "Receipt" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "businessId" TEXT NOT NULL,
     "locationId" TEXT,
+    "outletId" TEXT,
+    "serverId" TEXT,
+    "terminalId" TEXT,
     "receiptNumber" TEXT NOT NULL,
     "totalAmount" REAL NOT NULL,
     "paymentMethod" TEXT NOT NULL,
@@ -189,10 +202,11 @@ CREATE TABLE "Receipt" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "cashierName" TEXT,
-    "outletId" TEXT,
     CONSTRAINT "Receipt_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "Receipt_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "StoreLocation" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Receipt_outletId_fkey" FOREIGN KEY ("outletId") REFERENCES "Outlet" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "Receipt_outletId_fkey" FOREIGN KEY ("outletId") REFERENCES "Outlet" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Receipt_serverId_fkey" FOREIGN KEY ("serverId") REFERENCES "Server" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Receipt_terminalId_fkey" FOREIGN KEY ("terminalId") REFERENCES "Terminal" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -220,15 +234,43 @@ CREATE TABLE "Supplier" (
 );
 
 -- CreateTable
+CREATE TABLE "Server" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "businessId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'OFFLINE',
+    "lastHeartbeat" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Server_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "InventoryScope" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "businessId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "InventoryScope_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "Terminal" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "businessId" TEXT,
+    "serverId" TEXT,
     "macAddress" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'PENDING',
     "apiKey" TEXT,
     "outletId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Terminal_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Terminal_serverId_fkey" FOREIGN KEY ("serverId") REFERENCES "Server" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Terminal_outletId_fkey" FOREIGN KEY ("outletId") REFERENCES "Outlet" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable

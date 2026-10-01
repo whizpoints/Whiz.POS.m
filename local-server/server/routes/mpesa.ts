@@ -67,7 +67,12 @@ async function triggerTransactionStatus(config: any, receipt: string, businessId
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
-      }).catch(err => console.error(`[M-Pesa Webhook] Failed to query transaction status for ${receipt}:`, err));
+      })
+      .then(async res => {
+        const text = await res.text();
+        console.log(`[M-Pesa Webhook] Transaction status response for ${receipt}:`, res.status, text);
+      })
+      .catch(err => console.error(`[M-Pesa Webhook] Failed to query transaction status for ${receipt}:`, err));
     } catch (err) {
       console.error(`[M-Pesa Webhook] Setup failed for transaction status query ${receipt}:`, err);
     }

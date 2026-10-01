@@ -103,7 +103,7 @@ router.get('/cloud', async (req: any, res: any) => {
   }
 });
 
-// Update Cloud Config
+// Update Cloud Config (Legacy)
 router.post('/cloud', async (req: any, res: any) => {
   try {
     const fs = await import('fs/promises');
@@ -129,4 +129,101 @@ router.post('/cloud', async (req: any, res: any) => {
   }
 });
 
+// Modern Save Endpoint (Linked via browser)
+router.post('/save', async (req: any, res: any) => {
+  try {
+    const { backOfficeUrl, apiKey, cloudBusinessId, syncMode, outletId, serverId, cloudBusinessName, cloudLocationName } = req.body;
+    // Update Local Business ID and cascade to prevent data orphaning/wiping!
+    const existingBusiness = await db.selectFrom('Business').selectAll().executeTakeFirst();
+    
+    let newSettingsStr = '{}';
+    if (existingBusiness) {
+        let currentSettings: any = {};
+        try {
+            if (existingBusiness.settings && typeof existingBusiness.settings === 'string') {
+                currentSettings = JSON.parse(existingBusiness.settings);
+            } else if (existingBusiness.settings && typeof existingBusiness.settings === 'object') {
+                currentSettings = existingBusiness.settings;
+            }
+        } catch (e) {}
+        currentSettings = {
+            ...currentSettings,
+            backOfficeUrl,
+            backOfficeApiKey: apiKey,
+            cloudLocationId: outletId,
+            serverId,
+            cloudBusinessName,
+            cloudLocationName
+        };
+        newSettingsStr = JSON.stringify(currentSettings);
+    } else {
+        newSettingsStr = JSON.stringify({
+            backOfficeUrl,
+            backOfficeApiKey: apiKey,
+            cloudLocationId: outletId,
+            serverId,
+            cloudBusinessName,
+            cloudLocationName
+        });
+    }
+
+    if (!existingBusiness && cloudBusinessId) {
+        await db.insertInto('Business').values({
+            id: cloudBusinessId,
+            name: 'Cloud Outlet',
+            email: 'admin@whizpoint.com',
+            apiKey: apiKey,
+            settings: newSettingsStr,
+            setupComplete: 1,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        }).execute();
+    } else if (existingBusiness && cloudBusinessId && existingBusiness.id !== cloudBusinessId) {
+        const oldId = existingBusiness.id;
+        
+        await db.updateTable('Business').set({ 
+            email: `old_${oldId}_${existingBusiness.email}`,
+            apiKey: `old_${oldId}_${existingBusiness.apiKey || ''}`
+        }).where('id', '=', oldId).execute();
+        
+        await db.insertInto('Business').values({
+            ...existingBusiness,
+            id: cloudBusinessId,
+            apiKey: apiKey,
+            settings: newSettingsStr
+        }).execute();
+
+        const tablesWithBusinessId = ['Category', 'MpesaConfig', 'User', 'StoreLocation', 'Outlet', 'StockMovement', 'Product', 'Customer', 'MpesaTransaction', 'Receipt', 'Supplier', 'Server', 'InventoryScope', 'Terminal', 'SyncLog'];
+        
+        for (const table of tablesWithBusinessId) {
+            try {
+                await db.updateTable(table as any).set({ businessId: cloudBusinessId }).where('businessId', '=', oldId).execute();
+            } catch (err) {
+                console.error(`Failed to cascade businessId on ${table}`, err);
+            }
+        }
+
+        await db.deleteFrom('Business').where('id', '=', oldId).execute();
+    } else if (existingBusiness) {
+        await db.updateTable('Business').set({ apiKey, settings: newSettingsStr }).where('id', '=', existingBusiness.id).execute();
+    }
+  
+      let newToken = null;
+      if (cloudBusinessId) {
+        const user = await db.selectFrom('User').selectAll().where('businessId', '=', cloudBusinessId).executeTakeFirst();
+        if (user) {
+          const jwt = (await import('jsonwebtoken')).default;
+          newToken = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '7d' });
+        }
+      }
+
+      res.json({ success: true, newToken });
+    } catch (e: any) {
+    console.error('Failed to save config:', e);
+    res.status(500).json({ error: e.message || 'Failed to save configuration' });
+  }
+});
+
 export default router;
+
+

@@ -8,6 +8,9 @@ import { FileText,
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react';
 
 
+import { mutate } from 'swr';
+import { io } from 'socket.io-client';
+
 import AuthPage from './pages/AuthPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
@@ -22,6 +25,7 @@ import NotFound from './pages/NotFound';
 import Inventory from './pages/Inventory';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import VerifyDocument from './pages/VerifyDocument';
+import ConnectServer from './pages/ConnectServer';
 import { BranchProvider, useBranchContext } from './context/BranchContext';
 
 import Customers from './pages/Customers';
@@ -132,9 +136,10 @@ import { Navigate } from 'react-router-dom';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem('whiz-token');
+  const location = useLocation();
   
   if (!token) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   try {
@@ -204,6 +209,7 @@ function App() {
           <Route path="/privacy" element={<PublicLayout><PrivacyPage /></PublicLayout>} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/V/:code" element={<PublicLayout><VerifyDocument /></PublicLayout>} />
+          <Route path="/connect/server/:requestId" element={<ProtectedRoute><DashboardWrapper><ConnectServer /></DashboardWrapper></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardWrapper><Dashboard /></DashboardWrapper></ProtectedRoute>} />
           <Route path="/dashboard/settings" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
           <Route path="/dashboard/outlets" element={<DashboardWrapper><OutletsDevices /></DashboardWrapper>} />
@@ -334,7 +340,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { locations, activeLocationId, setActiveLocationId, isLoading, isLocked } = useBranchContext();
+  const { locations, activeLocationId, isLoading, isLocked } = useBranchContext();
 
     const [user, setUser] = useState<any>(() => {
     try {
@@ -363,6 +369,31 @@ function DashboardLayout({ children }: { children: ReactNode }) {
     fetchUser();
   }, []);
 
+  // WebPortal Real-Time Socket Connection
+  useEffect(() => {
+    if (!user?.businessId) return;
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+    const socket = io(API_BASE_URL, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+    });
+
+    socket.on('connect', () => {
+      console.log('[WebPortal Socket] Connected for real-time updates');
+      socket.emit('join_business', user.businessId);
+    });
+
+    socket.on('dashboard_update', (data) => {
+      console.log('[WebPortal Socket] Received dashboard update:', data);
+      // Revalidate all SWR queries globally to instantly update the UI without refreshing
+      mutate(() => true, undefined, { revalidate: true });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user?.businessId]);
 
   const handleLogout = () => {
     localStorage.removeItem('whiz-token');
@@ -513,18 +544,6 @@ function DashboardLayout({ children }: { children: ReactNode }) {
 
             <div className="topbar-actions ml-auto flex shrink-0 items-center">
               <div className="flex items-center gap-2 mr-2">
-                {!isLoading && !isLocked && (
-                  <select
-                    value={activeLocationId}
-                    onChange={(e) => setActiveLocationId(e.target.value)}
-                    className="border rounded-lg bg-gray-50 p-1 md:p-2 text-[11px] md:text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 max-w-[90px] md:max-w-none truncate"
-                  >
-                    <option value="ALL">All Branches</option>
-                    {locations.map(loc => (
-                      <option key={loc.id} value={loc.id}>{loc.name}</option>
-                    ))}
-                  </select>
-                )}
                 {!isLoading && isLocked && locations.find(l => l.id === activeLocationId) && (
                   <div className="border rounded-lg bg-gray-100 p-1 md:p-2 text-[11px] md:text-sm text-gray-600 truncate max-w-[120px] font-medium" title="You are assigned to this branch">
                     {locations.find(l => l.id === activeLocationId)?.name}

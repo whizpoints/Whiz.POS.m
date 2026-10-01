@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePosStore, SavedDocument } from '../store/posStore';
+import { DatePicker } from '../components/ui/DatePicker';
 import {
   FileText, Download, Plus, Trash2, Upload, Image as ImageIcon,
   Settings, User, Calendar, DollarSign, LayoutTemplate,
@@ -632,11 +633,11 @@ export default function InvoiceGenerator() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-slate-500 mb-1 block">Issue Date</label>
-                      <input type="text" placeholder="e.g., 20 Nov 2024" value={date} onChange={(e) => setDate(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500" />
+                      <DatePicker value={date} onChange={setDate} />
                     </div>
                     <div>
                       <label className="text-xs text-slate-500 mb-1 block">Due Date</label>
-                      <input type="text" placeholder="e.g., Upon Receipt" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500" />
+                      <DatePicker value={dueDate} onChange={setDueDate} />
                     </div>
                   </div>
                </div>

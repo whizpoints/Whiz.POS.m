@@ -1,5 +1,6 @@
 import prisma from '../db.js';
 import { Router } from 'express';
+import { encrypt } from '../utils/crypto.js';
 
 const router = Router();
 
@@ -13,7 +14,13 @@ router.get('/mpesa', async (req: any, res: any) => {
       where: locationId ? { businessId, locationId } : { businessId }
     });
     
-    res.json(config || null);
+    if (config) {
+      // Don't send the real password back to the frontend, just a boolean indicator if it exists
+      const configToReturn = { ...config, initiatorPassword: config.initiatorPassword ? true : false };
+      return res.json(configToReturn);
+    }
+    
+    res.json(null);
   } catch (error) {
     console.error('Error fetching M-Pesa config:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -26,10 +33,11 @@ router.post('/mpesa', async (req: any, res: any) => {
     const businessId = req.query.businessId as string || 'default-business-id';
     const { 
       consumerKey, consumerSecret, passkey, shortcode, environment,
-      merchantType, tillNumber, paybillNumber, accountReference, stkEnabled, c2bEnabled 
+      merchantType, tillNumber, paybillNumber, accountReference, stkEnabled, c2bEnabled,
+      initiatorName, initiatorPassword
     } = req.body;
     
-    const updateData = {
+    const updateData: any = {
       consumerKey,
       consumerSecret,
       passkey,
@@ -39,9 +47,14 @@ router.post('/mpesa', async (req: any, res: any) => {
       tillNumber,
       paybillNumber,
       accountReference,
+      initiatorName,
       stkEnabled: stkEnabled ?? true,
       c2bEnabled: c2bEnabled ?? true
     };
+
+    if (initiatorPassword && initiatorPassword !== '********') {
+      updateData.initiatorPassword = encrypt(initiatorPassword);
+    }
     
     const locationId = req.query.locationId as string | undefined;
     

@@ -1,24 +1,22 @@
-import { FileBarChart, Download, TrendingUp, Calendar } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileBarChart, Download, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { useBranchContext } from '../context/BranchContext';
-
-import { useState, useEffect } from 'react';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 export default function Reports() {
   const [data, setData] = useState<any[]>([
-    { name: 'Mon', sales: 0, profit: 0 },
-    { name: 'Tue', sales: 0, profit: 0 },
-    { name: 'Wed', sales: 0, profit: 0 },
-    { name: 'Thu', sales: 0, profit: 0 },
-    { name: 'Fri', sales: 0, profit: 0 },
-    { name: 'Sat', sales: 0, profit: 0 },
-    { name: 'Sun', sales: 0, profit: 0 },
+    { name: 'Mon', sales: 0, profit: 0 }
   ]);
   const [stats, setStats] = useState({
     revenue: 0, revenueDelta: 0, profit: 0, profitDelta: 0, transactions: 0, transactionsDelta: 0
   });
   const [_loading, setLoading] = useState(true);
   const { activeLocationId } = useBranchContext();
+  
+  // Dynamic filters
+  const [groupBy, setGroupBy] = useState('day');
+  const [dateFilter, setDateFilter] = useState('7d');
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -26,8 +24,20 @@ export default function Reports() {
         setLoading(true);
         const token = localStorage.getItem('whiz-token');
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-        const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
-        const response = await fetch(`${API_BASE_URL}/api/dashboard/reports${query}`, {
+        
+        const params = new URLSearchParams();
+        if (activeLocationId !== 'ALL') params.append('locationId', activeLocationId);
+        params.append('groupBy', groupBy);
+        
+        if (dateFilter === '7d') {
+           const d = new Date(); d.setDate(d.getDate() - 7);
+           params.append('startDate', d.toISOString());
+        } else if (dateFilter === '30d') {
+           const d = new Date(); d.setDate(d.getDate() - 30);
+           params.append('startDate', d.toISOString());
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/dashboard/reports?${params.toString()}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {
@@ -42,7 +52,10 @@ export default function Reports() {
       }
     };
     fetchReports();
-  }, [activeLocationId]);
+  }, [activeLocationId, groupBy, dateFilter]);
+
+  if (_loading) return <LoadingSpinner message="Loading reports..." />;
+  
   return (
     <div className="space-y-5 px-4 py-4 md:p-6 animate-in fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -50,12 +63,26 @@ export default function Reports() {
           <h1 className="text-2xl font-bold font-heading text-[color:var(--text-primary)]">Reports & Analytics</h1>
           <p className="text-[color:var(--text-secondary)]">Z-reports, P&L, inventory forecasting and insights.</p>
         </div>
-        <div className="flex gap-2">
-          <button className="btn btn-secondary">
-            <Calendar className="w-4 h-4" /> This Week
-          </button>
-          <button className="btn btn-primary">
-            <Download className="w-4 h-4" /> Export Report
+        <div className="flex flex-wrap gap-2">
+          <select 
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value)}
+            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-blue-500"
+          >
+            <option value="day">Group by Day</option>
+            <option value="branch">Group by Branch</option>
+          </select>
+          <select 
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-blue-500"
+          >
+            <option value="all">All Time</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>
+          <button className="btn btn-primary hidden md:flex items-center gap-2">
+            <Download className="w-4 h-4" /> Export
           </button>
         </div>
       </div>

@@ -1,6 +1,9 @@
+let cachedStaff: any[] = [];
+let isStaffLoaded = false;
 import { useState, useEffect } from 'react';
 import { Plus, Mail, Phone, ShieldCheck } from 'lucide-react';
 import { useBranchContext } from '../context/BranchContext';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import StaffModal from '../components/Staff/StaffModal';
 import toast from 'react-hot-toast';
 import { Trash2, Edit2 } from 'lucide-react';
@@ -8,15 +11,15 @@ import { useConfirm } from '../context/ConfirmContext';
 
 export default function Staff() {
   const { confirm } = useConfirm();
-  const [staff, setStaff] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [staff, setStaff] = useState<any[]>(cachedStaff);
+  const [loading, setLoading] = useState(!isStaffLoaded);
   const { activeLocationId } = useBranchContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
 
   const fetchStaff = async () => {
     try {
-      setLoading(true);
+      if (!isStaffLoaded) setLoading(true);
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
       const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
@@ -28,7 +31,7 @@ export default function Staff() {
       if (response.ok) {
         const data = await response.json();
         if (data.staff) {
-          setStaff(data.staff);
+          cachedStaff = data.staff; isStaffLoaded = true; setStaff(data.staff);
         }
       }
     } catch (error) {
@@ -41,6 +44,8 @@ export default function Staff() {
   useEffect(() => {
     fetchStaff();
   }, [activeLocationId]);
+
+  if (loading) return <LoadingSpinner message="Loading staff data..." />;
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
@@ -144,3 +149,5 @@ export default function Staff() {
     </div>
   );
 }
+
+

@@ -1,7 +1,7 @@
 import prisma from '../db.js';
 import { Router } from 'express';
 import { MpesaCallbackUrlService } from '../services/mpesaUrls.js';
-import { generateSecurityCredential } from '../utils/crypto.js';
+import { generateSecurityCredential, decrypt } from '../utils/crypto.js';
 
 const router = Router();
 
@@ -36,7 +36,8 @@ async function triggerTransactionStatus(config: any, receipt: string, businessId
     if (!config.initiatorName || !config.initiatorPassword) return;
     try {
       const token = await getOAuthToken(config.consumerKey, config.consumerSecret, config.environment);
-      const securityCredential = await generateSecurityCredential(config.initiatorPassword);
+      const plaintextPassword = decrypt(config.initiatorPassword);
+      const securityCredential = await generateSecurityCredential(plaintextPassword);
       
       const tsUrl = config.environment === 'production'
         ? 'https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query'
@@ -66,7 +67,12 @@ async function triggerTransactionStatus(config: any, receipt: string, businessId
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
-      }).catch(err => console.error(`[M-Pesa Webhook] Failed to query transaction status for ${receipt}:`, err));
+      })
+      .then(async res => {
+        const text = await res.text();
+        console.log(`[M-Pesa Webhook] Transaction status response for ${receipt}:`, res.status, text);
+      })
+      .catch(err => console.error(`[M-Pesa Webhook] Failed to query transaction status for ${receipt}:`, err));
     } catch (err) {
       console.error(`[M-Pesa Webhook] Setup failed for transaction status query ${receipt}:`, err);
     }
@@ -339,7 +345,7 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
         where: { 
           businessId,
           status: 'UNLINKED',
-          isEnriched: true,
+          // isEnriched: true,
           ...(q ? {
             OR: [
               { transactionId: { contains: q } },

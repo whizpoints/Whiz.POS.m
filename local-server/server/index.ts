@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 // @ts-nocheck
 import 'dotenv/config';
 import express from 'express';
@@ -67,7 +68,8 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 // 2. Cloud Socket.io Client (Connects to Web Portal)
-const CLOUD_URL = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+const isProd = process.env.NODE_ENV === 'production';
+const CLOUD_URL = process.env.CLOUD_API_URL || (isProd ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
 let cloudSocket;
 try {
   cloudSocket = ClientIO(CLOUD_URL, {
@@ -203,7 +205,8 @@ app.use((req, res, next) => {
 // -----------------------------------------
 setInterval(async () => {
   try {
-    const CLOUD_API = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+    const isProd = process.env.NODE_ENV === 'production';
+    const CLOUD_API = process.env.CLOUD_API_URL || (isProd ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
     const business = await db.selectFrom('Business').selectAll().executeTakeFirst();
     const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
     if (!business || !business.apiKey || !location) return;
@@ -239,7 +242,7 @@ setInterval(async () => {
           
           const businessSetup = business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {};
           businessSetup.businessName = business.name;
-          businessSetup.locationId = location.id;
+          businessSetup.locationId = businessSetup.cloudLocationId || location.id;
 
           const pushRes = await fetch(`${CLOUD_API}/api/sync/delta`, {
               method: 'POST',
@@ -259,8 +262,10 @@ setInterval(async () => {
           });
 
           if (pushRes.ok) {
-              await db.insertInto('SyncLog').values({
-                  id: require('crypto').randomUUID(),
+              await db.insertInto('SyncLog')
+// @ts-ignore
+.values({
+                  id: crypto.randomUUID(),
                   businessId: business.id,
                   terminal: 'LocalServer',
                   status: 'SUCCESS',
@@ -284,7 +289,7 @@ setInterval(async () => {
       
       const pullSinceStr = lastPullLog ? new Date(lastPullLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
       
-      const pullRes = await fetch(`${CLOUD_API}/api/sync/delta?since=${encodeURIComponent(pullSinceStr)}&locationId=${location.id}`, {
+      const pullRes = await fetch(`${CLOUD_API}/api/sync/delta?since=${encodeURIComponent(pullSinceStr)}&locationId=${(business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {}).cloudLocationId || location.id}`, {
           headers: {
               'x-api-key': apiKey,
               'Authorization': `Bearer ${apiKey}`
@@ -294,7 +299,7 @@ setInterval(async () => {
       if (pullRes.ok) {
           const pullData = await pullRes.json();
           if (pullData.success && pullData.data) {
-              const payload = { ...pullData.data };
+              const payload = { ...pullData.data, isFromCloud: true };
               
               if (payload.businessSetup) {
                   delete payload.businessSetup.lanAdminIp;
@@ -312,8 +317,10 @@ setInterval(async () => {
               });
 
               if (localPostRes.ok) {
-                  await db.insertInto('SyncLog').values({
-                      id: require('crypto').randomUUID(),
+                  await db.insertInto('SyncLog')
+// @ts-ignore
+.values({
+                      id: crypto.randomUUID(),
                       businessId: business.id,
                       terminal: 'LocalServer',
                       status: 'SUCCESS',
@@ -330,7 +337,7 @@ setInterval(async () => {
   } catch (err) {
     // console.error('[Sync Engine] Background sync failed:', err.message);
   }
-}, 60000); // Run every 60 seconds // Run every 60 seconds
+}, 5000); // Run every 5 seconds // Run every 60 seconds
 
 server.listen(Number(PORT), '0.0.0.0', () => {
   if (Number(PORT) === 3000) {
@@ -354,4 +361,6 @@ server.listen(Number(PORT), '0.0.0.0', () => {
     }
   }
 });
+
+
 

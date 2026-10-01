@@ -193,11 +193,11 @@ router.get('/locations', async (req: any, res: any) => {
 router.post('/locations', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { name, address } = req.body;
+    const { name, address, scopeId } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
 
     const location = await prisma.storeLocation.create({
-      data: { businessId, name, address }
+      data: { businessId, name, address, scopeId: scopeId || null }
     });
     res.json({ success: true, location });
   } catch (error) {
@@ -211,14 +211,14 @@ router.put('/locations/:id', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const { id } = req.params;
-    const { name, address } = req.body;
+    const { name, address, scopeId } = req.body;
 
     const existing = await prisma.storeLocation.findUnique({ where: { id } });
     if (!existing || existing.businessId !== businessId) return res.status(403).json({ error: 'Forbidden' });
 
     const location = await prisma.storeLocation.update({
       where: { id },
-      data: { name, address }
+      data: { name, address, scopeId: scopeId || null }
     });
     res.json({ success: true, location });
   } catch (error) {
@@ -241,6 +241,74 @@ router.delete('/locations/:id', async (req: any, res: any) => {
   } catch (error) {
     console.error('Delete location error:', error);
     res.status(500).json({ error: 'Failed to delete location' });
+  }
+});
+
+// --- INVENTORY SCOPES ---
+
+router.get('/scopes', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const scopes = await prisma.inventoryScope.findMany({
+      where: { businessId },
+      orderBy: { createdAt: 'asc' }
+    });
+    res.json({ success: true, scopes });
+  } catch (error) {
+    console.error('Fetch scopes error:', error);
+    res.status(500).json({ error: 'Failed to fetch scopes' });
+  }
+});
+
+router.post('/scopes', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    const scope = await prisma.inventoryScope.create({
+      data: { businessId, name, description }
+    });
+    res.json({ success: true, scope });
+  } catch (error) {
+    console.error('Create scope error:', error);
+    res.status(500).json({ error: 'Failed to create scope' });
+  }
+});
+
+router.put('/scopes/:id', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const { id } = req.params;
+    const { name, description } = req.body;
+
+    const existing = await prisma.inventoryScope.findUnique({ where: { id } });
+    if (!existing || existing.businessId !== businessId) return res.status(403).json({ error: 'Forbidden' });
+
+    const scope = await prisma.inventoryScope.update({
+      where: { id },
+      data: { name, description }
+    });
+    res.json({ success: true, scope });
+  } catch (error) {
+    console.error('Update scope error:', error);
+    res.status(500).json({ error: 'Failed to update scope' });
+  }
+});
+
+router.delete('/scopes/:id', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const { id } = req.params;
+
+    const existing = await prisma.inventoryScope.findUnique({ where: { id } });
+    if (!existing || existing.businessId !== businessId) return res.status(403).json({ error: 'Forbidden' });
+
+    await prisma.inventoryScope.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete scope error:', error);
+    res.status(500).json({ error: 'Failed to delete scope' });
   }
 });
 

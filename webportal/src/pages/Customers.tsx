@@ -1,3 +1,5 @@
+let cachedCustomers: any[] = [];
+let isCustomersLoaded = false;
 import { useState, useEffect } from 'react';
 import { Search, Plus, Star, Edit2, Trash2, Mail, RefreshCw } from 'lucide-react';
 import CustomerModal from '../components/Customers/CustomerModal';
@@ -7,8 +9,8 @@ import { useConfirm } from '../context/ConfirmContext';
 
 export default function Customers() {
   const { confirm } = useConfirm();
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [customers, setCustomers] = useState<any[]>(cachedCustomers);
+  const [loading, setLoading] = useState(!isCustomersLoaded);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [emailCustomer, setEmailCustomer] = useState<any>(null);
@@ -29,12 +31,14 @@ export default function Customers() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
+      cachedCustomers = data;
+      isCustomersLoaded = true;
       setCustomers(data);
     } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+        console.error(err);
+      } finally {
+        if (!isCustomersLoaded) setLoading(false);
+      }
   };
 
   const handleDelete = async (id: string) => {
@@ -290,3 +294,4 @@ export default function Customers() {
     </div>
   );
 }
+

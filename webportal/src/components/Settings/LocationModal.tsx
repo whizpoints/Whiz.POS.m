@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useBranchContext } from '../../context/BranchContext';
 
 export default function LocationModal({ location, onClose }: { location: any, onClose: () => void }) {
+  const { scopes } = useBranchContext();
   const [formData, setFormData] = useState({
     name: location?.name || '',
-    address: location?.address || ''
+    address: location?.address || '',
+    scopeId: location?.scopeId || ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -29,7 +32,11 @@ export default function LocationModal({ location, onClose }: { location: any, on
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token || ''}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+           name: formData.name,
+           address: formData.address,
+           scopeId: formData.scopeId || null
+        })
       });
 
       if (res.ok) {
@@ -80,6 +87,21 @@ export default function LocationModal({ location, onClose }: { location: any, on
               value={formData.address}
               onChange={e => setFormData({ ...formData, address: e.target.value })}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Inventory Group (Scope)</label>
+            <select
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all"
+              value={formData.scopeId}
+              onChange={e => setFormData({ ...formData, scopeId: e.target.value })}
+            >
+              <option value="">No Shared Scope (Isolated Inventory)</option>
+              {scopes && scopes.map((s: any) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-1">Branches in the same scope share the exact same inventory pool.</p>
           </div>
 
           <div className="pt-4 flex justify-end gap-3">

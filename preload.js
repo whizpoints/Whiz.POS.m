@@ -22,6 +22,11 @@ contextBridge.exposeInMainWorld('electron', {
    */
   readData: (fileName) => ipcRenderer.invoke('read-data', fileName),
 
+  openExternal: (url) => {
+    const { shell } = require('electron');
+    return shell.openExternal(url);
+  },
+
   mergeData: (fileName, data) => ipcRenderer.invoke('merge-data', fileName, data),
   applyStockMovements: (movements) => ipcRenderer.invoke('apply-stock-movements', movements),
 

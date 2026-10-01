@@ -42,7 +42,7 @@ const getEmailTransporter = async (businessId: string) => {
   const settings = typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings;
   
   if (!settings.emailEnabled || !settings.emailAppPassword || !settings.emailFrom) {
-    throw new Error('Email is not configured for this business');
+    if (!process.env.BREVO_SMTP_SERVER || !process.env.BREVO_SMTP_LOGIN || !process.env.BREVO_SMTP_KEY) { throw new Error('Email is not configured for this business, and system Brevo fallback is missing.'); } const transporter = nodemailer.createTransport({ host: process.env.BREVO_SMTP_SERVER, port: Number(process.env.BREVO_SMTP_PORT) || 587, secure: false, auth: { user: process.env.BREVO_SMTP_LOGIN, pass: process.env.BREVO_SMTP_KEY } }); settings.emailFrom = process.env.BREVO_RECEIPTS_FROM_EMAIL || 'support@whizpoint.app'; settings.emailReplyTo = business.email || settings.emailFrom; return { transporter, settings, businessName: business.name, logoUrl: business.logoUrl || business.documentLogoUrl };
   }
 
   const decryptedPassword = decrypt(settings.emailAppPassword);

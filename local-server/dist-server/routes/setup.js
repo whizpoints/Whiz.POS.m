@@ -13,39 +13,50 @@ router.post('/sync', async (req, res) => {
         // or JSON array from https://api.whizpoint.app/api/outlets/{outletId}/backup
         // For this implementation, the frontend passes down the critical auth data 
         // it received from the cloud login to bootstrap the local DB.
-        // 1. Clear local SQLite database (since it's a fresh setup)
-        await db.deleteFrom('User').execute();
-        await db.deleteFrom('Business').execute();
+        // 1. Check if business already exists
+        const existingBusiness = await db.selectFrom('Business').selectAll().executeTakeFirst();
+        const existingUsersCount = await db.selectFrom('User').select(eb => eb.fn.count('id').as('count')).executeTakeFirst();
+        if (!existingBusiness) {
+            await db.deleteFrom('Business').execute();
+        }
         // 2. Seed Local SQLite Database
         const businessData = {
-            id: business?.id || 'local_bus_1',
-            name: business?.name || 'Local Outlet',
-            email: business?.email || 'admin@whizpoint.com',
+            id: business?.id || existingBusiness?.id || 'local_bus_1',
+            name: business?.name || existingBusiness?.name || 'Local Outlet',
+            email: business?.email || existingBusiness?.email || 'admin@whizpoint.com',
+            apiKey: cloudToken || existingBusiness?.apiKey, // Always update API key to new cloud token
             setupComplete: 1, // boolean becomes 1 in sqlite/kysely without transformer
-            createdAt: new Date().toISOString(),
+            createdAt: existingBusiness?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
-        const localBusiness = await db.insertInto('Business')
-            .values(businessData)
-            .returningAll()
-            .executeTakeFirstOrThrow();
-        if (users && Array.isArray(users)) {
-            for (const u of users) {
-                await db.insertInto('User').values({
-                    id: u.id,
-                    email: u.email,
-                    name: u.name,
-                    password: u.password,
-                    pin: u.password && u.password.length === 4 && /^\d+$/.test(u.password) ? u.password : null,
-                    role: u.role || 'ADMIN',
-                    businessId: localBusiness.id,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                }).execute();
-            }
+        if (existingBusiness) {
+            await db.updateTable('Business').set(businessData).execute();
         }
         else {
-            // Fallback admin if no users provided in payload
+            await db.insertInto('Business').values(businessData).execute();
+        }
+        const localBusiness = await db.selectFrom('Business').selectAll().executeTakeFirstOrThrow();
+        if (users && Array.isArray(users)) {
+            // If syncing cloud users, only insert if they don't exist
+            for (const u of users) {
+                const userExists = await db.selectFrom('User').where('id', '=', u.id).executeTakeFirst();
+                if (!userExists) {
+                    await db.insertInto('User').values({
+                        id: u.id,
+                        email: u.email,
+                        name: u.name,
+                        password: u.password,
+                        pin: u.password && u.password.length === 4 && /^\d+$/.test(u.password) ? u.password : null,
+                        role: u.role || 'ADMIN',
+                        businessId: localBusiness.id,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    }).execute();
+                }
+            }
+        }
+        else if (Number(existingUsersCount?.count) === 0) {
+            // Fallback admin if no users provided and no existing users
             await db.insertInto('User').values({
                 id: 'local_admin_1', // must provide id if schema doesn't autogenerate string uuid natively
                 email: 'admin@whizpoint.com',
@@ -57,6 +68,31 @@ router.post('/sync', async (req, res) => {
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             }).execute();
+        }
+        // Check if StoreLocation exists
+        let location = await db.selectFrom('StoreLocation').where('businessId', '=', localBusiness.id).selectAll().executeTakeFirst();
+        if (!location) {
+            const locId = 'loc_' + Math.random().toString(36).substring(2, 9);
+            location = await db.insertInto('StoreLocation').values({
+                id: locId,
+                businessId: localBusiness.id,
+                name: 'Default Location',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            }).returningAll().executeTakeFirstOrThrow();
+        }
+        if (outletId) {
+            const existingOutlet = await db.selectFrom('Outlet').where('id', '=', outletId).executeTakeFirst();
+            if (!existingOutlet) {
+                await db.insertInto('Outlet').values({
+                    id: outletId,
+                    businessId: localBusiness.id,
+                    locationId: location.id,
+                    name: 'Linked Outlet',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                }).execute();
+            }
         }
         // Mark as complete locally
         console.log(`[Setup] Successfully downloaded and restored backup for Outlet ${outletId}`);

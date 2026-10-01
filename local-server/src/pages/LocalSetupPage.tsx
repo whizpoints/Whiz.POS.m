@@ -94,38 +94,78 @@ export default function AuthPage() {
     if (setupStep > 1) setSetupStep(prev => prev - 1);
   };
 
-  const handleVerifyApiKey = async () => {
-    if (!apiKey) return toast.error('Please enter an API key');
+  
+  const handleVerifyApiKey = async () => { if (!apiKey) return toast.error('Please enter an API key'); setLoading(true); try { const CLOUD_API = (process.env.NODE_ENV === 'production' ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app'); const res = await fetch(`${CLOUD_API}/api/business/locations`, { headers: { 'x-api-key': apiKey } }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Invalid API Key'); const profileRes = await fetch(`${CLOUD_API}/api/business/profile`, { headers: { 'x-api-key': apiKey } }); const profileData = await profileRes.json(); if (profileRes.ok) { setBusinessName(profileData.business?.name || profileData.name || ''); setBusinessData(profileData.business || profileData); } setAvailableLocations(data.locations || []); if (data.locations && data.locations.length > 0) { setSelectedLocationId(data.locations[0].id); } setIsApiKeyVerified(true); toast.success('Successfully connected to cloud!'); } catch (err: any) { toast.error(err.message); } finally { setLoading(false); } }; // --- NEW: Modern Browser Authorization Flow ---
+  const [pollIntervalId, setPollIntervalId] = useState<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalId) clearInterval(pollIntervalId);
+    };
+  }, [pollIntervalId]);
+
+  const handleLinkAccount = async () => {
     setLoading(true);
     try {
-      const res = await fetch('https://api.whizpoint.app/api/business/locations', {
-        headers: { 'x-api-key': apiKey }
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Invalid API Key');
+      const CLOUD_API = (process.env.NODE_ENV === 'production' ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
       
-      const profileRes = await fetch('https://api.whizpoint.app/api/business/profile', {
-        headers: { 'x-api-key': apiKey }
+      const res = await fetch(`${CLOUD_API}/api/pairing/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'SERVER', deviceInfo: { os: navigator.platform } })
       });
-      const profileData = await profileRes.json();
-      if (profileRes.ok) {
-        setBusinessName(profileData.name || '');
-        setBusinessData(profileData);
-      }
-
-      setAvailableLocations(data.locations || []);
-      if (data.locations && data.locations.length > 0) {
-        setSelectedLocationId(data.locations[0].id);
-      }
-      setIsApiKeyVerified(true);
-      toast.success('Successfully connected to cloud!');
+      if (!res.ok) throw new Error('Failed to generate link request');
+      const data = await res.json();
+      
+      const connectUrl = `${CLOUD_API}/connect/server/${data.requestId}`;
+      
+      // Start polling
+      const pId = setInterval(() => checkCloudApproval(CLOUD_API, data.requestId, pId), 3000);
+      setPollIntervalId(pId);
+      
+      setIsApiKeyVerified(true); // Hijack the state to show waiting UI
+      
+      toast(`Please open the browser window that just popped up, or go to ${connectUrl}`, { duration: 10000 });
+      window.open(connectUrl, '_blank');
     } catch (err: any) {
-      toast.error(err.message);
-    } finally {
+      toast.error('Cloud connection failed. Ensure you have internet.');
       setLoading(false);
     }
   };
 
+  const checkCloudApproval = async (cloudApi: string, requestId: string, intervalId: any) => {
+    try {
+      const res = await fetch(`${cloudApi}/api/pairing/${requestId}/status`);
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      if (data.status === 'APPROVED' && data.credentials) {
+        clearInterval(intervalId);
+        
+        // Trigger local DB seeding via /api/setup/sync
+        const syncRes = await fetch('/api/setup/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ outletId: data.credentials.outletId, cloudToken: data.credentials.apiKey })
+        });
+
+        if (syncRes.ok) {
+           toast.success('Successfully Linked to Cloud and Synced!');
+           setIsBackendReady(false); // force a reload of the layout
+           setTimeout(() => window.location.reload(), 1500);
+        } else {
+           toast.error('Failed to save configuration locally');
+           setIsApiKeyVerified(false);
+        }
+      } else if (data.status === 'EXPIRED') {
+        clearInterval(intervalId);
+        toast.error('Pairing request expired');
+        setIsApiKeyVerified(false);
+      }
+    } catch (err) {
+      // Keep polling
+    }
+  };
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);

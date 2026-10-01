@@ -1,7 +1,7 @@
 // Suppress annoying Content Security Policy warnings in development console
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
-import { app, BrowserWindow, ipcMain, utilityProcess } from 'electron';
+import { app, BrowserWindow, ipcMain, utilityProcess, shell } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -117,6 +117,12 @@ function createWindow() {
 
   // Always launch on whole screen not restore
   mainWindow.maximize();
+
+  // Force external links to open in the OS default browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;

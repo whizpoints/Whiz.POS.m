@@ -247,6 +247,12 @@ function createWindow() {
   mainWindow.maximize();
   mainWindow.show();
 
+  // Force external links to open in the OS default browser rather than an Electron popup
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    require('electron').shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
   // In development, load from the Vite dev server
   if (!app.isPackaged) {
     const url = process.argv[2] || 'http://localhost:5174';

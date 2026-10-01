@@ -3,6 +3,7 @@ import { ShoppingCart, Search, Download, Filter, Printer, FileText, Mail, Refres
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
 import { useBranchContext } from '../context/BranchContext';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 export default function Sales() {
   const [sales, setSales] = useState<any[]>([]);
@@ -40,6 +41,8 @@ export default function Sales() {
     };
     fetchSales();
   }, [activeLocationId]);
+
+  if (loading) return <LoadingSpinner message="Loading sales data..." />;
 
   const getStatusBadge = (status: string) => {
     switch (status) {

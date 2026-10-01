@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 // @ts-nocheck
 import 'dotenv/config';
 import express from 'express';
@@ -11,6 +12,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import authRoutes from './routes/auth.js';
+import db from './db.js';
 import syncRoutes from './routes/sync.js';
 import syncDeltaRoutes from './routes/syncDelta.js';
 import dashboardRoutes from './routes/dashboard.js';
@@ -54,7 +56,8 @@ io.on('connection', (socket) => {
 });
 app.set('io', io);
 // 2. Cloud Socket.io Client (Connects to Web Portal)
-const CLOUD_URL = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+const isProd = process.env.NODE_ENV === 'production';
+const CLOUD_URL = process.env.CLOUD_API_URL || (isProd ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
 let cloudSocket;
 try {
     cloudSocket = ClientIO(CLOUD_URL, {
@@ -173,7 +176,8 @@ app.use((req, res, next) => {
 // -----------------------------------------
 setInterval(async () => {
     try {
-        const CLOUD_API = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+        const isProd = process.env.NODE_ENV === 'production';
+        const CLOUD_API = process.env.CLOUD_API_URL || (isProd ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
         const business = await db.selectFrom('Business').selectAll().executeTakeFirst();
         const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
         if (!business || !business.apiKey || !location)
@@ -187,18 +191,24 @@ setInterval(async () => {
                 .orderBy('createdAt', 'desc')
                 .executeTakeFirst();
             const pushSinceStr = lastPushLog ? new Date(lastPushLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
-            const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements] = await Promise.all([
+            const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements, rawReceipts] = await Promise.all([
                 db.selectFrom('User').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
                 db.selectFrom('Product').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
                 db.selectFrom('Customer').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
                 db.selectFrom('Supplier').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
                 db.selectFrom('StockMovement').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+                db.selectFrom('Receipt').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
             ]);
-            if (localUsers.length > 0 || localProducts.length > 0 || localCustomers.length > 0 || localStockMovements.length > 0 || pushSinceStr === "1970-01-01T00:00:00.000Z") {
-                console.log(`[Sync Engine] Pushing ${localProducts.length} products, ${localUsers.length} users, ${localStockMovements.length} inventory logs to Cloud`);
+            const localTransactions = [];
+            for (const r of rawReceipts) {
+                const items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', '=', r.id).execute();
+                localTransactions.push({ ...r, items });
+            }
+            if (localUsers.length > 0 || localProducts.length > 0 || localCustomers.length > 0 || localStockMovements.length > 0 || localTransactions.length > 0 || pushSinceStr === "1970-01-01T00:00:00.000Z") {
+                console.log(`[Sync Engine] Pushing ${localProducts.length} products, ${localUsers.length} users, ${localStockMovements.length} inventory logs, ${localTransactions.length} transactions to Cloud`);
                 const businessSetup = business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {};
                 businessSetup.businessName = business.name;
-                businessSetup.locationId = location.id;
+                businessSetup.locationId = businessSetup.cloudLocationId || location.id;
                 const pushRes = await fetch(`${CLOUD_API}/api/sync/delta`, {
                     method: 'POST',
                     headers: {
@@ -210,12 +220,19 @@ setInterval(async () => {
                         products: localProducts,
                         customers: localCustomers,
                         suppliers: localSuppliers,
+                        transactions: localTransactions,
                         inventoryLogs: localStockMovements.map(sm => ({ ...sm, variance: sm.quantity })), // Map local quantity to cloud variance
                         businessSetup
                     })
                 });
                 if (pushRes.ok) {
-                    await db.insertInto('SyncLog').values({
+                    await db.insertInto('SyncLog')
+                        // @ts-ignore
+                        .values({
+                        id: crypto.randomUUID(),
+                        businessId: business.id,
+                        terminal: 'LocalServer',
+                        status: 'SUCCESS',
                         type: 'PUSH_DELTA',
                         createdAt: new Date().toISOString()
                     }).execute();
@@ -234,7 +251,7 @@ setInterval(async () => {
                 .orderBy('createdAt', 'desc')
                 .executeTakeFirst();
             const pullSinceStr = lastPullLog ? new Date(lastPullLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
-            const pullRes = await fetch(`${CLOUD_API}/api/sync/delta?since=${encodeURIComponent(pullSinceStr)}&locationId=${location.id}`, {
+            const pullRes = await fetch(`${CLOUD_API}/api/sync/delta?since=${encodeURIComponent(pullSinceStr)}&locationId=${(business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {}).cloudLocationId || location.id}`, {
                 headers: {
                     'x-api-key': apiKey,
                     'Authorization': `Bearer ${apiKey}`
@@ -243,7 +260,7 @@ setInterval(async () => {
             if (pullRes.ok) {
                 const pullData = await pullRes.json();
                 if (pullData.success && pullData.data) {
-                    const payload = { ...pullData.data };
+                    const payload = { ...pullData.data, isFromCloud: true };
                     if (payload.businessSetup) {
                         delete payload.businessSetup.lanAdminIp;
                         delete payload.businessSetup.apiUrl;
@@ -258,7 +275,13 @@ setInterval(async () => {
                         body: JSON.stringify(payload)
                     });
                     if (localPostRes.ok) {
-                        await db.insertInto('SyncLog').values({
+                        await db.insertInto('SyncLog')
+                            // @ts-ignore
+                            .values({
+                            id: crypto.randomUUID(),
+                            businessId: business.id,
+                            terminal: 'LocalServer',
+                            status: 'SUCCESS',
                             type: 'PULL_DELTA',
                             createdAt: pullData.timestamp || new Date().toISOString()
                         }).execute();
@@ -270,41 +293,11 @@ setInterval(async () => {
         catch (e) {
             console.error('[Sync Engine] PULL_DELTA failed:', e.message);
         }
-        // 1. Fetch pending receipts from SQLite
-        const pendingReceipts = await db.selectFrom('Receipt')
-            .selectAll()
-            .where('synced', '=', 0) // Assume synced column is integer 0 or 1
-            .execute();
-        if (pendingReceipts.length === 0)
-            return;
-        // Fetch items for pending receipts
-        for (const receipt of pendingReceipts) {
-            receipt.items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', '=', receipt.id).execute();
-        }
-        // 2. Send to Cloud REST API
-        const res = await fetch(`${CLOUD_API}/api/sync/sales`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${location.apiKey}` // Or x-api-key based on auth logic
-            },
-            body: JSON.stringify({ receipts: pendingReceipts })
-        });
-        if (res.ok) {
-            // 3. Mark as synced locally
-            for (const receipt of pendingReceipts) {
-                await db.updateTable('Receipt').set({ synced: 1 }).where('id', '=', receipt.id).execute();
-            }
-            console.log(`[Sync Engine] Successfully synced ${pendingReceipts.length} receipts to cloud.`);
-            if (cloudSocket && cloudSocket.connected) {
-                cloudSocket.emit('local_transaction_synced', { businessId: location.businessId, count: pendingReceipts.length });
-            }
-        }
     }
     catch (err) {
         // console.error('[Sync Engine] Background sync failed:', err.message);
     }
-}, 60000); // Run every 60 seconds // Run every 60 seconds
+}, 5000); // Run every 5 seconds // Run every 60 seconds
 server.listen(Number(PORT), '0.0.0.0', () => {
     if (Number(PORT) === 3000) {
         console.log(`🚀 Cloud Web App (Back Office) running in ${process.env.NODE_ENV} mode on port ${PORT}`);

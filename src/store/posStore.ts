@@ -1955,6 +1955,18 @@ const serverData = await response.json();
         try {
           // Prioritize loading business setup first.
           const { data: businessSetupData } = await readDataFromFile('business-setup.json');
+          try { 
+            const localUrl = businessSetupData?.apiUrl ? businessSetupData.apiUrl.replace(/\/api$/, '') : 'http://localhost:5050';
+            const res = await fetch(`${localUrl}/api/business/setup-status`).catch(() => null); 
+            if (res && res.ok) { 
+              const json = await res.json(); 
+              if (json.isSetup && json.business && businessSetupData) { 
+                businessSetupData.businessId = json.business.id; 
+                businessSetupData.cloudBusinessId = json.business.id; 
+              } 
+            } 
+          } catch(e) {} 
+          
           let isSetup = false;
           if (businessSetupData && businessSetupData.isSetup) {
             // Check if we have env vars to override/set defaults for Back Office

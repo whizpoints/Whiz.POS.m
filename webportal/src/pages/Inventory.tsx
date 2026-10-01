@@ -1,6 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+let cachedProducts: any[] = [];
+let isInventoryLoaded = false;
+import { useState, useRef, useEffect } from 'react';
+
 import { Search, Package, Plus, Edit2, Trash2, ArrowRightLeft, FileUp, Download } from 'lucide-react';
 import { useBranchContext } from '../context/BranchContext';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { getApiBaseUrl } from '../lib/utils';
 import StockTransferModal from '../components/Inventory/StockTransferModal';
 import ProductModal from '../components/Inventory/ProductModal';
@@ -10,8 +14,8 @@ import { useConfirm } from '../context/ConfirmContext';
 
 export default function Inventory() {
   const { confirm } = useConfirm();
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<any[]>(cachedProducts);
+  const [loading, setLoading] = useState(!isInventoryLoaded);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -26,22 +30,26 @@ export default function Inventory() {
     fetchProducts();
   }, [activeLocationId]);
 
+  if (loading) return <LoadingSpinner message="Loading inventory data..." />;
+
   const fetchProducts = async () => {
     const token = localStorage.getItem('whiz-token');
     try {
-      setLoading(true);
+      
       const API_BASE_URL = getApiBaseUrl();
       const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
       const res = await fetch(`${API_BASE_URL}/api/inventory${query}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
+      cachedProducts = data;
+      isInventoryLoaded = true;
       setProducts(data);
     } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+        console.error(err);
+      } finally {
+        if (!isInventoryLoaded) setLoading(false);
+      }
   };
 
   const handleDelete = async (id: string) => {
@@ -127,7 +135,7 @@ export default function Inventory() {
     }
 
     try {
-      setLoading(true);
+      
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();
       const res = await fetch(`${API_BASE_URL}/api/inventory/import/products`, {
@@ -146,7 +154,7 @@ export default function Inventory() {
     } catch (err) {
       toast.error('Network error during import');
     } finally {
-      setLoading(false);
+      
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -401,3 +409,7 @@ export default function Inventory() {
     </div>
   );
 }
+
+
+
+

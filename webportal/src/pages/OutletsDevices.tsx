@@ -1,12 +1,12 @@
 import { Copy, Building2, Monitor, Server, Link as LinkIcon, RefreshCw, ShieldCheck } from 'lucide-react';
 import OutletsManager from '../components/Settings/OutletsManager';
-import LocationManager from '../components/Settings/LocationManager';
 import TerminalManager from '../components/Settings/TerminalManager';
 import BranchPerformanceChart from '../components/Settings/BranchPerformanceChart';
 import { useBranchContext } from '../context/BranchContext';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../context/ConfirmContext';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 export default function OutletsDevices() {
   const { confirm } = useConfirm();
@@ -64,7 +64,11 @@ export default function OutletsDevices() {
 
   const generatePairingCode = async () => {
     if (!activeLocationId || activeLocationId === 'ALL') {
-      toast.error('Please select a specific location from the top dropdown first.');
+      // Just wait, it should resolve to locations[0]
+      if (locations.length > 0) {
+        setActiveLocationId(locations[0].id);
+        return; // Will retry naturally or user clicks again
+      }
       return;
     }
     
@@ -95,58 +99,24 @@ export default function OutletsDevices() {
     }
   };
 
-  // VIEW 1: MASTER LIST (ALL BRANCHES)
-  if (!activeLocationId || activeLocationId === 'ALL') {
-    return (
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-muted)] mb-1">
-              Global Overview
-            </div>
-            <h1 className="font-heading text-2xl sm:text-[1.7rem] font-black tracking-tight text-[color:var(--text-primary)] truncate flex items-center gap-2">
-              <Building2 className="w-6 h-6 text-[color:var(--accent-primary)]" />
-              Branch Management
-            </h1>
-            <p className="text-sm text-[color:var(--text-secondary)] mt-0.5">
-              Select a branch below to manage its local servers, active POS outlets, and device approvals.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <LocationManager />
-        </div>
-      </div>
-    );
+  // VIEW: SINGLE SERVER DRILL-DOWN
+  if (!activeLocation) {
+    return <LoadingSpinner message="Loading Server data..." />;
   }
-
-  // VIEW 2: BRANCH DRILL-DOWN (SPECIFIC BRANCH SELECTED)
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 p-6">
       
-      {/* Back Button and Header */}
       <div className="flex flex-col gap-4">
-        <button 
-          onClick={() => {
-            setActiveLocationId('ALL');
-            setPairingData(null);
-          }}
-          className="w-fit flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-sky-600 transition-colors bg-white/60 backdrop-blur px-4 py-2 rounded-xl border border-white shadow-sm hover:shadow-md"
-        >
-          &larr; Back to all branches
-        </button>
-        
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-muted)] mb-1">
-            Managing Network For
+            Managing Server For
           </div>
           <h1 className="font-heading text-2xl sm:text-[1.7rem] font-black tracking-tight text-sky-600 truncate flex items-center gap-2">
             <Building2 className="w-6 h-6" />
-            {activeLocation?.name || 'Selected Branch'}
+            {activeLocation?.name || 'Selected Server'}
           </h1>
           <p className="text-sm text-[color:var(--text-secondary)] mt-0.5">
-            Overview, server integrations, and POS terminals linked to this branch.
+            Server integrations and POS terminals linked to this account.
           </p>
         </div>
       </div>
@@ -199,7 +169,7 @@ export default function OutletsDevices() {
                         </div>
                         <div className="bg-white/60 px-3 py-1.5 rounded-lg border border-slate-200">
                            <span className="text-slate-500 font-semibold mr-2">API Key:</span> 
-                           <span className="text-slate-800 font-mono">••••••••{activeLocation.apiKey.slice(-4)}</span>
+                           <span className="text-slate-800 font-mono">****************{activeLocation.apiKey.slice(-4)}</span>
                         </div>
                       </div>
                     </div>

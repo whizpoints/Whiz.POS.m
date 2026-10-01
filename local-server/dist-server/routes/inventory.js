@@ -183,15 +183,15 @@ router.put('/:id', async (req, res) => {
                 else {
                     await db.insertInto('ProductInventory').values({ id: randomUUID(), productId: id, locationId: targetLocationId, stock: newStock, reorderLevel: reorderLevel || 5 }).returningAll().executeTakeFirstOrThrow();
                 }
-                if (variance !== 0) {
+                if (variance !== 0 || !existingInventory) {
                     const outletId = req.query.outletId || req.body.outletId || existingInventory?.outletId || null;
-                    await db.insertInto('StockMovement').values({ id: randomUUID(),
+                    await db.insertInto('StockMovement').values({
                         id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
                         businessId,
                         productId: id,
                         locationId: targetLocationId,
                         outletId: String(outletId) !== 'undefined' && outletId !== null ? String(outletId) : null,
-                        type: variance > 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+                        type: variance > 0 ? 'ADJUSTMENT_UP' : (variance < 0 ? 'ADJUSTMENT_DOWN' : 'ASSIGNMENT'),
                         quantity: Math.abs(variance),
                         reference: 'Server Manual Update',
                         sourceTerminal: 'SERVER',

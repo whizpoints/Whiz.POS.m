@@ -1,4 +1,5 @@
 import { useState, useEffect, type ReactNode } from 'react';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import {
   Key, Copy, CheckCircle2, CreditCard, ShieldCheck, AlertTriangle,
   RefreshCw, Eye, EyeOff, Save, Building2, Globe, Lock, User2,
@@ -80,7 +81,7 @@ export default function Settings() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-[color:var(--text-muted)]">Loading settings...</div>;
+    return <LoadingSpinner message="Loading settings..." />;
   }
 
   return (
@@ -174,7 +175,7 @@ function CopyField({ value, mono = true, isSecret = false }: { value: string; mo
         style={mono ? { letterSpacing: '0.2px' } : {}}
       >
         <span className="break-all text-[color:var(--text-primary)]">
-          {show ? value : '������������������������'}
+          {show ? value : '************************'}
         </span>
       </div>
       <div className="flex gap-2">
@@ -361,6 +362,7 @@ function PaymentsPanel() {
   const [showConsumer, setShowConsumer] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [showPasskey, setShowPasskey] = useState(false);
+  const [showInitiatorPass, setShowInitiatorPass] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -385,6 +387,8 @@ function PaymentsPanel() {
     consumerKey: '',
     consumerSecret: '',
     passkey: '',
+    initiatorName: '',
+    initiatorPassword: '',
     stkEnabled: true,
     c2bEnabled: true
   });
@@ -410,6 +414,8 @@ function PaymentsPanel() {
               consumerKey: data.consumerKey || '',
               consumerSecret: data.consumerSecret || '',
               passkey: data.passkey || '',
+              initiatorName: data.initiatorName || '',
+              initiatorPassword: data.initiatorPassword ? '********' : '',
               stkEnabled: data.stkEnabled ?? true,
               c2bEnabled: data.c2bEnabled ?? true
             });
@@ -488,7 +494,7 @@ function PaymentsPanel() {
 
       <div className="glass-panel rounded-2xl p-4 md:p-6 space-y-5 md:space-y-6">
         {isLoading ? (
-          <div className="flex justify-center p-8"><div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div></div>
+          <LoadingSpinner message="Loading M-Pesa Configuration..." />
         ) : (
           <>
             <div className="grid gap-4 md:grid-cols-2">
@@ -619,6 +625,68 @@ function PaymentsPanel() {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <div className="md:col-span-2 mt-4 p-4 rounded-xl bg-blue-50/50 border border-blue-100 text-sm">
+                <h4 className="font-semibold text-blue-900 mb-1 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  How to get Initiator Credentials
+                </h4>
+                <div className="text-blue-800 space-y-2 text-[12px] leading-relaxed">
+                  <p>
+                    While Consumer Keys manage STK Push, <strong>Initiator Credentials</strong> allow WhizPOS to automatically verify customer names and handle transaction statuses (via Safaricom's G2 Security).
+                  </p>
+                  <ol className="list-decimal pl-4 space-y-1">
+                    <li>Log into the <a href="https://org.ke.m-pesa.com/" target="_blank" rel="noopener noreferrer" className="font-bold text-blue-700 underline hover:text-blue-900">M-PESA Organization Portal</a> (not Daraja).</li>
+                    <li>Go to <strong>Operators</strong> &rarr; <strong>Add New Operator</strong>.</li>
+                    <li>Create a new API User (e.g., "WhizAPI").</li>
+                    <li>Assign them the <strong>Business Administrator</strong> or <strong>API Operator</strong> role (must have "Transaction Status" permissions).</li>
+                    <li>The username you created is your <strong>Initiator Name</strong>. The operator's password is the <strong>Initiator Password</strong>.</li>
+                  </ol>
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="label">Initiator Name (For Transaction Status)</label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      name="initiatorName"
+                      value={config.initiatorName}
+                      onChange={handleChange}
+                      type="text"
+                      className="input font-mono text-[13px]"
+                      placeholder="Enter Initiator Name"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="label">Initiator Password</label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]" />
+                    <input
+                      name="initiatorPassword"
+                      value={config.initiatorPassword}
+                      onChange={handleChange}
+                      type={showInitiatorPass ? 'text' : 'password'}
+                      className="input !pl-10 !pr-10 font-mono text-[13px]"
+                      placeholder="Enter Initiator Password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowInitiatorPass(v => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)] transition-colors"
+                    >
+                      {showInitiatorPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <p className="mt-1 text-[11px] text-[color:var(--text-muted)]">
+                  The password is securely encrypted at rest. It will be encrypted again with Safaricom's certificate before transmission.
+                </p>
               </div>
 
               <div className="md:col-span-2 mt-2">

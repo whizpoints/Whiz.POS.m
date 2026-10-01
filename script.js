@@ -1,68 +1,110 @@
 const fs = require('fs');
-const path = 'c:/Users/Josphat Mburu/Documents/codes/Whiz_POS-master/src/pages/DeveloperPage.tsx';
+
+const path = 'local-server/src/pages/LocalSetupPage.tsx';
 let content = fs.readFileSync(path, 'utf8');
 
-const targetRegex = /<div className="bg-green-50 p-4 border-b flex items-center justify-between">[\s\S]*?<button type="button" onClick=\{\(\) => togglePasswordVisibility\('mpesaConsumerSecret'\)\} className="text-sm text-blue-600">Toggle Secret Visibility<\/button>\s*<\/div>\s*<\/div>/;
+// Replace handleVerifyApiKey
+const handleVerifyRegex = /const handleVerifyApiKey = async \(\) => \{[\s\S]*?^\s*\};\n/m;
+const newHandleLink = `
+  // --- NEW: Modern Browser Authorization Flow ---
+  const [pollIntervalId, setPollIntervalId] = useState<any>(null);
 
-const replacement = <div className="bg-green-50 p-4 border-b flex items-center justify-between">
-                                      <div className="flex items-center gap-3">
-                                          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/1024px-M-PESA_LOGO-01.svg.png" alt="M-Pesa" className="h-8" />
-                                          <h3 className="font-bold text-green-800 text-lg">STK Push & C2B API</h3>
-                                      </div>
-                                      <label className="relative inline-flex items-center cursor-pointer">
-                                          <input type="checkbox" className="sr-only peer" checked={mpesaConfig.enabled} onChange={(e) => setMpesaConfig({...mpesaConfig, enabled: e.target.checked})} />
-                                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                                      </label>
-                                      </div>
-                                      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4 bg-white">
-                                      <div>
-                                          <label className="block text-sm font-medium">Environment</label>
-                                          <select name="environment" value={mpesaConfig.environment} onChange={(e) => setMpesaConfig({...mpesaConfig, environment: e.target.value as any})} className="w-full p-3 border rounded-lg">
-                                          <option value="Sandbox">Sandbox (Testing)</option>
-                                          <option value="Production">Live (Production)</option>
-                                          </select>
-                                      </div>
-                                      <div>
-                                          <label className="block text-sm font-medium">Callback Domain</label>
-                                          <input type="text" name="callbackUrl" value={mpesaConfig.callbackUrl || 'https://api.whizpoint.app'} onChange={(e) => setMpesaConfig({...mpesaConfig, callbackUrl: e.target.value})} className="w-full p-3 border rounded-lg" placeholder="https://..." />
-                                      </div>
-                                      <div>
-                                          <label className="block text-sm font-medium">Type</label>
-                                          <select name="type" value={mpesaConfig.type} onChange={(e) => setMpesaConfig({...mpesaConfig, type: e.target.value as any})} className="w-full p-3 border rounded-lg">
-                                          <option value="Till">Buy Goods (Till Number)</option>
-                                          <option value="Paybill">Paybill</option>
-                                          </select>
-                                      </div>
-                                      <div>
-                                          <label className="block text-sm font-medium">Consumer Key</label>
-                                          <input type="text" name="consumerKey" value={mpesaConfig.consumerKey} onChange={(e) => setMpesaConfig({...mpesaConfig, consumerKey: e.target.value})} className="w-full p-3 border rounded-lg" />
-                                      </div>
-                                      <div>
-                                          <label className="block text-sm font-medium">Consumer Secret</label>
-                                          <input type={showPasswords['mpesaConsumerSecret'] ? 'text' : 'password'} name="consumerSecret" value={mpesaConfig.consumerSecret} onChange={(e) => setMpesaConfig({...mpesaConfig, consumerSecret: e.target.value})} className="w-full p-3 border rounded-lg" />
-                                      </div>
-                                      <div>
-                                          <label className="block text-sm font-medium">Passkey</label>
-                                          <input type={showPasswords['mpesaPasskey'] ? 'text' : 'password'} name="passkey" value={mpesaConfig.passkey} onChange={(e) => setMpesaConfig({...mpesaConfig, passkey: e.target.value})} className="w-full p-3 border rounded-lg" />
-                                      </div>
-                                      <div>
-                                          <label className="block text-sm font-medium text-purple-700">Business Shortcode (Store No. / Head Office)</label>
-                                          <input type="text" name="shortcode" value={mpesaConfig.shortcode} onChange={(e) => setMpesaConfig({...mpesaConfig, shortcode: e.target.value})} className="w-full p-3 border rounded-lg border-purple-200 bg-purple-50" placeholder="e.g. 123456" />
-                                      </div>
-                                      <div>
-                                          <label className="block text-sm font-medium text-blue-700">Till / Paybill Number (PartyB)</label>
-                                          <input type="text" name="partyB" value={mpesaConfig.partyB} onChange={(e) => setMpesaConfig({...mpesaConfig, partyB: e.target.value})} className="w-full p-3 border rounded-lg border-blue-200 bg-blue-50" placeholder="e.g. 3098707" />
-                                      </div>
-                                      <div className="md:col-span-2 flex gap-4">
-                                          <button type="button" onClick={() => togglePasswordVisibility('mpesaPasskey')} className="text-sm text-blue-600">Toggle Passkey Visibility</button>
-                                          <button type="button" onClick={() => togglePasswordVisibility('mpesaConsumerSecret')} className="text-sm text-blue-600">Toggle Secret Visibility</button>
-                                      </div>
-                                      </div>;
+  useEffect(() => {
+    return () => {
+      if (pollIntervalId) clearInterval(pollIntervalId);
+    };
+  }, [pollIntervalId]);
 
-if(targetRegex.test(content)) {
-    content = content.replace(targetRegex, replacement);
-    fs.writeFileSync(path, content, 'utf8');
-    console.log("SUCCESS");
-} else {
-    console.log("NOT FOUND");
-}
+  const handleLinkAccount = async () => {
+    setLoading(true);
+    try {
+      const CLOUD_API = (process.env.NODE_ENV === 'production' ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
+      
+      const res = await fetch(\`\${CLOUD_API}/api/pairing/request\`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'SERVER', deviceInfo: { os: navigator.platform } })
+      });
+      if (!res.ok) throw new Error('Failed to generate link request');
+      const data = await res.json();
+      
+      const connectUrl = \`\${CLOUD_API}/connect/server/\${data.requestId}\`;
+      
+      // Start polling
+      const pId = setInterval(() => checkCloudApproval(CLOUD_API, data.requestId, pId), 3000);
+      setPollIntervalId(pId);
+      
+      setIsApiKeyVerified(true); // Hijack the state to show waiting UI
+      
+      toast(\`Please open the browser window that just popped up, or go to \${connectUrl}\`, { duration: 10000 });
+      window.open(connectUrl, '_blank');
+    } catch (err: any) {
+      toast.error('Cloud connection failed. Ensure you have internet.');
+      setLoading(false);
+    }
+  };
+
+  const checkCloudApproval = async (cloudApi: string, requestId: string, intervalId: any) => {
+    try {
+      const res = await fetch(\`\${cloudApi}/api/pairing/\${requestId}/status\`);
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      if (data.status === 'APPROVED' && data.credentials) {
+        clearInterval(intervalId);
+        
+        // Trigger local DB seeding via /api/setup/sync
+        const syncRes = await fetch('/api/setup/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ outletId: data.credentials.outletId, cloudToken: data.credentials.apiKey })
+        });
+
+        if (syncRes.ok) {
+           toast.success('Successfully Linked to Cloud and Synced!');
+           setIsBackendReady(false); // force a reload of the layout
+           setTimeout(() => window.location.reload(), 1500);
+        } else {
+           toast.error('Failed to save configuration locally');
+           setIsApiKeyVerified(false);
+        }
+      } else if (data.status === 'EXPIRED') {
+        clearInterval(intervalId);
+        toast.error('Pairing request expired');
+        setIsApiKeyVerified(false);
+      }
+    } catch (err) {
+      // Keep polling
+    }
+  };
+`;
+
+content = content.replace(/const handleVerifyApiKey = async \(\) => \{[\s\S]*?\};(\r?\n)/, newHandleLink);
+
+// Replace UI step 1
+const uiRegex = /\{!isOfflineMode \? \([\s\S]*?\) : \(/m;
+const newUI = `{!isOfflineMode ? (
+                    <div className="flex flex-col items-center justify-center p-6 bg-blue-500/10 border border-blue-500/20 rounded-xl mb-6 mt-4">
+                      {isApiKeyVerified ? (
+                        <div className="text-center animate-in fade-in">
+                           <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+                           <h3 className="text-lg font-bold text-white mb-2">Waiting for Approval</h3>
+                           <p className="text-gray-400 text-sm">Please log in to your Whiz POS Cloud Admin to approve this server link.</p>
+                           <button type="button" onClick={() => { if(pollIntervalId) clearInterval(pollIntervalId); setIsApiKeyVerified(false); }} className="mt-4 px-4 py-2 bg-gray-800 text-white rounded-lg text-sm">Cancel</button>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <h3 className="text-lg font-bold text-white mb-2">Link Server to Cloud</h3>
+                          <p className="text-gray-400 text-sm mb-4">Securely pair this local server with your Whiz POS account to sync your business operations.</p>
+                          <button type="button" onClick={handleLinkAccount} disabled={loading} className="w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)]">
+                            {loading ? 'Generating Link...' : 'Link WHIZPOS Account'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (`
+
+content = content.replace(uiRegex, newUI);
+
+fs.writeFileSync(path, content, 'utf8');
+console.log("Updated LocalSetupPage.tsx");

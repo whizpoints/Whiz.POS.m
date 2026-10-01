@@ -1,5 +1,11 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
+export interface InventoryScope {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export interface StoreLocation {
   id: string;
   name: string;
@@ -7,10 +13,12 @@ export interface StoreLocation {
   createdAt?: string;
   apiKey?: string;
   pairingCode?: string;
+  scopeId?: string;
 }
 
 interface BranchContextType {
   locations: StoreLocation[];
+  scopes: InventoryScope[];
   activeLocationId: string | 'ALL';
   setActiveLocationId: (id: string | 'ALL') => void;
   isLoading: boolean;
@@ -21,6 +29,7 @@ const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export const BranchProvider = ({ children }: { children: ReactNode }) => {
   const [locations, setLocations] = useState<StoreLocation[]>([]);
+  const [scopes, setScopes] = useState<InventoryScope[]>([]);
   const [activeLocationId, setActiveLocationIdState] = useState<string | 'ALL'>('ALL');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -48,7 +57,7 @@ export const BranchProvider = ({ children }: { children: ReactNode }) => {
   }, [userLocationId]);
 
   useEffect(() => {
-    const fetchLocations = async () => {
+    const fetchData = async () => {
       try {
         const token = localStorage.getItem('whiz-token');
         if (!token) {
@@ -57,30 +66,41 @@ export const BranchProvider = ({ children }: { children: ReactNode }) => {
         }
 
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-        const res = await fetch(`${API_BASE_URL}/api/business/locations`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        
+        const [locRes, scopeRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/business/locations`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/business/scopes`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
 
-        if (res.ok) {
-          const data = await res.json();
+        if (locRes.ok) {
+          const data = await locRes.json();
+          if (data.success && data.locations) {
+            setLocations(data.locations);
+            // Default to the first location for a single-server architecture
+            if (!userLocationId && data.locations.length > 0 && activeLocationId === 'ALL') {
+              setActiveLocationIdState(data.locations[0].id);
+            }
+          }
+        }
+        
+        if (scopeRes.ok) {
+          const data = await scopeRes.json();
           if (data.success) {
-            setLocations(data.locations || []);
+            setScopes(data.scopes || []);
           }
         }
       } catch (err) {
-        console.error('Failed to fetch locations:', err);
+        console.error('Failed to fetch locations/scopes:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchLocations();
+    fetchData();
   }, []);
 
   return (
-    <BranchContext.Provider value={{ locations, activeLocationId, setActiveLocationId, isLoading, isLocked: !!userLocationId } as any}>
+    <BranchContext.Provider value={{ locations, scopes, activeLocationId, setActiveLocationId, isLoading, isLocked: !!userLocationId } as any}>
       {children}
     </BranchContext.Provider>
   );

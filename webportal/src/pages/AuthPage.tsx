@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Mail, Lock, Building2, ArrowRight, Eye, EyeOff, LogOut, CheckCircle2, ShieldCheck, Activity, CreditCard, PieChart, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -10,7 +10,22 @@ export default function AuthPage() {
   const [isSwitching, setIsSwitching] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
+  
+  // Persist the return URL for OAuth flows
+  React.useEffect(() => {
+    let returnUrl = '/dashboard';
+    if (location.state?.from) {
+      returnUrl = typeof location.state.from === 'string' 
+        ? location.state.from 
+        : `${location.state.from.pathname}${location.state.from.search || ''}`;
+      sessionStorage.setItem('whiz-return-url', returnUrl);
+    }
+  }, [location.state]);
+
+  const getReturnUrl = () => sessionStorage.getItem('whiz-return-url') || '/dashboard';
+  
   const isSuspended = searchParams.get('suspended') === 'true';
 
   const [formData, setFormData] = useState({
@@ -46,7 +61,7 @@ export default function AuthPage() {
           if (parsed?.isSuperAdmin) {
             navigate('/admin');
           } else {
-            navigate('/dashboard');
+            navigate(getReturnUrl(), { replace: true });
           }
         } catch (e) {
         console.error(e);
@@ -85,7 +100,7 @@ export default function AuthPage() {
         if (user?.isSuperAdmin) {
           navigate('/admin');
         } else {
-          navigate('/dashboard');
+          navigate(getReturnUrl(), { replace: true });
         }
       }
     };
@@ -115,7 +130,7 @@ export default function AuthPage() {
         if (data.user?.isSuperAdmin) {
           navigate('/admin');
         } else {
-          navigate('/dashboard');
+          navigate(getReturnUrl(), { replace: true });
         }
       } else {
         toast.error(data.error || 'Authentication failed');
@@ -306,7 +321,7 @@ export default function AuthPage() {
                {/* Actions */}
                <div className="flex flex-col gap-3">
                   <button 
-                     onClick={() => activeSession?.isSuperAdmin ? navigate('/admin') : navigate('/dashboard')} 
+                     onClick={() => activeSession?.isSuperAdmin ? navigate('/admin') : navigate(getReturnUrl(), { replace: true })} 
                      className="w-full text-white font-semibold text-[15px] h-[54px] rounded-[14px] transition-all flex items-center justify-center gap-2 shadow-[0_8px_16px_rgba(10,158,245,0.2)] hover:shadow-[0_12px_24px_rgba(10,158,245,0.3)] hover:-translate-y-0.5 active:scale-[0.98]"
                      style={{ backgroundColor: colors.primaryBlue }}
                   >

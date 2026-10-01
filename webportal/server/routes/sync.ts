@@ -91,6 +91,13 @@ router.post('/sales', async (req: any, res: any) => {
       }
     }
 
+    const io = req.app.get('io');
+    if (io) {
+       io.to(`business_${businessId}`).emit('cloud_sync_received', { timestamp: new Date().toISOString() });
+       io.to(`business_${businessId}`).emit('downward_sync_event', { timestamp: new Date().toISOString() });
+       io.to(`business_${businessId}`).emit('dashboard_update', { timestamp: new Date().toISOString() });
+    }
+
     res.json({ success: true, syncedCount: createdReceipts.length });
   } catch (error) {
     console.error('Sync error:', error);
@@ -419,6 +426,13 @@ router.post('/full', (req: any, res: any) => {
       }
 
       console.log(`[Background Sync] Success! Users: ${syncedUsers}, Products: ${syncedProducts}, Sales: ${syncedSales}, Customers: ${syncedCustomers}, Suppliers: ${syncedSuppliers}, Movements: ${syncedMovements}`);
+      
+      const io = req.app.get('io');
+      if (io) {
+         io.to(`business_${businessId}`).emit('cloud_sync_received', { timestamp: new Date().toISOString() });
+         io.to(`business_${businessId}`).emit('downward_sync_event', { timestamp: new Date().toISOString() });
+         io.to(`business_${businessId}`).emit('dashboard_update', { timestamp: new Date().toISOString() });
+      }
     } catch (error: any) {
       console.error('POS Full Background Sync error:', error);
     }

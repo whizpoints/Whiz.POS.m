@@ -10,7 +10,13 @@ const authenticate = async (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
   const apiKey = req.headers['x-api-key'];
 
-      if (apiKey) {
+    if (apiKey) {
+      const server = await prisma.server.findFirst({ where: { apiKey } });
+      if (server) {
+        req.user = { businessId: server.businessId, serverId: server.id };
+        return next();
+      }
+      
       const business = await prisma.business.findFirst({ where: { apiKey } });
       if (business) {
         req.user = { businessId: business.id };
@@ -50,6 +56,16 @@ router.get('/', async (req: any, res: any) => {
 
     const sinceDate = new Date(since);
 
+    let targetScopeId = undefined;
+    if (locationId) {
+      const loc = await prisma.storeLocation.findUnique({ where: { id: String(locationId) } });
+      if (loc && loc.scopeId) targetScopeId = loc.scopeId;
+    }
+    if (outletId) {
+      const out = await prisma.outlet.findUnique({ where: { id: String(outletId) } });
+      if (out && out.scopeId) targetScopeId = out.scopeId;
+    }
+
     const [
       users,
       products,
@@ -64,8 +80,13 @@ router.get('/', async (req: any, res: any) => {
       prisma.product.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
       prisma.productInventory.findMany({ 
           where: { 
-              locationId: locationId ? String(locationId) : undefined,
-              outletId: outletId ? String(outletId) : undefined,
+              OR: [
+                 ...(targetScopeId ? [{ scopeId: targetScopeId }] : []),
+                 { 
+                    locationId: locationId ? String(locationId) : undefined,
+                    outletId: outletId ? String(outletId) : undefined,
+                 }
+              ],
               updatedAt: { gt: sinceDate },
               product: { businessId } // Ensure it belongs to the business
           },
@@ -117,15 +138,22 @@ router.post('/', async (req: any, res: any) => {
 
     let targetLocationId = undefined;
     let targetOutletId = undefined;
+    let targetScopeId = undefined;
     
     if (businessSetup?.locationId) {
       const loc = await prisma.storeLocation.findFirst({ where: { id: businessSetup.locationId, businessId } });
-      if (loc) targetLocationId = loc.id;
+      if (loc) {
+        targetLocationId = loc.id;
+        targetScopeId = loc.scopeId;
+      }
     }
 
     if (businessSetup?.outletId && targetLocationId) {
       const out = await prisma.outlet.findFirst({ where: { id: businessSetup.outletId, locationId: targetLocationId } });
-      if (out) targetOutletId = out.id;
+      if (out) {
+        targetOutletId = out.id;
+        if (out.scopeId) targetScopeId = out.scopeId;
+      }
     }
 
     const results = {
@@ -231,8 +259,10 @@ router.post('/', async (req: any, res: any) => {
               id: String(log.id),
               businessId,
               productId: productMatch.id,
-              locationId: targetLocationId || '',
-              outletId: targetOutletId || null,
+              locationId: targetLocationId || log.locationId || '',
+              outletId: targetOutletId || log.outletId || null,
+              serverId: log.serverId || req.user.serverId || null,
+              terminalId: log.terminalId || null,
               type: log.type || log.reason || 'SALE',
               quantity: Math.abs(Number(log.variance) || 0),
               reference: String(log.reference || log.id),
@@ -243,19 +273,24 @@ router.post('/', async (req: any, res: any) => {
           const inventories = await prisma.productInventory.findMany({
             where: { 
               productId: productMatch.id, 
-              locationId: targetLocationId, 
-              OR: [{ outletId: targetOutletId || null }, { outletId: null }]
+              OR: [
+                 ...(targetScopeId ? [{ scopeId: targetScopeId }] : []),
+                 { locationId: targetLocationId, OR: [{ outletId: targetOutletId || null }, { outletId: null }] }
+              ]
             }
           });
 
-          let inventoryToUpdate = inventories.find(i => i.outletId === (targetOutletId || null)) || inventories.find(i => i.outletId === null);
+          let inventoryToUpdate = targetScopeId 
+               ? inventories.find(i => i.scopeId === targetScopeId)
+               : (inventories.find(i => i.outletId === (targetOutletId || null)) || inventories.find(i => i.outletId === null));
           
           if (!inventoryToUpdate) {
              inventoryToUpdate = await prisma.productInventory.create({
                 data: {
                    productId: productMatch.id,
                    locationId: targetLocationId || '',
-                   outletId: null,
+                   outletId: targetScopeId ? null : (targetOutletId || null),
+                   scopeId: targetScopeId || null,
                    stock: 0,
                    reorderLevel: 5
                 }
@@ -281,7 +316,7 @@ router.post('/', async (req: any, res: any) => {
     // 3. Transactions (Sales)
     if (transactions && Array.isArray(transactions)) {
        for (const t of transactions) {
-          const existing = await prisma.receipt.findFirst({ where: { businessId, receiptNumber: String(t.id) } });
+          const existing = await prisma.receipt.findUnique({ where: { id: String(t.id) } });
           const rawStatus = (t.status || '').toUpperCase();
           if (resolveConflict(t, existing)) {
               if (rawStatus !== 'CANCELLED') {
@@ -297,7 +332,11 @@ router.post('/', async (req: any, res: any) => {
                       const createdReceipt = await prisma.receipt.create({
                          data: {
                             id: t.id,
-                            businessId, locationId: targetLocationId, outletId: targetOutletId || null,
+                            businessId, 
+                            locationId: targetLocationId || t.locationId || null, 
+                            outletId: null,
+                            serverId: t.serverId || req.user.serverId || null,
+                            terminalId: t.terminalId || null,
                             receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
                             paymentMethod: String(t.paymentMethod || 'CASH'), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
                             mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null, status: safeStatus as any,
@@ -369,6 +408,14 @@ router.post('/', async (req: any, res: any) => {
               }
            });
        }
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+       // Broadcast to all POS terminals and web dashboard
+       io.to(`business_${businessId}`).emit('cloud_sync_received', { timestamp: new Date().toISOString() });
+       io.to(`business_${businessId}`).emit('downward_sync_event', { timestamp: new Date().toISOString() });
+       io.to(`business_${businessId}`).emit('dashboard_update', { timestamp: new Date().toISOString() });
     }
 
     res.json({

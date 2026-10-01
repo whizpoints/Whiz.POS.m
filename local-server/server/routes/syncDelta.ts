@@ -204,10 +204,18 @@ router.get('/', async (req: any, res: any) => {
 router.post('/', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, businessSetup, documents } = req.body;
+    const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, businessSetup, documents, mpesaConfigs, isFromCloud } = req.body;
 
     let targetLocationId: string | null = null;
     let targetOutletId: string | null = null;
+    let mappedLocalLocationId: string | null = null;
+    let mappedLocalOutletId: string | null = null;
+    if (isFromCloud) {
+        const loc = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
+        if (loc) mappedLocalLocationId = loc.id;
+        const out = await db.selectFrom('Outlet').selectAll().executeTakeFirst();
+        if (out) mappedLocalOutletId = out.id;
+    }
     
     // Try to resolve from businessSetup in payload
     if (businessSetup?.locationId) {
@@ -219,6 +227,9 @@ router.post('/', async (req: any, res: any) => {
       const out = await db.selectFrom('Outlet').selectAll().where('id', '=', businessSetup.outletId).where('locationId', '=', targetLocationId).executeTakeFirst();
       if (out) targetOutletId = out.id;
     }
+
+    if (isFromCloud && mappedLocalLocationId && !targetLocationId) targetLocationId = mappedLocalLocationId;
+    if (isFromCloud && mappedLocalOutletId && !targetOutletId) targetOutletId = mappedLocalOutletId;
 
     // Fallback: resolve from the authenticated user's outlet
     if (!targetOutletId && req.user.outletId) {
@@ -284,8 +295,8 @@ router.post('/', async (req: any, res: any) => {
                       shortcode: mc.shortcode || '',
                       initiatorName: mc.initiatorName || null,
                       initiatorPassword: mc.initiatorPassword || null,
-                      stkEnabled: mc.stkEnabled !== false,
-                      c2bEnabled: mc.c2bEnabled !== false,
+                      stkEnabled: mc.stkEnabled !== false ? 1 : 0,
+                      c2bEnabled: mc.c2bEnabled !== false ? 1 : 0,
                       updatedAt: mc.updatedAt ? new Date(mc.updatedAt).toISOString() : new Date().toISOString()
                   }).where('id', '=', existing.id).execute();
               } else {
@@ -305,8 +316,8 @@ router.post('/', async (req: any, res: any) => {
                       shortcode: mc.shortcode || '',
                       initiatorName: mc.initiatorName || null,
                       initiatorPassword: mc.initiatorPassword || null,
-                      stkEnabled: mc.stkEnabled !== false,
-                      c2bEnabled: mc.c2bEnabled !== false,
+                      stkEnabled: mc.stkEnabled !== false ? 1 : 0,
+                      c2bEnabled: mc.c2bEnabled !== false ? 1 : 0,
                       createdAt: mc.createdAt ? new Date(mc.createdAt).toISOString() : new Date().toISOString(),
                       updatedAt: mc.updatedAt ? new Date(mc.updatedAt).toISOString() : new Date().toISOString()
                   }).execute();
@@ -441,14 +452,14 @@ router.post('/', async (req: any, res: any) => {
 
       // 3.5 Product Inventory (Absolute from Cloud)
       if (inventory && Array.isArray(inventory)) {
-         for (const inv of inventory) {
+         for (const inv of inventory) { const resolvedLocationId = isFromCloud && mappedLocalLocationId ? mappedLocalLocationId : (inv.locationId || targetLocationId || null); const resolvedOutletId = isFromCloud && mappedLocalOutletId ? mappedLocalOutletId : (inv.outletId || targetOutletId || null);
             if (!inv.productId) continue;
             
             const existing = await db.selectFrom('ProductInventory')
                 .selectAll()
                 .where('productId', '=', inv.productId)
-                .where('locationId', 'is', inv.locationId || null)
-                .where('outletId', 'is', inv.outletId || null)
+                .where('locationId', 'is', resolvedLocationId)
+                .where('outletId', 'is', resolvedOutletId)
                 .executeTakeFirst();
             
             if (resolveConflict(inv, existing)) {
@@ -463,8 +474,8 @@ router.post('/', async (req: any, res: any) => {
                         .values({
                             id: inv.id || randomUUID(),
                             productId: inv.productId,
-                            locationId: inv.locationId || targetLocationId || null,
-                            outletId: inv.outletId || targetOutletId || null,
+                            locationId: resolvedLocationId,
+                            outletId: resolvedOutletId,
                             stock: Number(inv.stock) || 0,
                             updatedAt: (inv.updatedAt ? new Date(inv.updatedAt) : new Date()).toISOString()
                         }).execute();
@@ -712,6 +723,7 @@ router.post('/', async (req: any, res: any) => {
 });
 
 export default router;
+
 
 
 

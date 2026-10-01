@@ -8,7 +8,15 @@ export async function generateSecurityCredential(initiatorPassword: string): Pro
             console.log('Fetching Safaricom Production Certificate dynamically...');
             const response = await fetch('https://developer.safaricom.co.ke/certificates/ProductionCertificate.cer');
             if (response.ok) {
-                cachedCertificate = await response.text();
+                const buffer = Buffer.from(await response.arrayBuffer());
+                let certString = buffer.toString('utf8');
+                
+                // Convert DER to PEM if it's not already in PEM format
+                if (!certString.includes('BEGIN CERTIFICATE')) {
+                    certString = `-----BEGIN CERTIFICATE-----\n${buffer.toString('base64').match(/.{1,64}/g)?.join('\n')}\n-----END CERTIFICATE-----\n`;
+                }
+                
+                cachedCertificate = certString;
             } else {
                 console.error('Failed to fetch certificate. Status:', response.status);
             }

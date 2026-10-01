@@ -25,18 +25,21 @@ model Business {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  users          User[]
-  locations      StoreLocation[]
-  products       Product[]
-  receipts       Receipt[]
-  customers      Customer[]
-  mpesaTxns      MpesaTransaction[]
-  mpesaConfigs   MpesaConfig[]
-  suppliers      Supplier[]
-  outlets        Outlet[]
-  stockMovements StockMovement[]
-  Client         Client[]
-  SavedDocument  SavedDocument[]
+  users           User[]
+  locations       StoreLocation[]
+  products        Product[]
+  receipts        Receipt[]
+  customers       Customer[]
+  mpesaTxns       MpesaTransaction[]
+  mpesaConfigs    MpesaConfig[]
+  suppliers       Supplier[]
+  outlets         Outlet[]
+  stockMovements  StockMovement[]
+  Client          Client[]
+  SavedDocument   SavedDocument[]
+  servers         Server[]
+  inventoryScopes InventoryScope[]
+  terminals       Terminal[]
 
   @@index([email])
   @@index([updatedAt])
@@ -106,17 +109,19 @@ enum Role {
 }
 
 model StoreLocation {
-  id         String   @id @default(cuid())
-  businessId String
-  name       String
-  address    String?
-  pairingCode String?
+  id                   String    @id @default(cuid())
+  businessId           String
+  name                 String
+  address              String?
+  pairingCode          String?
   pairingCodeExpiresAt DateTime?
-  apiKey     String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @default(now()) @updatedAt
+  apiKey               String?
+  scopeId              String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @default(now()) @updatedAt
 
   business       Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  scope          InventoryScope?    @relation(fields: [scopeId], references: [id], onDelete: SetNull)
   receipts       Receipt[]
   users          User[]
   mpesaConfig    MpesaConfig?
@@ -126,6 +131,7 @@ model StoreLocation {
   stockMovements StockMovement[]
 
   @@index([businessId])
+  @@index([scopeId])
   @@index([updatedAt])
 }
 
@@ -134,11 +140,13 @@ model Outlet {
   businessId String
   locationId String
   name       String
+  scopeId    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 
-  business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  location StoreLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location StoreLocation   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  scope    InventoryScope? @relation(fields: [scopeId], references: [id], onDelete: SetNull)
 
   inventory      ProductInventory[]
   stockMovements StockMovement[]
@@ -146,9 +154,11 @@ model Outlet {
   users          User[]
   mpesaConfigs   MpesaConfig[]
   mpesaTxns      MpesaTransaction[]
+  Terminal       Terminal[]
 
   @@index([businessId])
   @@index([locationId])
+  @@index([scopeId])
   @@index([updatedAt])
 }
 
@@ -158,6 +168,8 @@ model StockMovement {
   productId  String
   locationId String
   outletId   String?
+  serverId   String?
+  terminalId String?
   type       String // SALE, TRANSFER, PO, ADJUSTMENT
   quantity   Int
   reference  String?
@@ -168,11 +180,15 @@ model StockMovement {
   product  Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
   location StoreLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
   outlet   Outlet?       @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  server   Server?       @relation(fields: [serverId], references: [id], onDelete: SetNull)
+  terminal Terminal?     @relation(fields: [terminalId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
   @@index([productId])
   @@index([locationId])
   @@index([outletId])
+  @@index([serverId])
+  @@index([terminalId])
   @@index([timestamp])
   @@index([updatedAt])
 }
@@ -205,18 +221,21 @@ model ProductInventory {
   productId    String
   locationId   String
   outletId     String?
+  scopeId      String?
   stock        Int      @default(0)
   reorderLevel Int      @default(5)
   updatedAt    DateTime @updatedAt
 
-  product  Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  location StoreLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  outlet   Outlet?       @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  product  Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  location StoreLocation   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  outlet   Outlet?         @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  scope    InventoryScope? @relation(fields: [scopeId], references: [id], onDelete: SetNull)
 
   @@unique([productId, locationId, outletId])
   @@index([productId])
   @@index([locationId])
   @@index([outletId])
+  @@index([scopeId])
   @@index([updatedAt])
 }
 
@@ -281,6 +300,9 @@ model Receipt {
   id            String        @id @default(cuid())
   businessId    String
   locationId    String?
+  outletId      String?
+  serverId      String?
+  terminalId    String?
   receiptNumber String
   totalAmount   Float
   paymentMethod String
@@ -295,12 +317,15 @@ model Receipt {
 
   business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location StoreLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  outletId String?
   outlet   Outlet?        @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  server   Server?        @relation(fields: [serverId], references: [id], onDelete: SetNull)
+  terminal Terminal?      @relation(fields: [terminalId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
   @@index([locationId])
   @@index([outletId])
+  @@index([serverId])
+  @@index([terminalId])
   @@index([receiptNumber])
   @@index([createdAt])
   @@index([updatedAt])
@@ -341,8 +366,63 @@ model Supplier {
   @@index([updatedAt])
 }
 
+model Server {
+  id            String    @id @default(cuid())
+  businessId    String
+  name          String
+  status        String    @default("OFFLINE")
+  lastHeartbeat DateTime?
+  apiKey        String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  terminals      Terminal[]
+  receipts       Receipt[]
+  stockMovements StockMovement[]
+
+  @@index([businessId])
+}
+
+model InventoryScope {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  business  Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  inventory ProductInventory[]
+  outlets   Outlet[]
+  locations StoreLocation[]
+
+  @@index([businessId])
+  @@index([updatedAt])
+}
+
+model PairingRequest {
+  id         String @id @default(cuid())
+  type       String @default("SERVER") // SERVER or TERMINAL
+  status     String @default("PENDING") // PENDING, APPROVED, EXPIRED
+  deviceInfo Json?
+
+  // These will be filled upon approval
+  businessId String?
+  outletId   String?
+  serverId   String? // The actual server created upon approval
+  apiKey     String? // The generated token to hand back
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
 model Terminal {
   id         String   @id @default(cuid())
+  businessId String?
+  serverId   String?
   macAddress String   @unique
   name       String
   status     String   @default("PENDING")
@@ -350,6 +430,17 @@ model Terminal {
   outletId   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
+
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  server   Server?   @relation(fields: [serverId], references: [id], onDelete: SetNull)
+  outlet   Outlet?   @relation(fields: [outletId], references: [id], onDelete: SetNull)
+
+  receipts       Receipt[]
+  stockMovements StockMovement[]
+
+  @@index([businessId])
+  @@index([serverId])
+  @@index([outletId])
 }
 
 model Client {
@@ -391,4 +482,3 @@ model SavedDocument {
 
   @@index([businessId])
 }
-

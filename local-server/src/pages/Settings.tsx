@@ -3,7 +3,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import {
   Key, Copy, CheckCircle2, CreditCard, ShieldCheck, AlertTriangle,
   RefreshCw, Eye, EyeOff, Save, Building2, Globe, Lock, User2, Mail,
-  Bell, Palette, Database, Download, Trash2, ChevronRight
+  Bell, Palette, Database, Download, Trash2, ChevronRight, Link
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
@@ -203,37 +203,100 @@ function SecurityPanel({ profile, fetchProfile }: any) {
   const [cloudInfo, setCloudInfo] = useState<any>(null);
   const [error, setError] = useState('');
 
-  // Step 1: User enters API Key → we validate it against the cloud
-  const handleVerifyApiKey = async () => {
-    if (!apiKey.trim()) {
-      toast.error('Please enter your API Key');
-      return;
-    }
+  // --- NEW: Modern Browser Authorization Flow ---
+  const [pollIntervalId, setPollIntervalId] = useState<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalId) clearInterval(pollIntervalId);
+    };
+  }, [pollIntervalId]);
+
+  const handleLinkAccount = async () => {
     setIsVerifying(true);
     setError('');
     try {
-      // First, verify the API key is valid by hitting the cloud
-      const res = await fetch(`${url}/api/business/locations`, {
-        headers: { 'x-api-key': apiKey.trim() }
+      const CLOUD_API = (process.env.NODE_ENV === 'production' ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
+      
+      const res = await fetch(`${CLOUD_API}/api/pairing/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'SERVER', deviceInfo: { os: navigator.platform } })
       });
-      if (!res.ok) {
-        setError('Invalid API Key. Please check it on your Back Office under Outlets & Devices.');
-        setIsVerifying(false);
-        return;
-      }
+      if (!res.ok) throw new Error('Failed to generate link request');
       const data = await res.json();
-      if (!data.locations || data.locations.length === 0) {
-        setError('No branches found for this API Key. Please create a branch on the Back Office first.');
-        setIsVerifying(false);
-        return;
-      }
-      toast.success('API Key verified! Now enter the 6-digit Pairing Code from your Back Office.');
-      setStep('pairing');
-    } catch (err) {
-      console.error(err);
-      setError(`Could not reach Back Office at ${url}. Check URL and internet connection.`);
-    } finally {
+      
+      const connectUrl = `${CLOUD_API}/connect/server/${data.requestId}`;
+      
+      // Start polling
+      const pId = setInterval(() => checkCloudApproval(CLOUD_API, data.requestId, pId), 3000);
+      setPollIntervalId(pId);
+      
+      setStep('pairing' as any); // Hijack the step for "waiting" UI
+      
+      toast(`Please open the browser window that just popped up, or go to ${connectUrl}`, { duration: 10000 });
+        if ((window as any).electron && (window as any).electron.openExternal) {
+           (window as any).electron.openExternal(connectUrl);
+        } else {
+           window.open(connectUrl, '_blank');
+        }
+    } catch (err: any) {
+      setError('Cloud connection failed. Ensure you have internet.');
       setIsVerifying(false);
+    }
+  };
+
+  const checkCloudApproval = async (cloudApi: string, requestId: string, intervalId: any) => {
+    try {
+      const res = await fetch(`${cloudApi}/api/pairing/${requestId}/status`);
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      if (data.status === 'APPROVED' && data.credentials) {
+        clearInterval(intervalId);
+        
+        // Save the received API key directly to the server settings
+        const saveRes = await fetch('/api/settings/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            backOfficeUrl: cloudApi,
+            apiKey: data.credentials.apiKey,
+            cloudBusinessId: data.credentials.businessId,
+            syncMode: 'AUTO_REALTIME',
+            outletId: data.credentials.outletId,
+            serverId: data.credentials.serverId,
+              cloudBusinessName: data.credentials.businessName,
+              cloudLocationName: data.credentials.locationName
+            })
+        });
+
+        if (saveRes.ok) {
+          const saveData = await saveRes.json();
+          if (saveData.newToken) {
+            localStorage.setItem('whiz-token', saveData.newToken);
+            // Also update the whiz-user to reflect the new businessId
+            const userRaw = localStorage.getItem('whiz-user');
+            if (userRaw) {
+               const u = JSON.parse(userRaw);
+               u.businessId = data.credentials.businessId;
+               localStorage.setItem('whiz-user', JSON.stringify(u));
+            }
+          }
+          toast.success('Successfully Linked to Cloud!');
+          setTimeout(() => window.location.reload(), 2000);
+        } else {
+          const errData = await saveRes.json().catch(() => ({}));
+          setError(errData.error || 'Failed to save configuration locally');
+          setStep('cloud' as any);
+        }
+      } else if (data.status === 'EXPIRED') {
+        clearInterval(intervalId);
+        setError('Pairing request expired');
+        setStep('input');
+      }
+    } catch (err) {
+      // Keep polling
     }
   };
 
@@ -387,98 +450,49 @@ function SecurityPanel({ profile, fetchProfile }: any) {
         </div>
       )}
 
-      {/* Step 1: Enter URL + API Key */}
+      {/* Step 1: Link Account */}
       {step === 'input' && (
-        <div className="glass-panel p-5 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[color:var(--text-secondary)]">Back Office URL</label>
-            <div className="relative">
-              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
-              <input
-                type="text"
-                className="input !pl-10 w-full"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://api.whizpoint.app"
-              />
-            </div>
+        <div className="glass-panel p-6 flex flex-col items-center justify-center space-y-4 text-center">
+          <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-2">
+            <Link className="w-8 h-8 text-blue-500" />
           </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[color:var(--text-secondary)]">Business API Key</label>
-            <p className="text-xs text-[color:var(--text-muted)]">
-              Get this from your Back Office → Outlets & Devices → Generate Pairing Code
-            </p>
-            <div className="relative">
-              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-muted)]" />
-              <input
-                type="password"
-                className="input !pl-10 w-full font-mono text-sm"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Paste your API Key here"
-              />
-            </div>
-          </div>
+          <h3 className="text-xl font-bold text-[color:var(--text-primary)]">Link to Cloud</h3>
+          <p className="text-sm text-[color:var(--text-secondary)] max-w-sm">
+            Securely pair this local server with your WHIZPOS cloud business account to enable synchronization and remote management.
+          </p>
 
           {error && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-600">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-600 w-full text-left">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
-          <div className="pt-2">
-            <button onClick={handleVerifyApiKey} disabled={isVerifying || !apiKey.trim()} className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2">
-              {isVerifying ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-              {isVerifying ? 'Verifying...' : 'Verify API Key'}
+          <div className="pt-4 w-full">
+            <button onClick={handleLinkAccount} disabled={isVerifying} className="btn btn-primary w-full inline-flex items-center justify-center gap-2 py-3">
+              {isVerifying ? <RefreshCw className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
+              {isVerifying ? 'Generating Request...' : 'Link WHIZPOS Account'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 2: Enter Pairing Code */}
+      {/* Step 2: Waiting for Cloud Approval */}
       {step === 'pairing' && (
-        <div className="glass-panel p-5 space-y-4">
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-            <Lock className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-            <div>
-              <div className="text-sm font-bold text-blue-700">API Key Verified ✓</div>
-              <div className="text-xs text-[color:var(--text-muted)]">
-                Now enter the <span className="font-bold">6-digit Pairing Code</span> shown on your Back Office (Outlets & Devices page). The code expires in 15 minutes.
-              </div>
+        <div className="glass-panel p-8 flex flex-col items-center justify-center space-y-6 text-center">
+          <RefreshCw className="w-12 h-12 text-blue-500 animate-spin" />
+          <div>
+            <div className="text-lg font-bold text-[color:var(--text-primary)] mb-2">Waiting for Approval</div>
+            <div className="text-sm text-[color:var(--text-secondary)] max-w-sm mx-auto">
+              A browser window has been opened. Please log in to your WHIZPOS cloud account and approve this server.
             </div>
           </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[color:var(--text-secondary)]">Pairing Code</label>
-            <input
-              type="text"
-              className="input w-full text-center text-3xl font-mono tracking-[0.4em] py-4"
-              maxLength={6}
-              value={pairingCode}
-              onChange={(e) => setPairingCode(e.target.value.replace(/\D/g, ''))}
-              placeholder="000000"
-              autoFocus
-            />
-          </div>
-
-          {error && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-600">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div className="flex gap-2 pt-2">
-            <button onClick={() => { setStep('input'); setError(''); setPairingCode(''); }} className="btn btn-ghost">
-              ← Back
-            </button>
-            <button onClick={handleValidatePairing} disabled={isConfirming || pairingCode.length !== 6} className="btn btn-primary flex-1 inline-flex items-center justify-center gap-2">
-              {isConfirming ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              {isConfirming ? 'Linking...' : 'Complete Handshake'}
-            </button>
-          </div>
+          <button onClick={() => {
+            if (pollIntervalId) clearInterval(pollIntervalId);
+            setStep('input');
+          }} className="btn btn-ghost mt-4">
+            Cancel
+          </button>
         </div>
       )}
     </div>
@@ -1443,3 +1457,4 @@ function EmailPanel({ profile, onSave }: any) {
     </div>
   );
 }
+

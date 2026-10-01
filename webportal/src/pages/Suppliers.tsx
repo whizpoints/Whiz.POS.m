@@ -1,14 +1,17 @@
+let cachedSuppliers: any[] = [];
+let isSuppliersLoaded = false;
 import { useState, useEffect } from 'react';
 import { Search, Plus, Phone, Building2, Edit2, Trash2 } from 'lucide-react';
 import { useBranchContext } from '../context/BranchContext';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import SupplierModal from '../components/Suppliers/SupplierModal';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../context/ConfirmContext';
 
 export default function Suppliers() {
   const { confirm } = useConfirm();
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState<any[]>(cachedSuppliers);
+  const [loading, setLoading] = useState(!isSuppliersLoaded);
   const { activeLocationId } = useBranchContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
@@ -16,7 +19,7 @@ export default function Suppliers() {
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
-        setLoading(true);
+        if (!isSuppliersLoaded) setLoading(true);
         const token = localStorage.getItem('whiz-token');
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
         const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
@@ -40,6 +43,8 @@ export default function Suppliers() {
     fetchSuppliers();
   }, [activeLocationId]);
 
+  if (loading) return <LoadingSpinner message="Loading suppliers data..." />;
+
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
       title: 'Confirm Action',
@@ -56,7 +61,7 @@ export default function Suppliers() {
       if (res.ok) {
         toast.success('Supplier deleted successfully');
         // trigger re-fetch
-        setLoading(true);
+        if (!isSuppliersLoaded) setLoading(true);
         const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
         const response = await fetch(`${API_BASE_URL}/api/dashboard/suppliers${query}`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (response.ok) {
@@ -212,7 +217,7 @@ export default function Suppliers() {
         onClose={() => setIsModalOpen(false)}
         supplier={selectedSupplier}
         onComplete={() => {
-          setLoading(true);
+          if (!isSuppliersLoaded) setLoading(true);
           const token = localStorage.getItem('whiz-token');
           const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
           const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
@@ -225,4 +230,6 @@ export default function Suppliers() {
     </div>
   );
 }
+
+
 

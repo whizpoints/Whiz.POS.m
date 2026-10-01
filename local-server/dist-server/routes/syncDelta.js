@@ -184,9 +184,19 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, businessSetup, documents } = req.body;
+        const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, businessSetup, documents, mpesaConfigs, isFromCloud } = req.body;
         let targetLocationId = null;
         let targetOutletId = null;
+        let mappedLocalLocationId = null;
+        let mappedLocalOutletId = null;
+        if (isFromCloud) {
+            const loc = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
+            if (loc)
+                mappedLocalLocationId = loc.id;
+            const out = await db.selectFrom('Outlet').selectAll().executeTakeFirst();
+            if (out)
+                mappedLocalOutletId = out.id;
+        }
         // Try to resolve from businessSetup in payload
         if (businessSetup?.locationId) {
             const loc = await db.selectFrom('StoreLocation').selectAll().where('id', '=', businessSetup.locationId).where('businessId', '=', businessId).executeTakeFirst();
@@ -198,6 +208,10 @@ router.post('/', async (req, res) => {
             if (out)
                 targetOutletId = out.id;
         }
+        if (isFromCloud && mappedLocalLocationId && !targetLocationId)
+            targetLocationId = mappedLocalLocationId;
+        if (isFromCloud && mappedLocalOutletId && !targetOutletId)
+            targetOutletId = mappedLocalOutletId;
         // Fallback: resolve from the authenticated user's outlet
         if (!targetOutletId && req.user.outletId) {
             const out = await db.selectFrom('Outlet')
@@ -232,6 +246,7 @@ router.post('/', async (req, res) => {
             suppliers: 0,
             transactions: 0,
             inventory: 0,
+            mpesaConfigs: 0,
             skipped: 0
         };
         // Helper for conflict resolution
@@ -242,6 +257,59 @@ router.post('/', async (req, res) => {
                 return true; // If local has no timestamp, assume newer
             return new Date(incoming.updatedAt) > new Date(existing.updatedAt);
         };
+        // 0. MpesaConfigs
+        if (mpesaConfigs && Array.isArray(mpesaConfigs)) {
+            for (const mc of mpesaConfigs) {
+                const existing = await db.selectFrom('MpesaConfig').selectAll().where('id', '=', String(mc.id)).executeTakeFirst();
+                if (resolveConflict(mc, existing)) {
+                    if (existing) {
+                        await db.updateTable('MpesaConfig').set({
+                            merchantType: mc.merchantType || 'BUY_GOODS',
+                            tillNumber: mc.tillNumber || null,
+                            paybillNumber: mc.paybillNumber || null,
+                            accountReference: mc.accountReference || null,
+                            environment: mc.environment || 'sandbox',
+                            consumerKey: mc.consumerKey || '',
+                            consumerSecret: mc.consumerSecret || '',
+                            passkey: mc.passkey || '',
+                            shortcode: mc.shortcode || '',
+                            initiatorName: mc.initiatorName || null,
+                            initiatorPassword: mc.initiatorPassword || null,
+                            stkEnabled: mc.stkEnabled !== false,
+                            c2bEnabled: mc.c2bEnabled !== false,
+                            updatedAt: mc.updatedAt ? new Date(mc.updatedAt).toISOString() : new Date().toISOString()
+                        }).where('id', '=', existing.id).execute();
+                    }
+                    else {
+                        await db.insertInto('MpesaConfig').values({
+                            id: String(mc.id),
+                            businessId,
+                            locationId: mc.locationId || null,
+                            outletId: mc.outletId || null,
+                            merchantType: mc.merchantType || 'BUY_GOODS',
+                            tillNumber: mc.tillNumber || null,
+                            paybillNumber: mc.paybillNumber || null,
+                            accountReference: mc.accountReference || null,
+                            environment: mc.environment || 'sandbox',
+                            consumerKey: mc.consumerKey || '',
+                            consumerSecret: mc.consumerSecret || '',
+                            passkey: mc.passkey || '',
+                            shortcode: mc.shortcode || '',
+                            initiatorName: mc.initiatorName || null,
+                            initiatorPassword: mc.initiatorPassword || null,
+                            stkEnabled: mc.stkEnabled !== false,
+                            c2bEnabled: mc.c2bEnabled !== false,
+                            createdAt: mc.createdAt ? new Date(mc.createdAt).toISOString() : new Date().toISOString(),
+                            updatedAt: mc.updatedAt ? new Date(mc.updatedAt).toISOString() : new Date().toISOString()
+                        }).execute();
+                    }
+                    results.mpesaConfigs++;
+                }
+                else {
+                    results.skipped++;
+                }
+            }
+        }
         // 1. Users
         if (users && Array.isArray(users)) {
             for (const u of users) {
@@ -371,13 +439,15 @@ router.post('/', async (req, res) => {
         // 3.5 Product Inventory (Absolute from Cloud)
         if (inventory && Array.isArray(inventory)) {
             for (const inv of inventory) {
+                const resolvedLocationId = isFromCloud && mappedLocalLocationId ? mappedLocalLocationId : (inv.locationId || targetLocationId || null);
+                const resolvedOutletId = isFromCloud && mappedLocalOutletId ? mappedLocalOutletId : (inv.outletId || targetOutletId || null);
                 if (!inv.productId)
                     continue;
                 const existing = await db.selectFrom('ProductInventory')
                     .selectAll()
                     .where('productId', '=', inv.productId)
-                    .where('locationId', 'is', inv.locationId || null)
-                    .where('outletId', 'is', inv.outletId || null)
+                    .where('locationId', 'is', resolvedLocationId)
+                    .where('outletId', 'is', resolvedOutletId)
                     .executeTakeFirst();
                 if (resolveConflict(inv, existing)) {
                     if (existing) {
@@ -392,8 +462,8 @@ router.post('/', async (req, res) => {
                             .values({
                             id: inv.id || randomUUID(),
                             productId: inv.productId,
-                            locationId: inv.locationId || targetLocationId || null,
-                            outletId: inv.outletId || targetOutletId || null,
+                            locationId: resolvedLocationId,
+                            outletId: resolvedOutletId,
                             stock: Number(inv.stock) || 0,
                             updatedAt: (inv.updatedAt ? new Date(inv.updatedAt) : new Date()).toISOString()
                         }).execute();
