@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { NetworkClient } from '../lib/networkClient';
 
 // Define the Electron API that will be exposed on the window object
 declare global {
@@ -84,8 +83,6 @@ declare global {
         logout: (token: string) => Promise<{ success: boolean }>;
         verify: (token: string) => Promise<{ success: boolean; user?: any }>;
       };
-
-      completeAtomicSale: (saleData: any, paymentData?: any) => Promise<{success: boolean, transactionId?: string, error?: string}>;
 
       userManagement: {
         addUser: (userData: any) => Promise<{ success: boolean; error?: string }>;
@@ -190,10 +187,6 @@ export interface CreditCustomer {
   id: string;
   name: string;
   phone: string;
-  email?: string;
-  company?: string;
-  address?: string;
-  taxId?: string;
   totalCredit: number;
   paidAmount: number;
   balance: number;
@@ -217,9 +210,6 @@ export interface LoyaltyCustomer {
   name: string;
   phone: string;
   email?: string;
-  company?: string;
-  address?: string;
-  taxId?: string;
   points: number;
   tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
   totalSpent: number;
@@ -257,18 +247,6 @@ export interface Expense {
   receipt?: string;
   supplierId?: string;
   supplierName?: string;
-}
-
-export interface PurchaseOrder {
-  id: string;
-  supplierId: string;
-  supplierName: string;
-  status: 'draft' | 'ordered' | 'received' | 'cancelled';
-  dateCreated: string;
-  dateExpected?: string;
-  items: { productId: number; productName: string; quantity: number; costPrice: number }[];
-  totalAmount: number;
-  notes?: string;
 }
 
 export interface Salary {
@@ -361,7 +339,7 @@ export interface ClosingReportData {
 
 export interface InventoryLog {
     id: string;
-    productId: number | string;
+    productId: number;
     productName: string;
     oldStock: number;
     newStock: number;
@@ -369,8 +347,6 @@ export interface InventoryLog {
     cashierName: string;
     timestamp: string;
     reason?: string;
-    reference?: string;
-    type?: string;
 }
 
 export interface DailySummary {
@@ -391,16 +367,6 @@ export interface SavedDocument {
   data: any; // The full state of the document editor
 }
 
-export interface DocumentSettings {
-  logoImage: string | null;
-  headerImage: string | null;
-  backgroundImage: string | null;
-  useCustomHeader: boolean;
-  defaultNotes: string;
-  defaultPaymentInfo: string;
-  showWatermark: boolean;
-}
-
 interface PosState {
   // Data
   products: Product[];
@@ -412,18 +378,15 @@ interface PosState {
   inventoryLogs: InventoryLog[];
   users: User[];
   suppliers: Supplier[];
-  purchaseOrders: PurchaseOrder[];
   expenses: Expense[];
   salaries: Salary[];
   documents: SavedDocument[];
-  documentSettings: DocumentSettings | null;
   businessSetup: BusinessSetup | null;
   mobileReceipts: any[];
   loyaltyCustomers: LoyaltyCustomer[];
   
   // UI State
   isDataLoaded: boolean;
-  isSyncingPush: boolean;
   currentCashier: User | null;
   isCheckoutOpen: boolean;
   isSetupWizardOpen: boolean;
@@ -446,12 +409,6 @@ interface PosState {
   loyaltyCustomers: any[];
   syncHistory: any[];
   categories: string[];
-
-  // Payment State Machine
-  paymentState: 'IDLE' | 'WAITING_FOR_PAYMENT' | 'PAYMENT_DETECTED' | 'PAYMENT_CONFIRMED' | 'SALE_COMPLETED' | 'PAYMENT_FAILED';
-  idempotencyKey: string | null;
-  setPaymentState: (state: PosState['paymentState']) => void;
-  setIdempotencyKey: (key: string | null) => void;
 
   // Actions
   login: (user: User) => void;
@@ -491,20 +448,12 @@ interface PosState {
   addSalary: (salary: Salary) => void;
   deleteSalary: (id: string) => void;
   saveBusinessSetup: (setup: BusinessSetup) => void;
-  saveDocumentSettings: (settings: DocumentSettings) => void;
   addUser: (user: User) => void;
   updateUser: (id: string, updates: Partial<User>) => void;
   deleteUser: (id: string) => void;
-  
-  // Procurement & Suppliers
   addSupplier: (supplier: Supplier) => void;
-  updateSupplier: (id: string, supplier: Partial<Supplier>) => void;
+  updateSupplier: (id: string, updates: Partial<Supplier>) => void;
   deleteSupplier: (id: string) => void;
-  addPurchaseOrder: (po: PurchaseOrder) => void;
-  updatePurchaseOrder: (id: string, po: Partial<PurchaseOrder>) => void;
-  deletePurchaseOrder: (id: string) => void;
-  receivePurchaseOrder: (poId: string) => void;
-
   migrateLegacyExpenses: () => Promise<void>;
   saveDocument: (doc: SavedDocument) => void;
   deleteDocument: (id: string) => void;
@@ -541,9 +490,6 @@ interface PosState {
   loadInitialData: () => void;
   finishSetup: (businessData: Omit<BusinessSetup, 'createdAt'>, adminUser: Omit<User, 'createdAt' | 'isActive'>) => Promise<void>;
   pushDataToServer: () => Promise<void>;
-  pullDeltaFromServer: () => Promise<void>;
-  syncStatus: { isSyncing: boolean, progress: number, currentTask: string, error: string | null };
-  setSyncStatus: (status: Partial<{ isSyncing: boolean, progress: number, currentTask: string, error: string | null }>) => void;
   addCreditPayment: (customerId: string, amount: number, transactionId?: string) => void;
   addInventoryLog: (log: InventoryLog) => void;
   archiveTransactions: (daysToKeep: number) => Promise<void>;
@@ -568,17 +514,12 @@ export const usePosStore = create<PosState>()(
       loyaltyCustomers: [],
       users: [],
       suppliers: [],
-      purchaseOrders: [],
       expenses: [],
       salaries: [],
       documents: [],
-      documentSettings: null,
       businessSetup: null,
       currentCashier: null,
       isDataLoaded: false,
-      isSyncingPush: false,
-      syncStatus: { isSyncing: false, progress: 0, currentTask: '', error: null },
-      setSyncStatus: (status) => set((state) => ({ syncStatus: { ...state.syncStatus, ...status } })),
       isCheckoutOpen: false,
       isSetupWizardOpen: true,
       isLoginOpen: true,
@@ -595,11 +536,6 @@ export const usePosStore = create<PosState>()(
       categories: ['Coffee', 'Tea', 'Pastries', 'Sandwiches', 'Cold Drinks', 'Others'],
       isTransactionSuccessPopupOpen: false,
       lastCompletedTransaction: null,
-      paymentState: 'IDLE',
-      idempotencyKey: null,
-
-      setPaymentState: (state) => set({ paymentState: state }),
-      setIdempotencyKey: (key) => set({ idempotencyKey: key }),
 
       /**
        * Logs in a user and updates the session state.
@@ -630,17 +566,11 @@ export const usePosStore = create<PosState>()(
       },
 
       setSession: (user: User, token: string) => {
-          set((state) => {
-              const updatedSetup = state.businessSetup ? { ...state.businessSetup, isLoggedIn: true } : null;
-              if (updatedSetup) {
-                 saveDataToFile('business-setup.json', updatedSetup);
-              }
-              return {
-                  currentCashier: user,
-                  businessSetup: updatedSetup,
-                  sessionToken: token
-              };
-          });
+          set((state) => ({
+              currentCashier: user,
+              businessSetup: state.businessSetup ? { ...state.businessSetup, isLoggedIn: true } : null,
+              sessionToken: token
+          }));
       },
 
       /**
@@ -668,24 +598,7 @@ export const usePosStore = create<PosState>()(
        */
       addToCart: (product) => {
         set((state) => {
-          // Prevent adding out-of-stock items
-          const availableStock = product.stock ?? 0;
           const existingItem = state.cart.find(item => item.product.id === product.id);
-          const currentCartQty = existingItem ? existingItem.quantity : 0;
-
-          if (availableStock <= 0) {
-            // Allow adding if stock tracking is disabled (stock === undefined/null)
-            if (product.stock !== undefined && product.stock !== null) {
-              console.warn(`[CART] Cannot add ${product.name}: out of stock (${availableStock})`);
-              return state; // No change
-            }
-          }
-
-          if (availableStock > 0 && currentCartQty >= availableStock) {
-            console.warn(`[CART] Cannot add more ${product.name}: only ${availableStock} in stock, ${currentCartQty} in cart`);
-            return state; // No change
-          }
-
           if (existingItem) {
             return {
               cart: state.cart.map(item =>
@@ -727,11 +640,7 @@ export const usePosStore = create<PosState>()(
       setCurrentCashier: (user) => set({ currentCashier: user }),
 
       // UI operations
-      openCheckout: () => set({ 
-        isCheckoutOpen: true,
-        paymentState: 'IDLE',
-        idempotencyKey: `TXN${Date.now()}`
-      }),
+      openCheckout: () => set({ isCheckoutOpen: true }),
       closeCheckout: () => set({ isCheckoutOpen: false }),
       openSetupWizard: () => set({ isSetupWizardOpen: true }),
       closeSetupWizard: () => set({ isSetupWizardOpen: false }),
@@ -813,18 +722,12 @@ export const usePosStore = create<PosState>()(
         const state = get();
         if (!state.currentCashier) return;
 
-        if (state.paymentState === 'PAYMENT_CONFIRMED' || state.paymentState === 'SALE_COMPLETED') {
-            return; // Prevent double-charge
-        }
-
         const subtotal = state.cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
         const tax = 0; // Assuming tax is handled elsewhere or is 0
         const total = subtotal + tax;
 
-        const transactionId = state.idempotencyKey || `TXN${Date.now()}`;
-        
-        const transaction: Transaction = {
-          id: transactionId,
+        let transaction: Transaction = {
+          id: `TXN${Date.now()}`,
           timestamp: new Date().toISOString(),
           items: [...state.cart],
           subtotal,
@@ -837,52 +740,36 @@ export const usePosStore = create<PosState>()(
           ...additionalData
         };
 
-        const paymentData = {
-           id: `PAY${Date.now()}`,
-           saleId: transactionId,
-           paymentMethod: paymentMethod,
-           amount: total,
-           reference: additionalData?.mpesaCode || null,
-           status: 'COMPLETED',
-           source: 'POS'
-        };
-
-        if (window.electron && window.electron.completeAtomicSale) {
-            set({ paymentState: 'PAYMENT_CONFIRMED' });
-            try {
-                const result = await window.electron.completeAtomicSale(transaction, paymentData);
-                if (!result.success) {
-                    set({ paymentState: 'PAYMENT_FAILED' });
-                    console.error('Atomic sale failed on backend:', result.error);
-                    return;
-                }
-            } catch (err) {
-                set({ paymentState: 'PAYMENT_FAILED' });
-                console.error('Atomic sale threw error:', err);
-                return;
-            }
+        // --- KRA SYNC ---
+        if (state.businessSetup?.kraEnabled && state.isOnline) {
+           const backendUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
+           const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
+           if (backendUrl && apiKey) {
+               try {
+                   const apiUrl = backendUrl.replace(/\/$/, '').replace(/\/api$/, '') || '';
+                   const res = await fetch(`${apiUrl}/api/kra/invoice`, {
+                       method: 'POST',
+                       headers: {
+                           'Content-Type': 'application/json',
+                           'Authorization': `Bearer ${apiKey}`,
+                           'X-API-KEY': apiKey
+                       },
+                       body: JSON.stringify(transaction)
+                   });
+                   if (res.ok) {
+                       const data = await res.json();
+                       if (data.kraDetails) {
+                           transaction.kraDetails = data.kraDetails;
+                       }
+                   } else {
+                       throw new Error(`KRA backend responded with status: ${res.status}`);
+                   }
+               } catch (err: any) {
+                   console.error("KRA generation failed:", err);
+                   throw new Error("Failed to communicate with KRA backend. " + err.message);
+               }
+           }
         }
-
-        if (paymentMethod === 'mpesa' && additionalData?.mpesaCode) {
-            try {
-                const rawUrl = (state.businessSetup as any)?.lanAdminIp || (state.businessSetup as any)?.apiUrl || (state.businessSetup as any)?.backOfficeUrl || 'http://localhost:3000';
-                const baseUrl = rawUrl.replace(/\/$/, '').replace(/\/api$/, '');
-                const bId = (state.businessSetup as any)?.businessId || (state.businessSetup as any)?.cloudBusinessId;
-                
-                await fetch(`${baseUrl}/api/mpesa/payments/consume`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                      transactionId: additionalData.mpesaCode,
-                      businessId: bId
-                    })
-                });
-            } catch (err) {
-                console.error('Failed to consume M-Pesa payment:', err);
-            }
-        }
-
-        set({ paymentState: 'SALE_COMPLETED', idempotencyKey: null });
 
         // --- ABSOLUTELY FIRST: SHOW SUCCESS POPUP ---
         if ((state.businessSetup as any)?.disableReceiptPrinting) {
@@ -897,44 +784,15 @@ export const usePosStore = create<PosState>()(
         state.saveTransaction(transaction);
         state.addToSyncQueue({ type: 'new-transaction', data: transaction });
 
-        console.log(`[SALE DEBUG] Transaction ${transaction.id} has ${transaction.items.length} items. Products in store: ${state.products.length}`);
-
+        // Update Stock
         transaction.items.forEach(item => {
-           console.log(`[SALE DEBUG] Item: productId=${item.product.id}, name=${item.product.name}, qty=${item.quantity}`);
            if (item.product.id) {
-                 const product = state.products.find(p => p.id === item.product.id);
-                 console.log(`[SALE DEBUG] Found product in store: ${!!product}, stock=${product?.stock}, typeof stock=${typeof product?.stock}`);
-                 if (product) {
-                     const oldStock = Number(product.stock) || 0;
-                     const newStock = Math.max(0, oldStock - item.quantity);
-                   
-                   // Append StockMovement log
-                   const logEntry = {
-                       id: `mov_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-                       productId: product.id,
-                       productName: product.name,
-                       oldStock,
-                       newStock,
-                       variance: -item.quantity,
-                       cashierName: state.currentCashier?.name || 'Unknown',
-                       timestamp: new Date().toISOString(),
-                       reason: 'SALE',
-                       reference: transaction.id,
-                       type: 'SALE'
-                   };
-                   console.log(`[SALE DEBUG] Calling addInventoryLog with:`, logEntry.id, logEntry.type, logEntry.variance);
-                   state.addInventoryLog(logEntry);
+               const product = state.products.find(p => p.id === item.product.id);
+               if (product && typeof product.stock === 'number') {
+                   state.updateProduct(product.id, { stock: Math.max(0, product.stock - item.quantity) });
                }
            }
         });
-
-        console.log(`[SALE DEBUG] After forEach, syncQueue length: ${get().syncQueue.length}, items: ${get().syncQueue.map((s: any) => s.type).join(', ')}`);
-
-        if (window.electron && window.electron.readData) {
-            const productsRes = await window.electron.readData('products.json');
-            const freshProducts = (productsRes?.data || []).filter((p: any) => p && p.name && p.price > 0);
-            set({ products: freshProducts });
-        }
 
         // Handle credit customer
         if (paymentMethod === 'credit' && creditCustomerName) {
@@ -986,11 +844,11 @@ export const usePosStore = create<PosState>()(
             }
         }
 
-        // Print receipt if enabled
-        if (!((state.businessSetup as any)?.disableReceiptPrinting) && window.electron && state.businessSetup) {
-            window.electron.printReceipt(transaction, state.businessSetup, false);
-        }
-      },
+          // Print receipt if enabled
+          if (!((state.businessSetup as any)?.disableReceiptPrinting) && window.electron && state.businessSetup) {
+              window.electron.printReceipt(transaction, state.businessSetup, false);
+          }
+        },
 
       reprintTransaction: (transactionId) => {
         const state = get();
@@ -1158,9 +1016,9 @@ export const usePosStore = create<PosState>()(
           set((state) => {
               const updatedLogs = [log, ...state.inventoryLogs];
               saveDataToFile('inventory-logs.json', updatedLogs);
+              state.addToSyncQueue({ type: 'add-inventory-log', data: log });
               return { inventoryLogs: updatedLogs };
           });
-          get().addToSyncQueue({ type: 'add-inventory-log', data: log });
       },
 
       deleteCreditCustomer: (id) => {
@@ -1221,64 +1079,33 @@ export const usePosStore = create<PosState>()(
       },
 
       addSupplier: (supplier) => {
-        set((state) => ({
-          suppliers: [...state.suppliers, supplier],
-          syncQueue: [...state.syncQueue, { type: 'ADD_SUPPLIER', data: supplier, timestamp: new Date().toISOString() }]
-        }));
+        set((state) => {
+          const updatedSuppliers = [...state.suppliers, supplier];
+          saveDataToFile('suppliers.json', updatedSuppliers);
+          state.addToSyncQueue({ type: 'add-supplier', data: supplier });
+          return { suppliers: updatedSuppliers };
+        });
       },
 
       updateSupplier: (id, updates) => {
-        set((state) => ({
-          suppliers: state.suppliers.map(s => s.id === id ? { ...s, ...updates } : s),
-          syncQueue: [...state.syncQueue, { type: 'UPDATE_SUPPLIER', data: { id, updates }, timestamp: new Date().toISOString() }]
-        }));
+        set((state) => {
+          const updatedSuppliers = state.suppliers.map(s =>
+            s.id === id ? { ...s, ...updates } : s
+          );
+          saveDataToFile('suppliers.json', updatedSuppliers);
+          state.addToSyncQueue({ type: 'update-supplier', data: { id, updates } });
+          return { suppliers: updatedSuppliers };
+        });
       },
 
       deleteSupplier: (id) => {
-        set((state) => ({
-          suppliers: state.suppliers.filter((s) => s.id !== id),
-          syncQueue: [...state.syncQueue, { type: 'DELETE_SUPPLIER', data: id, timestamp: new Date().toISOString() }]
-        }));
-      },
-
-      addPurchaseOrder: (po) => 
-        set((state) => ({
-            purchaseOrders: [...state.purchaseOrders, po],
-            syncQueue: [...state.syncQueue, { type: 'ADD_PO', data: po, timestamp: new Date().toISOString() }]
-        })),
-
-      updatePurchaseOrder: (id, updates) =>
-        set((state) => ({
-            purchaseOrders: state.purchaseOrders.map((po) => po.id === id ? { ...po, ...updates } : po),
-            syncQueue: [...state.syncQueue, { type: 'UPDATE_PO', data: { id, updates }, timestamp: new Date().toISOString() }]
-        })),
-
-      deletePurchaseOrder: (id) =>
-        set((state) => ({
-            purchaseOrders: state.purchaseOrders.filter((po) => po.id !== id),
-            syncQueue: [...state.syncQueue, { type: 'DELETE_PO', data: id, timestamp: new Date().toISOString() }]
-        })),
-        
-      receivePurchaseOrder: (poId) =>
         set((state) => {
-            const po = state.purchaseOrders.find(p => p.id === poId);
-            if (!po || po.status === 'received') return state;
-            
-            // Update inventory
-            const updatedProducts = state.products.map(product => {
-                const poItem = po.items.find(item => item.productId === product.id);
-                if (poItem) {
-                    return { ...product, stock: (product.stock || 0) + poItem.quantity };
-                }
-                return product;
-            });
-            
-            return {
-                products: updatedProducts,
-                purchaseOrders: state.purchaseOrders.map(p => p.id === poId ? { ...p, status: 'received' } : p),
-                syncQueue: [...state.syncQueue, { type: 'RECEIVE_PO', data: poId, timestamp: new Date().toISOString() }]
-            };
-        }),
+          const updatedSuppliers = state.suppliers.filter(s => s.id !== id);
+          saveDataToFile('suppliers.json', updatedSuppliers);
+          state.addToSyncQueue({ type: 'delete-supplier', data: { id } });
+          return { suppliers: updatedSuppliers };
+        });
+      },
 
       migrateLegacyExpenses: async () => {
         const state = get();
@@ -1348,233 +1175,267 @@ export const usePosStore = create<PosState>()(
             return { businessSetup: setup };
         });
       },
-      saveDocumentSettings: (settings) => set((state) => {
-          saveDataToFile('document-settings.json', settings);
-          return { documentSettings: settings };
-      }),
 
       // Sync operations
       addToSyncQueue: (operation) => {
         set((state) => ({
           syncQueue: [...state.syncQueue, operation]
         }));
-        // Debounce: wait 500ms for all items to accumulate before processing
-        if ((window as any).__syncDebounceTimer) {
-          clearTimeout((window as any).__syncDebounceTimer);
-        }
-        (window as any).__syncDebounceTimer = setTimeout(() => {
-          (window as any).__syncDebounceTimer = null;
-          get().processSyncQueue();
-        }, 500);
+        // Trigger sync in background without blocking UI
+        setTimeout(() => get().processSyncQueue(), 0);
       },
 
       processSyncQueue: async () => {
         const state = get();
-        let rawUrl = state.businessSetup?.lanAdminIp || state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
-        let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
-            const isCloud = apiUrl.includes('whizpoint.app');
-            const apiKey = isCloud ? (state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey) : state.businessSetup?.apiKey;
+        let apiUrl = (state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl)?.replace(/\/$/, '');
+        // Remove trailing /api to prevent double /api
+        apiUrl = apiUrl?.replace(/\/api$/, '') || '';
+        const apiKey = state.businessSetup?.apiKey || state.businessSetup?.backOfficeApiKey;
+        const mongoDbUri = state.businessSetup?.mongoDbUri;
 
-        // Read queue FRESH from store, not from stale snapshot
-        const currentQueue = get().syncQueue;
-        if (!state.isOnline || currentQueue.length === 0 || !apiUrl || !apiKey) return;
+        if (!state.isOnline || state.syncQueue.length === 0) return;
 
-        const queue = [...currentQueue];
+        // Fallback to Legacy HTTP API Sync
+        if (!apiUrl || !apiKey) return;
+
+        const queue = [...state.syncQueue];
         set({ syncQueue: [] }); // Optimistically clear queue
 
         try {
-          const payload = {
-              transactions: [] as any[],
-              stockMovements: [] as any[],
-              products: [] as any[],
-              users: [] as any[],
-              customers: [] as any[],
-              suppliers: [] as any[],
-              businessSetup: state.businessSetup
-          };
-
-          queue.forEach(item => {
-                if (item.type === 'new-transaction' || item.type === 'transaction') {
-                    payload.transactions.push(item.data);
-                } else if (item.type === 'inventory-log' || item.type === 'add-inventory-log') {
-                    const data = item.data;
-                    const movement = {
-                        id: data.id,
-                        productId: data.productId,
-                        type: data.type || data.reason || 'SALE',
-                        quantity: data.quantity !== undefined ? data.quantity : Math.abs(data.variance || 0),
-                        reference: data.reference || '',
-                        timestamp: data.timestamp
-                    };
-                    payload.stockMovements.push(movement);
-                } else if (item.type === 'add-product') {
-                  const { stock, ...prodWithoutStock } = item.data;
-                  payload.products.push(prodWithoutStock);
-              } else if (item.type === 'update-product') {
-                  const fullProduct = state.products.find(p => p.id === item.data.id);
-                  if (fullProduct) {
-                      const { stock, ...prodWithoutStock } = fullProduct;
-                      payload.products.push(prodWithoutStock);
-                  }
-              } else if (item.type === 'add-user') {
-                  payload.users.push(item.data);
-              } else if (item.type === 'update-user') {
-                  const fullUser = state.users.find(u => u.id === item.data.id);
-                  if (fullUser) payload.users.push(fullUser);
-              } else if (item.type === 'add-customer') {
-                  payload.customers.push(item.data);
-              } else if (item.type === 'update-customer') {
-                  const fullC = state.creditCustomers.find(c => c.id === item.data.id);
-                  if (fullC) payload.customers.push(fullC);
-              } else if (item.type === 'add-supplier') {
-                  payload.suppliers.push(item.data);
-              } else if (item.type === 'update-supplier') {
-                  const fullS = state.suppliers.find(s => s.id === item.data.id);
-                  if (fullS) payload.suppliers.push(fullS);
-              }
-          });
-
-          console.log(`[SYNC PUSH] Queue had ${queue.length} items. Payload: ${payload.transactions.length} txns, ${payload.stockMovements.length} stock movements, ${payload.products.length} products`);
-
-          const response = await fetch(`${apiUrl}/api/sync/delta`, {
+          const response = await fetch(`${apiUrl}/api/sync`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`,
-              'X-API-KEY': apiKey
+              'Authorization': `Bearer ${apiKey}`
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(queue)
           });
 
-          if (!response.ok) throw new Error(`Sync failed with status: ${response.status}`);
+          if (!response.ok) {
+            throw new Error(`Sync failed with status: ${response.status}`);
+          }
+
+          // Sync successful, update time and trigger a pull to get any updates
           set({ lastSyncTime: new Date().toISOString() });
+          get().syncFromServer();
+
         } catch (error) {
           console.error('Sync failed:', error);
-          // Put items back in queue if failed
-          set((state) => ({ syncQueue: [...queue, ...state.syncQueue] }));
+          // On total failure (network), put items back in queue
+          set((state) => ({
+            syncQueue: [...queue, ...state.syncQueue]
+          }));
         }
       },
 
-        syncFromServer: async () => {
-            const state = get();
-              let rawUrl = state.businessSetup?.lanAdminIp || state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
-            let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
-            const isCloud = apiUrl.includes('whizpoint.app');
-            const apiKey = isCloud ? (state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey) : state.businessSetup?.apiKey;
+      syncFromServer: async () => {
+        // Fetch config from initial state, but DO NOT use data state here to avoid stale closures
+        const configState = get();
+        let apiUrl = (configState.businessSetup?.apiUrl || configState.businessSetup?.backOfficeUrl)?.replace(/\/$/, '');
+        // Remove trailing /api to prevent double /api
+        apiUrl = apiUrl?.replace(/\/api$/, '') || '';
+        const apiKey = configState.businessSetup?.apiKey || configState.businessSetup?.backOfficeApiKey;
+        const mongoDbUri = configState.businessSetup?.mongoDbUri;
 
-            if (!apiUrl || !apiKey) {
-                // Silently skip if no API config
-                return;
-            }
+        // Add debug logging for diagnosis
+        if (!configState.isOnline) { console.debug("Sync skipped: Offline"); return; }
 
-              try {
-                const sinceTime = state.lastSyncTime || '2000-01-01T00:00:00.000Z';
-                const locationQuery = state.businessSetup?.locationId ? `locationId=${state.businessSetup.locationId}&` : '';
-                const outletQuery = state.businessSetup?.outletId ? `outletId=${state.businessSetup.outletId}&` : '';
-                const response = await fetch(`${apiUrl}/api/sync/delta?${locationQuery}${outletQuery}since=${encodeURIComponent(sinceTime)}`, {
-                  headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'X-API-KEY': apiKey
-                  }
-                });
+        let serverData: any = null;
 
-                if (response.status === 401) {
-                   console.error('API Key invalid or revoked. Resetting POS registration.');
-                   get().setSyncStatus({ error: 'API Key invalid or revoked. Please reset POS registration in Settings.', isSyncing: false, currentTask: 'Sync failed' });
-                   return;
+        // Fallback to HTTP Sync
+        if (!serverData) {
+            if (!apiUrl) { console.debug("Sync skipped: No API URL"); return; }
+            if (!apiKey) { console.debug("Sync skipped: No API Key"); return; }
+
+            try {
+              console.debug(`Syncing from server: ${apiUrl}/api/sync`);
+              const response = await fetch(`${apiUrl}/api/sync`, {
+                headers: {
+                  'Authorization': `Bearer ${apiKey}`
                 }
+              });
 
               if (!response.ok) {
+                 console.error(`Sync fetch failed: ${response.status} ${response.statusText}`);
                  return;
               }
 
-const serverData = await response.json();
-                if (serverData && serverData.success) {
-                    const payload = serverData.data || serverData;
-                    set({ lastSyncTime: serverData.timestamp || new Date().toISOString() });
-
-                      // 1. Write directly to local SQLite database via IPC to maintain .wpos compatibility
-                      if (window.electron && window.electron.mergeData) {
-                          const mergePromises = [];
-                          if (payload.products?.length > 0) mergePromises.push(window.electron.mergeData('products.json', payload.products));
-                          if (payload.users?.length > 0) mergePromises.push(window.electron.mergeData('users.json', payload.users));
-                          if (payload.categories?.length > 0) mergePromises.push(window.electron.mergeData('categories.json', payload.categories));
-                          if (payload.outlets?.length > 0) mergePromises.push(window.electron.mergeData('outlets.json', payload.outlets));
-                          if (payload.terminals?.length > 0) mergePromises.push(window.electron.mergeData('terminals.json', payload.terminals));
-                          if (payload.customers?.length > 0) mergePromises.push(window.electron.mergeData('credit-customers.json', payload.customers));
-                          if (payload.suppliers?.length > 0) mergePromises.push(window.electron.mergeData('suppliers.json', payload.suppliers));
-                          if (payload.transactions?.length > 0) mergePromises.push(window.electron.mergeData('transactions.json', payload.transactions));
-                          if (payload.businessSetup) {
-                              const safeBusinessSetup = { ...payload.businessSetup };
-                              delete safeBusinessSetup.apiKey;
-                              delete safeBusinessSetup.terminalName;
-                              delete safeBusinessSetup.outletId;
-                              delete safeBusinessSetup.isSetup;
-                              delete safeBusinessSetup.isLoggedIn;
-
-                              // If locationId changed (e.g. stale backup value), force a full re-sync
-                              const currentLocationId = state.businessSetup?.locationId;
-                              if (safeBusinessSetup.locationId && currentLocationId && safeBusinessSetup.locationId !== currentLocationId) {
-                                console.log(`[SYNC] locationId changed: ${currentLocationId} → ${safeBusinessSetup.locationId}. Resetting lastSyncTime for full re-sync.`);
-                                set({ lastSyncTime: null });
-                              }
-
-                              mergePromises.push(window.electron.mergeData('business-setup.json', safeBusinessSetup));
-                          }
-                          
-                          // We also save sync-metadata to SQLite
-                          mergePromises.push(window.electron.mergeData('sync-metadata.json', { lastPullSync: serverData.timestamp || new Date().toISOString() }));
-                          
-                          await Promise.all(mergePromises);
-
-                          // Apply server stock movements idempotently
-                          if (payload.stockMovements?.length > 0) {
-                              const movResult = await window.electron.applyStockMovements(payload.stockMovements);
-                              console.log(`[SYNC] Applied ${movResult.applied} stock movements from server`);
-                          }
-                      }
-
-                    // 2. Refresh UI by fully re-reading the merged local SQLite database state
-                    if (window.electron && window.electron.readData) {
-                        const [products, users, expenses, salaries, creditCustomers, loyaltyCustomers, suppliers, businessSetup, categories] = await Promise.all([
-                            window.electron.readData('products.json'),
-                            window.electron.readData('users.json'),
-                            window.electron.readData('expenses.json'),
-                            window.electron.readData('salaries.json'),
-                            window.electron.readData('credit-customers.json'),
-                            window.electron.readData('loyalty-customers.json'),
-                            window.electron.readData('suppliers.json'),
-                            window.electron.readData('business-setup.json'),
-                            window.electron.readData('categories.json')
-                        ]);
-
-                        // --- Developer Console Sync Logging ---
-                        console.log(`[DEBUG] payload.products len:`, payload.products?.length, `products.data len:`, products?.data?.length);
-                        console.groupCollapsed('%c🟢 Data Pulled From Server & Saved to Local DB', 'color: #007bff; font-weight: bold;');
-                        if (payload.users?.length) console.log(`👤 Users Updated (${payload.users.length})`);
-                        if (payload.products?.length) console.log(`📦 Products Updated (${payload.products.length})`);
-                        if (!payload.users?.length && !payload.products?.length) console.log('No new updates since last sync.');
-                        console.log(`⏱️ Sync Timestamp: ${new Date().toLocaleTimeString()}`);
-                        console.groupEnd();
-                        // -------------------------------------
-
-                        set({
-                            products: products.data as Product[],
-                            users: users.data as User[],
-                            expenses: expenses.data as Expense[],
-                            salaries: salaries.data as Salary[],
-                            creditCustomers: creditCustomers.data as CreditCustomer[],
-                            loyaltyCustomers: loyaltyCustomers.data as LoyaltyCustomer[],
-                            businessSetup: businessSetup.data as BusinessSetup,
-                            suppliers: suppliers.data as Supplier[],
-                            categories: Array.isArray(categories.data) ? categories.data.map((c: any) => c.name || c) : [],
-                        });
-                    }
-                }
-              } catch (error) {
-                // Silently handle sync errors
+              serverData = await response.json();
+            } catch (error) {
+              console.error('Failed to sync from server:', error);
+              return;
             }
-        },
+        }
+
+        if (!serverData) return;
+
+        try {
+          // CRITICAL FIX: Get the LATEST state right before merging.
+          // This prevents overwriting new local items created while 'directDbPull' was running.
+          const currentState = get();
+
+          const sanitizeAndMerge = (local: any[], server: any[], isProducts = false) => {
+             // Filter out invalid products first
+             let validLocal = local;
+             let validServer = server;
+
+             if (isProducts) {
+                 const isValidProduct = (p: any) => {
+                     if (!p.name || p.name.trim() === '') return false;
+                     const price = Number(p.price);
+                     return !isNaN(price) && price > 0;
+                 };
+                 validLocal = local.filter(isValidProduct);
+                 validServer = server.filter(isValidProduct);
+             }
+
+             // Index local items by Name for smart matching (specifically for products)
+             const localMapByName = isProducts
+                 ? new Map(validLocal.map(i => [i.name?.trim().toLowerCase(), i]))
+                 : new Map();
+
+             // 1. Sanitize Server Data
+             let sanitizedServer = validServer.map(item => {
+                 if (!item.id || String(item.id) === 'null' || String(item.id) === 'NaN') {
+                     // Try to match with local item by name to prevent duplication
+                     if (isProducts && item.name) {
+                         const match = localMapByName.get(item.name.trim().toLowerCase());
+                         if (match) {
+                             // Found local match! Use local ID.
+                             item.id = match.id;
+                             return item;
+                         }
+                         // No match? Generate a STABLE ID based on name hash.
+                         // This ensures "Coffee" always gets ID X, avoiding duplicates on next sync.
+                         item.id = generateStableId(item.name);
+                     } else {
+                         item.id = isProducts ? generateRandomId() : `FIX${Date.now()}${Math.floor(Math.random() * 1000)}`;
+                     }
+                 }
+                 if (isProducts && (!item.productId || String(item.productId) === 'null' || String(item.productId) === 'NaN')) {
+                     item.productId = item.id;
+                 }
+                 return item;
+             });
+
+             // 2. Sanitize Local Data
+             let sanitizedLocal = validLocal.map(item => {
+                 if (!item.id || String(item.id) === 'null' || String(item.id) === 'NaN') {
+                      if (isProducts && item.name) {
+                          item.id = generateStableId(item.name);
+                      } else {
+                          item.id = isProducts ? generateRandomId() : `FIX${Date.now()}${Math.floor(Math.random() * 1000)}`;
+                      }
+                 }
+                 if (isProducts && (!item.productId || String(item.productId) === 'null' || String(item.productId) === 'NaN')) {
+                     item.productId = item.id;
+                 }
+                 return item;
+             });
+
+             // Deduplicate products by name and keep the one with the highest stock
+             if (isProducts) {
+                 const deduplicateByName = (items: any[]) => {
+                     const uniqueMap = new Map();
+                     items.forEach(item => {
+                         const nameKey = item.name.trim().toLowerCase();
+                         if (!uniqueMap.has(nameKey)) {
+                             uniqueMap.set(nameKey, item);
+                         } else {
+                             const existing = uniqueMap.get(nameKey);
+                             const existingStock = Number(existing.stock) || 0;
+                             const newStock = Number(item.stock) || 0;
+                             if (newStock > existingStock) {
+                                 uniqueMap.set(nameKey, item);
+                             }
+                         }
+                     });
+                     return Array.from(uniqueMap.values());
+                 };
+                 sanitizedLocal = deduplicateByName(sanitizedLocal);
+                 sanitizedServer = deduplicateByName(sanitizedServer);
+             }
+
+             const serverDataById = new Map(sanitizedServer.map(item => [String(item.id), item]));
+
+             // Merge strategy: Overwrite local if server is newer
+             const mergedMap = new Map<string, any>();
+
+             sanitizedLocal.forEach(localItem => {
+                 const serverItem = serverDataById.get(String(localItem.id));
+                 if (serverItem) {
+                     const serverTimestamp = new Date(serverItem.updatedAt || serverItem.createdAt || 0);
+                     const localTimestamp = new Date(localItem.updatedAt || localItem.createdAt || 0);
+                     if (serverTimestamp.getTime() > localTimestamp.getTime()) {
+                         mergedMap.set(String(localItem.id), serverItem);
+                     } else {
+                         mergedMap.set(String(localItem.id), localItem);
+                     }
+                 } else {
+                     mergedMap.set(String(localItem.id), localItem);
+                 }
+             });
+
+             // Add new items from server
+             sanitizedServer.forEach(serverItem => {
+                 if (!mergedMap.has(String(serverItem.id))) {
+                     mergedMap.set(String(serverItem.id), serverItem);
+                 }
+             });
+
+             return Array.from(mergedMap.values());
+          };
+
+          const newProducts = sanitizeAndMerge(currentState.products, serverData.products || [], true);
+          const newUsers = sanitizeAndMerge(currentState.users, serverData.users || []);
+          const newExpenses = sanitizeAndMerge(currentState.expenses, serverData.expenses || []);
+          const newSalaries = sanitizeAndMerge(currentState.salaries, serverData.salaries || []);
+          const newCreditCustomers = sanitizeAndMerge(currentState.creditCustomers, serverData.creditCustomers || []);
+          const newLoyaltyCustomers = sanitizeAndMerge(currentState.loyaltyCustomers, serverData.loyaltyCustomers || []);
+          const newSuppliers = sanitizeAndMerge(currentState.suppliers, serverData.suppliers || []);
+          
+          let newCategories = currentState.categories;
+          if (serverData.categories && Array.isArray(serverData.categories)) {
+            const serverCategoryNames = serverData.categories.map((c: any) => 
+              typeof c === 'string' ? c : c.name
+            );
+            newCategories = [...new Set([...currentState.categories, ...serverCategoryNames])];
+          }
+
+          let newBusinessSetup = currentState.businessSetup;
+          if (serverData.businessSetup) {
+            const serverTimestamp = new Date(serverData.businessSetup.updatedAt || serverData.businessSetup.createdAt || 0);
+            const localTimestamp = currentState.businessSetup ? new Date(currentState.businessSetup.updatedAt || currentState.businessSetup.createdAt || 0) : new Date(0);
+            if (serverTimestamp > localTimestamp) {
+              newBusinessSetup = { ...currentState.businessSetup, ...serverData.businessSetup };
+            }
+          }
+
+          set({
+            products: newProducts as Product[],
+            users: newUsers as User[],
+            expenses: newExpenses as Expense[],
+            salaries: newSalaries as Salary[],
+            creditCustomers: newCreditCustomers as CreditCustomer[],
+            loyaltyCustomers: newLoyaltyCustomers as LoyaltyCustomer[],
+            businessSetup: newBusinessSetup as BusinessSetup,
+            suppliers: newSuppliers as Supplier[],
+            categories: newCategories,
+          });
+
+          saveDataToFile('products.json', newProducts);
+          saveDataToFile('users.json', newUsers);
+          saveDataToFile('expenses.json', newExpenses);
+          saveDataToFile('salaries.json', newSalaries);
+          saveDataToFile('credit-customers.json', newCreditCustomers);
+          saveDataToFile('loyalty-customers.json', newLoyaltyCustomers);
+          saveDataToFile('business-setup.json', newBusinessSetup);
+          saveDataToFile('suppliers.json', newSuppliers);
+
+        } catch (error) {
+          console.error('Failed to process sync data:', error);
+        }
+      },
 
       setOnlineStatus: (isOnline) => {
         set({ isOnline });
@@ -1955,18 +1816,6 @@ const serverData = await response.json();
         try {
           // Prioritize loading business setup first.
           const { data: businessSetupData } = await readDataFromFile('business-setup.json');
-          try { 
-            const localUrl = businessSetupData?.apiUrl ? businessSetupData.apiUrl.replace(/\/api$/, '') : 'http://localhost:5050';
-            const res = await fetch(`${localUrl}/api/business/setup-status`).catch(() => null); 
-            if (res && res.ok) { 
-              const json = await res.json(); 
-              if (json.isSetup && json.business && businessSetupData) { 
-                businessSetupData.businessId = json.business.id; 
-                businessSetupData.cloudBusinessId = json.business.id; 
-              } 
-            } 
-          } catch(e) {} 
-          
           let isSetup = false;
           if (businessSetupData && businessSetupData.isSetup) {
             // Check if we have env vars to override/set defaults for Back Office
@@ -1988,7 +1837,7 @@ const serverData = await response.json();
               set({ businessSetup: prefillSetup });
           }
 
-          const fileNames = ['products.json', 'users.json', 'transactions.json', 'credit-customers.json', 'expenses.json', 'salaries.json', 'credit-payments.json', 'inventory-logs.json', 'daily-summaries.json', 'loyalty-customers.json', 'suppliers.json', 'documents.json', 'document-settings.json'];
+          const fileNames = ['products.json', 'users.json', 'transactions.json', 'credit-customers.json', 'expenses.json', 'salaries.json', 'credit-payments.json', 'inventory-logs.json', 'daily-summaries.json', 'loyalty-customers.json', 'suppliers.json', 'documents.json'];
           const dataMap = {
             'products.json': 'products',
             'users.json': 'users',
@@ -2001,15 +1850,13 @@ const serverData = await response.json();
             'daily-summaries.json': 'dailySummaries',
             'loyalty-customers.json': 'loyaltyCustomers',
             'suppliers.json': 'suppliers',
-            'documents.json': 'documents',
-            'document-settings.json': 'documentSettings'
+            'documents.json': 'documents'
           };
 
           // Load Categories
           const { data: catData } = await readDataFromFile('categories.json');
           if (catData && Array.isArray(catData)) {
-            const normalized = catData.map((c: any) => c.name || c);
-            set({ categories: normalized });
+            set({ categories: catData });
           }
 
           for (const fileName of fileNames) {
@@ -2242,55 +2089,32 @@ const serverData = await response.json();
           await saveDataToFile('daily-summaries.json', newSummaries);
       },
 
-      
-      pullDeltaFromServer: async () => {
-        const state = get();
-        if (state.syncStatus.isSyncing) return;
-        
-        get().setSyncStatus({ isSyncing: true, progress: 10, currentTask: 'Pulling delta sync...', error: null });
-        try {
-            const since = state.lastSyncTime || new Date(0).toISOString();
-            const locationId = state.businessSetup?.locationId;
-            const outletId = state.businessSetup?.outletId;
-            
-            get().setSyncStatus({ progress: 50, currentTask: 'Downloading changes from server' });
-            
-            const response = await NetworkClient.pullDeltaSync(since, locationId, outletId);
-            
-            if (response && response.success && response.data) {
-                // Merge data back into local state
-                get().setSyncStatus({ progress: 90, currentTask: 'Merging data locally' });
-                // Note: For a robust app, we'd iterate and merge by ID here. 
-                // For simplicity in this architectural demo, we'll just log success.
-                // In production, we'd do:
-                // set((state) => ({ products: mergeArrays(state.products, response.data.products), ... }))
-            }
-            
-            get().setSyncStatus({ progress: 100, currentTask: 'Pull complete', isSyncing: false });
-        } catch (error: any) {
-            console.error('Pull sync error:', error);
-            if (error.message && error.message.includes('401')) {
-                console.error('API Key invalid or revoked during Pull. Resetting POS registration.');
-                get().setSyncStatus({ error: 'API Key invalid or revoked. Please reset POS registration in Settings.', isSyncing: false, currentTask: 'Sync failed' });
-                return;
-            }
-            get().setSyncStatus({ error: error.message, isSyncing: false, currentTask: 'Pull failed' });
-        }
-      },
-
       pushDataToServer: async () => {
         const state = get();
-        if (state.syncStatus.isSyncing) return;
+        // Use backOfficeUrl if available, fallback to apiUrl (legacy)
+        let rawUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
+        const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
+        const mongoDbUri = state.businessSetup?.mongoDbUri;
 
         if (!state.isOnline) {
             console.error("Cannot push data: App is offline");
             return;
         }
 
-        get().setSyncStatus({ isSyncing: true, progress: 10, currentTask: 'Preparing push payload...', error: null });
+        let apiUrl = rawUrl?.replace(/\/$/, '');
+        // Remove trailing /api to prevent double /api
+        apiUrl = apiUrl?.replace(/\/api$/, '') || '';
+
+        if (!apiUrl) {
+            console.error("Cannot push data: No Back Office URL configured");
+            return;
+        }
+        if (!apiKey) {
+            console.error("Cannot push data: No Back Office API Key configured");
+            return;
+        }
 
         try {
-            // Delta Payload - Ideally filter by updatedAt > lastSyncTime
             const payload = {
                 products: state.products,
                 users: state.users,
@@ -2299,43 +2123,26 @@ const serverData = await response.json();
                 customers: state.creditCustomers,
                 transactions: state.transactions,
                 businessSetup: state.businessSetup,
-                suppliers: state.suppliers,
-                stockMovements: state.inventoryLogs.filter((data: any) => !data.id?.startsWith('MOV_')).map((data: any) => ({
-                    id: data.id || `mov_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-                    productId: data.productId,
-                    locationId: state.businessSetup?.locationId,
-                    outletId: state.businessSetup?.outletId,
-                    type: data.type || (data.variance < 0 ? 'SALE' : 'ADJUSTMENT_UP'),
-                    quantity: Math.abs(data.variance || 0),
-                    reference: data.reference || data.reason || 'Sync',
-                    sourceTerminal: 'POS',
-                    timestamp: data.timestamp || new Date().toISOString(),
-                    updatedAt: data.timestamp || new Date().toISOString()
-                }))
+                suppliers: state.suppliers
             };
 
-            get().setSyncStatus({ progress: 50, currentTask: 'Uploading to Network Client' });
-            
-            await NetworkClient.pushDeltaSync(payload);
+            const response = await fetch(`${apiUrl}/api/sync/full`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'X-API-KEY': apiKey
+                },
+                body: JSON.stringify(payload)
+            });
 
-            get().setSyncStatus({ progress: 100, currentTask: 'Push successful' });
-            set({ lastSyncTime: new Date().toISOString() });
-            
-            // Auto trigger pull after push to ensure consistency
-            setTimeout(() => {
-                get().pullDeltaFromServer();
-            }, 1000);
-            
-        } catch (error: any) {
-            console.error('Push sync error:', error);
-            if (error.message && error.message.includes('401')) {
-                console.error('API Key invalid or revoked during Push. Resetting POS registration.');
-                get().setSyncStatus({ error: 'API Key invalid or revoked. Please reset POS registration in Settings.', isSyncing: false, currentTask: 'Sync failed' });
-                return;
+            if (!response.ok) {
+                throw new Error('Full sync failed');
             }
-            get().setSyncStatus({ error: error.message, currentTask: 'Push failed' });
-        } finally {
-            setTimeout(() => get().setSyncStatus({ isSyncing: false }), 2000);
+            console.log("Full sync successful");
+            set({ lastSyncTime: new Date().toISOString() });
+        } catch (error) {
+            console.error('Full sync error:', error);
         }
       },
 
@@ -2369,4 +2176,3 @@ const serverData = await response.json();
 // Initial data will be loaded in the main App component.
 
 // Sync intervals are now managed in App.tsx to ensure proper lifecycle and state access
-

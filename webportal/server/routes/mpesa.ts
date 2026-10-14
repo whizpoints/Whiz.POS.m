@@ -37,7 +37,16 @@ async function triggerTransactionStatus(config: any, receipt: string, businessId
     try {
       const token = await getOAuthToken(config.consumerKey, config.consumerSecret, config.environment);
       const plaintextPassword = decrypt(config.initiatorPassword);
-      const securityCredential = await generateSecurityCredential(plaintextPassword);
+      // Pass per-business cert if stored in DB, otherwise falls back to file-level cert
+      const securityCredential = await generateSecurityCredential(plaintextPassword, config.certificateBase64 || null);
+      
+      // Debug: detect if cert failed and fell back to plaintext password
+      const credentialLooksEncrypted = securityCredential.length > 50 && securityCredential !== plaintextPassword;
+      if (!credentialLooksEncrypted) {
+        console.error(`[Transaction Status] ⚠️  SecurityCredential for ${receipt} looks like PLAINTEXT (length=${securityCredential.length}). Check ProductionCertificate.cer — it may be malformed or missing.`);
+      } else {
+        console.log(`[Transaction Status] SecurityCredential OK for ${receipt}: length=${securityCredential.length}`);
+      }
       
       const tsUrl = config.environment === 'production'
         ? 'https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query'
@@ -58,7 +67,7 @@ async function triggerTransactionStatus(config: any, receipt: string, businessId
         Occasion: "Status"
       };
 
-      console.log(`[M-Pesa Webhook] Requesting Transaction Status for ${receipt}`);
+      console.log(`[M-Pesa Webhook] Requesting Transaction Status for ${receipt} → ResultURL: ${payload.ResultURL}`);
       
       fetch(tsUrl, {
         method: 'POST',
@@ -199,7 +208,7 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
     
     console.log(`[M-Pesa Webhook] STK Callback received for business ${businessId}:`, JSON.stringify(req.body, null, 2));
     
-    if (callbackData && callbackData.ResultCode === 0) {
+    if (callbackData && (callbackData.ResultCode === 0 || callbackData.ResultCode === "0")) {
       const items = callbackData.CallbackMetadata.Item;
       const amount = items.find((i: any) => i.Name === 'Amount')?.Value;
       const receipt = items.find((i: any) => i.Name === 'MpesaReceiptNumber')?.Value;
@@ -208,7 +217,8 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
       // Verify business config exists
       const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
       if (config) {
-        await prisma.mpesaTransaction.upsert({
+        const hasInitiator = !!(config.initiatorName && config.initiatorPassword);
+        const savedTxn = await prisma.mpesaTransaction.upsert({
           where: { transactionId: receipt },
           create: {
             businessId,
@@ -216,20 +226,37 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
             amount: parseFloat(amount),
             phoneNumber: phone.toString(),
             status: 'UNLINKED',
-            isEnriched: !(config.initiatorName && config.initiatorPassword)
+            // If no initiator configured, treat as enriched immediately (we have the phone from STK)
+            isEnriched: !hasInitiator
           },
           update: {}
         });
 
+        // Emit real-time Socket.IO event so connected POS terminals are notified immediately
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`business_${businessId}`).emit('mpesa_payment_received', {
+            transactionId: receipt,
+            amount: parseFloat(amount),
+            phoneNumber: phone.toString(),
+            isEnriched: !hasInitiator,
+            businessId
+          });
+          console.log(`[M-Pesa Webhook] Socket.IO event emitted to business_${businessId}`);
+        }
+
         // Fetch Customer Name using Transaction Status API
-        if (config.initiatorName && config.initiatorPassword) {
+        if (hasInitiator) {
           triggerTransactionStatus(config, receipt, businessId);
         }
       }
+    } else if (callbackData) {
+      console.log(`[M-Pesa Webhook] STK Push failed for business ${businessId}: ResultCode=${callbackData.ResultCode}, Desc=${callbackData.ResultDesc}`);
     }
     // Always return success to Safaricom to acknowledge receipt
     res.json({ "ResultCode": 0, "ResultDesc": "Success" });
   } catch (err) {
+
     console.error('STK Callback error:', err);
     res.json({ "ResultCode": 1, "ResultDesc": "Error processing callback" });
   }
@@ -300,7 +327,9 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
     const { businessId } = req.params;
     const result = req.body?.Result;
     
-    if (result && result.ResultCode === 0 && result.ResultParameters) {
+    console.log(`[Transaction Status] Callback received for business ${businessId}:`, JSON.stringify(req.body, null, 2));
+    
+    if (result && (result.ResultCode === 0 || result.ResultCode === "0") && result.ResultParameters) {
       const params = result.ResultParameters.ResultParameter;
       const receiptNumber = params.find((p: any) => p.Key === 'ReceiptNo')?.Value;
         const rawPartyName = params.find((p: any) => p.Key === 'DebitPartyName')?.Value || params.find((p: any) => p.Key === 'SenderPartyName')?.Value;
@@ -326,12 +355,29 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
           });
           
           console.log(`[Transaction Status] Enriched ${receiptNumber}: Name=${customerName}, Phone=${formattedPhone}`);
+
+          // Emit real-time Socket.IO update so POS terminals refresh the payment instantly
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`business_${businessId}`).emit('mpesa_payment_enriched', {
+              transactionId: receiptNumber,
+              customerName,
+              phoneNumber: formattedPhone,
+              isEnriched: true,
+              businessId
+            });
+          }
+        } else {
+          console.warn(`[Transaction Status] Could not find ReceiptNo or PartyName in result params. Params:`, JSON.stringify(params));
         }
+    } else if (result) {
+      console.warn(`[Transaction Status] Non-zero result for business ${businessId}: Code=${result.ResultCode}, Desc=${result.ResultDesc}`);
     }
     res.json({ "ResultCode": 0, "ResultDesc": "Accepted" });
   } catch (error) {
     console.error('Transaction Status Callback Error:', error);
     res.json({ "ResultCode": 1, "ResultDesc": "Error" });
+
   }
 });
 
@@ -347,7 +393,9 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
         where: { 
           businessId,
           status: 'UNLINKED',
-          isEnriched: true,
+          // NOTE: isEnriched filter removed intentionally — we show ALL unlinked transactions.
+          // The POS UI shows a "Verifying..." badge for unenriched ones.
+          // Enrichment (phone/name from Transaction Status API) happens async in background.
           ...(q ? {
             OR: [
               { transactionId: { contains: q } },
@@ -435,6 +483,68 @@ router.post('/payments/consume', async (req: any, res: any) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Consume error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 10. Upload Safaricom Certificate (per-business)
+// Accepts PEM text or raw base64. Stores in MpesaConfig.certificateBase64
+router.post('/certificate', async (req: any, res: any) => {
+  try {
+    const { businessId, certificatePem } = req.body;
+    if (!businessId || !certificatePem) {
+      return res.status(400).json({ error: 'Missing businessId or certificatePem' });
+    }
+
+    const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+    if (!config) {
+      return res.status(404).json({ error: 'M-Pesa config not found for this business' });
+    }
+
+    // Store raw (could be PEM or base64 DER — crypto.ts normalizes it on use)
+    await prisma.mpesaConfig.update({
+      where: { id: config.id },
+      data: { certificateBase64: certificatePem.trim() }
+    });
+
+    console.log(`[M-Pesa] Certificate uploaded for business ${businessId}`);
+    res.json({ success: true, message: 'Certificate saved successfully' });
+  } catch (err) {
+    console.error('Certificate upload error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 11. Get M-Pesa Config (for Settings UI) — excludes sensitive keys
+router.get('/config', async (req: any, res: any) => {
+  try {
+    const businessId = req.query.businessId as string;
+    if (!businessId) return res.status(400).json({ error: 'Missing businessId' });
+
+    const config = await prisma.mpesaConfig.findFirst({
+      where: { businessId },
+      select: {
+        id: true,
+        merchantType: true,
+        tillNumber: true,
+        paybillNumber: true,
+        accountReference: true,
+        environment: true,
+        shortcode: true,
+        initiatorName: true,
+        stkEnabled: true,
+        c2bEnabled: true,
+        certificateBase64: true // only used to compute hasCertificate flag below
+        // Deliberately omit: consumerKey, consumerSecret, passkey, initiatorPassword
+      }
+    });
+
+    if (!config) return res.status(404).json({ error: 'Config not found' });
+
+    // Strip certificateBase64 from response (security), expose only boolean flag
+    const { certificateBase64, ...safeConfig } = config as any;
+    res.json({ ...safeConfig, hasCertificate: !!certificateBase64 });
+  } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
 });

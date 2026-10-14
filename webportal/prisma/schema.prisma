@@ -65,6 +65,10 @@ model MpesaConfig {
   stkEnabled Boolean @default(true)
   c2bEnabled Boolean @default(true)
 
+  // Per-business Safaricom public certificate (base64-encoded PEM or DER).
+  // If null, the shared server/utils/ProductionCertificate.cer is used as fallback.
+  certificateBase64 String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

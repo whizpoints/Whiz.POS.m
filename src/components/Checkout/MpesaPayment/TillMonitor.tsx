@@ -79,12 +79,34 @@ export default function TillMonitor({ totalAmount }: Props) {
     return () => clearTimeout(timeout);
   }, [isPolling, totalAmount, isManualOffline]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!detectedPayment) return;
     
     if (detectedPayment.amount !== totalAmount) {
       toast('The transaction amount does not match the sale total.', 'error');
       return;
+    }
+
+    try {
+      // Mark payment as consumed on cloud server to prevent double-use
+      const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+      const businessSetup = usePosStore.getState().businessSetup;
+      const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId;
+
+      const consumeRes = await fetch(`${cloudUrl}/api/mpesa/payments/consume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId: detectedPayment.transactionId, businessId })
+      });
+
+      if (!consumeRes.ok) {
+        const err = await consumeRes.json().catch(() => ({}));
+        toast(err.error || 'This payment may already have been claimed.', 'error');
+        return;
+      }
+    } catch (err) {
+      // Non-fatal: log but proceed. The POS still records the sale locally.
+      console.error('[TillMonitor] Failed to consume payment on cloud server:', err);
     }
     
     // Complete the transaction atomically

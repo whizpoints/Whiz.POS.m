@@ -46,7 +46,7 @@ async function generateReceipt(transaction, businessSetup, isReprint = false) {
     // Dynamic replacement removed.
 
     template = template.replace('{{businessName}}', businessSetup?.businessName || 'WHIZ POS');
-    template = template.replace('{{location}}', businessSetup?.phone || '');
+    template = template.replace('{{location}}', 'Kagwe Town | ' + (businessSetup?.phone || ''));
     template = template.replace('{{address}}', businessSetup?.address || '');
     template = template.replace('{{phone}}', '');
     template = template.replace('{{receiptId}}', transaction.id + (isReprint ? ' (REPRINT)' : ''));
@@ -60,6 +60,8 @@ async function generateReceipt(transaction, businessSetup, isReprint = false) {
     let customerName = 'Walk Through Customer';
     if (paymentMethod === 'CREDIT' && transaction.creditCustomer) {
         customerName = transaction.creditCustomer;
+    } else if (paymentMethod === 'MPESA' && transaction.mpesaName) {
+        customerName = transaction.mpesaName;
     }
     template = template.replace('{{customer}}', customerName);
 
@@ -79,9 +81,12 @@ async function generateReceipt(transaction, businessSetup, isReprint = false) {
         `;
     } else if (paymentMethod === 'MPESA' && (transaction.mpesaCode || transaction.phoneNumber)) {
         paymentDetailsHtml = `
-            <div style="font-size: 11px; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 2px;">
-                ${transaction.phoneNumber ? `<div style="display: flex; justify-content: space-between;"><span>Phone:</span><span>${transaction.phoneNumber.replace(/^(\d{4})\d{3}(\d{3})$/, '$1***$2')}</span></div>` : ''}
-                ${transaction.mpesaCode ? `<div style="display: flex; justify-content: space-between;"><span>M-Pesa Code:</span><span>${transaction.mpesaCode}</span></div>` : ''}
+            <div style="font-size: 11px; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 4px;">
+                <div style="font-weight: bold; margin-bottom: 2px; text-align: center;">M-PESA PAYMENT</div>
+                ${transaction.mpesaName ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Name:</span><span style="font-weight: bold; text-align: right;">${transaction.mpesaName}</span></div>` : ''}
+                ${transaction.phoneNumber ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Phone:</span><span>${transaction.phoneNumber.replace(/^(\d{4})\d{3}(\d{3})$/, '$1***$2')}</span></div>` : ''}
+                ${transaction.mpesaCode ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Ref Code:</span><span style="font-weight: bold;">${transaction.mpesaCode}</span></div>` : ''}
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Amount:</span><span style="font-weight: bold;">Ksh ${total.toFixed(2)}</span></div>
             </div>
         `;
     }
@@ -140,24 +145,35 @@ async function generateReceipt(transaction, businessSetup, isReprint = false) {
     }
     template = template.replace('{{mpesaDetails}}', mpesaDetailsHtml);
 
-    // KRA eTIMS Section
-    let kraHtml = '';
-    if (transaction.kraInvoiceNo) {
-        // eTIMS requires displaying the QR code, Invoice Number, and Control Code (signature)
-        kraHtml = `
-            <div class="separator"></div>
-            <div class="info" style="text-align: center; margin-top: 10px;">
-                <p style="font-size: 11px; font-weight: bold; margin-bottom: 5px;">KRA eTIMS RECEIPT</p>
-                <div style="display: flex; justify-content: center; margin-bottom: 5px;">
-                    <!-- Placeholder for the QR Code. In a real system, you'd render an img tag here using a base64 encoded QR -->
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(transaction.kraQrCode || transaction.kraInvoiceNo)}" alt="KRA QR" width="100" height="100" />
-                </div>
-                <p style="font-size: 10px; margin-bottom: 2px;">Invoice No: <b>${transaction.kraInvoiceNo}</b></p>
-                ${transaction.kraSignature ? `<p style="font-size: 9px; word-break: break-all;">Sign: ${transaction.kraSignature}</p>` : ''}
+    // KRA Details Logic
+    let kraDetailsHtml = '';
+    if (transaction.kraDetails) {
+        let qrCodeHtml = '';
+        try {
+            const qrData = transaction.kraDetails.qrCode || transaction.kraDetails.url || transaction.kraDetails.controlCode || '';
+            if (qrData) {
+                const qrDataUrl = await qrcode.toDataURL(qrData);
+                qrCodeHtml = `<img src="${qrDataUrl}" style="width: 100px; height: 100px; margin: 5px auto; display: block;" />`;
+            }
+        } catch(e) {
+            console.error('QR Generate Error', e);
+        }
+        
+        kraDetailsHtml = `
+            <div style="text-align: center; margin-top: 10px; font-size: 11px;">
+                <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
+                <div style="font-weight: bold; margin-bottom: 2px;">KRA RECEIPT</div>
+                ${qrCodeHtml}
+                ${transaction.kraDetails.invoiceNumber ? `<div>Invoice: ${transaction.kraDetails.invoiceNumber}</div>` : ''}
+                ${transaction.kraDetails.receiptNumber ? `<div>Receipt: ${transaction.kraDetails.receiptNumber}</div>` : ''}
+                ${transaction.kraDetails.date ? `<div>Date: ${transaction.kraDetails.date}</div>` : ''}
+                ${transaction.kraDetails.controlCode ? `<div>Ctrl Code: ${transaction.kraDetails.controlCode}</div>` : ''}
+                <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
             </div>
         `;
     }
-    
+    template = template.replace('{{kraDetails}}', kraDetailsHtml);
+
     // Developer Footer Logic
     // Default to true if undefined
     const showDevFooter = businessSetup?.showDeveloperFooter !== false;
@@ -165,15 +181,11 @@ async function generateReceipt(transaction, businessSetup, isReprint = false) {
 
     if (showDevFooter) {
         devFooterHtml = `
-            ${kraHtml}
-            <div class="footer-dev" style="margin-top: 10px;">
+            <div class="footer-dev">
                 <p>System Designed and serviced by Whizpoint Solutions</p>
                 <p>Tell: 0740 841 168</p>
             </div>
         `;
-    } else {
-        // Even if dev footer is hidden, we must still show KRA if present
-        devFooterHtml = kraHtml;
     }
     template = template.replace('{{developerFooter}}', devFooterHtml);
 

@@ -390,7 +390,8 @@ function PaymentsPanel() {
     initiatorName: '',
     initiatorPassword: '',
     stkEnabled: true,
-    c2bEnabled: true
+    c2bEnabled: true,
+    hasCertificate: false
   });
 
   useEffect(() => {
@@ -417,7 +418,8 @@ function PaymentsPanel() {
               initiatorName: data.initiatorName || '',
               initiatorPassword: data.initiatorPassword ? '********' : '',
               stkEnabled: data.stkEnabled ?? true,
-              c2bEnabled: data.c2bEnabled ?? true
+              c2bEnabled: data.c2bEnabled ?? true,
+              hasCertificate: data.hasCertificate ?? false
             });
           }
         }
@@ -450,6 +452,44 @@ function PaymentsPanel() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  
+  const handleCertificateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const isCer = file.name.endsWith('.cer') || file.name.endsWith('.crt') || file.name.endsWith('.pem');
+      if (!isCer) {
+        toast.error('Please upload a valid .cer or .pem file');
+        return;
+      }
+
+      const text = await file.text();
+      let certificatePem = text;
+      
+      if (!text.includes('BEGIN CERTIFICATE')) {
+        const buffer = await file.arrayBuffer();
+        const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+        certificatePem = '-----BEGIN CERTIFICATE-----\n' + (base64.match(/.{1,64}/g)?.join('\n') || base64) + '\n-----END CERTIFICATE-----';
+      }
+
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+      const res = await fetch(`${API_BASE_URL}/api/mpesa/certificate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessId, certificatePem })
+      });
+
+      if (res.ok) {
+        toast.success('Certificate uploaded successfully!');
+        setConfig(prev => ({ ...prev, hasCertificate: true }));
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+    }
+    e.target.value = '';
   };
 
   const handleRegisterC2b = async () => {
@@ -627,7 +667,24 @@ function PaymentsPanel() {
                 </div>
               </div>
 
+              
+              <div className="md:col-span-2 mt-4 p-4 rounded-xl border ${config.hasCertificate ? 'bg-green-50/50 border-green-200' : 'bg-orange-50/50 border-orange-200'}">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-sm ${config.hasCertificate ? 'text-green-900' : 'text-orange-900'}">Safaricom Public Certificate</h3>
+                    <p className="text-xs mt-1 ${config.hasCertificate ? 'text-green-700' : 'text-orange-800'}">
+                      {config.hasCertificate ? '✅ Certificate is installed and active for this business.' : '⚠️ No certificate found. Transaction Status checks will fail!'}
+                    </p>
+                  </div>
+                  <label className="cursor-pointer px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-colors">
+                    Upload .cer
+                    <input type="file" accept=".cer,.crt,.pem" onChange={handleCertificateUpload} className="hidden" />
+                  </label>
+                </div>
+              </div>
+
               <div className="md:col-span-2 mt-4 p-4 rounded-xl bg-blue-50/50 border border-blue-100 text-sm">
+
                 <h4 className="font-semibold text-blue-900 mb-1 flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-blue-600" />
                   How to get Initiator Credentials

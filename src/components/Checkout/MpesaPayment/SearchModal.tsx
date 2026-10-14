@@ -1,19 +1,31 @@
 import React, { useState } from 'react';
-import { Search, X, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Search, X, CheckCircle2, AlertTriangle, Loader2, Clock } from 'lucide-react';
 import { Modal } from '../../ui/modal';
 import { usePosStore } from '../../../store/posStore';
+
+interface MpesaTxn {
+  transactionId: string;
+  customerName: string | null;
+  phoneNumber: string;
+  amount: number;
+  timestamp: string;
+  isEnriched: boolean;
+}
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   targetAmount: number;
+  /** Called when a transaction is selected and consumed — triggers sale completion */
+  onSelect: (txn: MpesaTxn) => void;
 }
 
-export default function SearchModal({ isOpen, onClose, targetAmount }: Props) {
+export default function SearchModal({ isOpen, onClose, targetAmount, onSelect }: Props) {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<MpesaTxn[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [selectingId, setSelectingId] = useState<string | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,15 +48,17 @@ export default function SearchModal({ isOpen, onClose, targetAmount }: Props) {
       
       if (res.ok) {
         const txns = await res.json();
-        const localUsedCodes = usePosStore.getState().transactions.map(t => t.mpesaCode).filter(Boolean);
-        const filteredTxns = txns.filter((t: any) => !localUsedCodes.includes(t.transactionId));
+        // Filter out transactions already used in local session
+        const localUsedCodes = usePosStore.getState().transactions.map(t => (t as any).mpesaCode).filter(Boolean);
+        const filtered = txns.filter((t: any) => !localUsedCodes.includes(t.transactionId));
         
-        setResults(filteredTxns.map((t: any) => ({
+        setResults(filtered.map((t: any) => ({
           transactionId: t.transactionId,
-          customerName: t.customerName || 'Customer',
+          customerName: t.customerName || null,
           phoneNumber: t.phoneNumber,
           amount: t.amount,
-          timestamp: t.timestamp
+          timestamp: t.timestamp,
+          isEnriched: t.isEnriched
         })));
       } else {
         setResults([]);
@@ -54,6 +68,38 @@ export default function SearchModal({ isOpen, onClose, targetAmount }: Props) {
       setResults([]);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleSelect = async (txn: MpesaTxn) => {
+    setSelectingId(txn.transactionId);
+    try {
+      const businessSetup = usePosStore.getState().businessSetup;
+      const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId;
+      const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+
+      // Mark the payment as consumed on the cloud server (prevents double-use)
+      const consumeRes = await fetch(`${cloudUrl}/api/mpesa/payments/consume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId: txn.transactionId, businessId })
+      });
+
+      if (!consumeRes.ok) {
+        const err = await consumeRes.json().catch(() => ({}));
+        alert(err.error || 'This payment may already have been claimed. Please check.');
+        setSelectingId(null);
+        return;
+      }
+
+      // Pass back to parent (CheckoutModal) to call completeTransaction
+      onSelect(txn);
+      onClose();
+    } catch (err) {
+      console.error('Failed to consume M-Pesa payment:', err);
+      alert('Network error. Please try again.');
+    } finally {
+      setSelectingId(null);
     }
   };
 
@@ -68,7 +114,7 @@ export default function SearchModal({ isOpen, onClose, targetAmount }: Props) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. John / 0740... / W32"
+            placeholder="e.g. John / 0740... / UJ1KZ8"
             className="w-full pl-12 pr-24 py-4 bg-gray-50 border border-gray-200 rounded-xl font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-colors"
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -100,33 +146,38 @@ export default function SearchModal({ isOpen, onClose, targetAmount }: Props) {
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Matching Payments</p>
             
             {results.map((txn, idx) => {
-              const isMatch = txn.amount === targetAmount;
+              const isAmountMatch = txn.amount === targetAmount;
+              const isSelecting = selectingId === txn.transactionId;
+              const displayName = txn.customerName
+                ? txn.customerName
+                : txn.isEnriched ? 'Unknown' : 'Verifying...';
               
               return (
-                <div key={idx} className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${isMatch ? 'bg-green-50/50 border-green-200 hover:bg-green-50' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                <div key={idx} className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${isAmountMatch ? 'bg-green-50/50 border-green-200 hover:bg-green-50' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-gray-900">
-                        {(txn.customerName && txn.customerName.trim().split(' ').length < 2 && txn.customerName !== 'Customer') 
-                          ? `${txn.customerName} (M-Pesa)` 
-                          : (txn.customerName || 'Unknown')}
-                      </p>
+                      <p className="font-medium text-gray-900">{displayName}</p>
+                      {!txn.isEnriched && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                          <Clock className="w-2.5 h-2.5" /> Verifying...
+                        </span>
+                      )}
                       <p className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
                         {txn.phoneNumber?.length > 15 ? 'Hidden (Privacy)' : txn.phoneNumber}
                       </p>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
-                      <span className="font-bold text-gray-900">{txn.transactionId}</span>
+                      <span className="font-bold text-gray-900 font-mono">{txn.transactionId}</span>
                       <span className="text-gray-500">{new Date(txn.timestamp).toLocaleTimeString()}</span>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-6">
                     <div className="text-right">
-                      <p className={`font-bold text-lg ${isMatch ? 'text-green-700' : 'text-gray-900'}`}>
+                      <p className={`font-bold text-lg ${isAmountMatch ? 'text-green-700' : 'text-gray-900'}`}>
                         KSh {txn.amount.toLocaleString()}
                       </p>
-                      {isMatch ? (
+                      {isAmountMatch ? (
                         <p className="text-[10px] font-bold text-green-600 uppercase flex items-center gap-1 justify-end">
                           <CheckCircle2 className="w-3 h-3" /> Amount Match
                         </p>
@@ -138,13 +189,13 @@ export default function SearchModal({ isOpen, onClose, targetAmount }: Props) {
                     </div>
                     
                     <button 
-                      onClick={() => {
-                        // Pass back to till monitor via store/props (in real implementation)
-                        onClose();
-                      }}
-                      className="px-6 py-3 bg-white border-2 border-gray-200 hover:border-green-500 hover:text-green-600 font-bold text-sm rounded-xl transition-all"
+                      onClick={() => handleSelect(txn)}
+                      disabled={isSelecting}
+                      className="px-6 py-3 bg-white border-2 border-gray-200 hover:border-green-500 hover:text-green-600 font-bold text-sm rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                      SELECT
+                      {isSelecting ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> CLAIMING...</>
+                      ) : 'SELECT'}
                     </button>
                   </div>
                 </div>

@@ -15,7 +15,7 @@ import { Banknote, CreditCard, Landmark, UserCheck, Search } from 'lucide-react'
 export type PaymentMethodType = 'cash' | 'mpesa' | 'card' | 'bank' | 'credit';
 
 export default function CheckoutModal() {
-  const { isCheckoutOpen, closeCheckout, cart } = usePosStore();
+  const { isCheckoutOpen, closeCheckout, cart, completeTransaction } = usePosStore();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodType>('cash');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -47,6 +47,15 @@ export default function CheckoutModal() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isCheckoutOpen, closeCheckout]);
+
+  /** Called when cashier picks a payment from SearchModal — completes the sale */
+  const handlePaymentSelected = (txn: { transactionId: string; amount: number; phoneNumber: string; customerName: string | null }) => {
+    completeTransaction('mpesa', undefined, {
+      mpesaCode: txn.transactionId,
+      phoneNumber: txn.phoneNumber,
+      amountTendered: txn.amount
+    });
+  };
 
   if (!isCheckoutOpen) return null;
 
@@ -176,9 +185,11 @@ export default function CheckoutModal() {
         <SearchModal 
           isOpen={isSearchOpen} 
           onClose={() => setIsSearchOpen(false)} 
-          targetAmount={totalAmount} 
+          targetAmount={totalAmount}
+          onSelect={handlePaymentSelected}
         />
       )}
     </div>
   );
 }
+

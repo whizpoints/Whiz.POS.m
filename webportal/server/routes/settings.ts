@@ -16,7 +16,7 @@ router.get('/mpesa', async (req: any, res: any) => {
     
     if (config) {
       // Don't send the real password back to the frontend, just a boolean indicator if it exists
-      const configToReturn = { ...config, initiatorPassword: config.initiatorPassword ? true : false };
+      const configToReturn = { ...config, initiatorPassword: config.initiatorPassword ? true : false, hasCertificate: !!config.certificateBase64 };
       return res.json(configToReturn);
     }
     
