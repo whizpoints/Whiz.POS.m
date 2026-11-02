@@ -17,6 +17,7 @@ if (!fs.existsSync(targetUserData)) {
   fs.mkdirSync(targetUserData, { recursive: true });
 }
 app.setPath('userData', targetUserData);
+process.env.WHIZPOS_DATA_DIR = targetUserData;
 
 process.on('uncaughtException', (error) => {
   const logPath = path.join(app.getPath('userData'), 'crash.log');

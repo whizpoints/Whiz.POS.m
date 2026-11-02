@@ -160,10 +160,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(wafMiddleware);
 // (Static files are served later below)
 // Serve local uploads
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
+import { getUploadsDir } from './paths.js';
+const uploadsDir = getUploadsDir();
 app.use('/uploads', express.static(uploadsDir));
 // API Routes
 app.use('/api/auth', authRoutes);

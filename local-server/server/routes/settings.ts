@@ -89,7 +89,8 @@ router.get('/cloud', async (req: any, res: any) => {
     const path = await import('path');
     const { fileURLToPath } = await import('url');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const configPath = path.join(__dirname, '..', '..', '..', 'server-config.json');
+    const { getServerConfigPath } = await import('../paths.js');
+    const configPath = getServerConfigPath();
     let config: any = {};
     try {
       const data = await fs.readFile(configPath, 'utf-8');
@@ -111,7 +112,8 @@ router.post('/cloud', async (req: any, res: any) => {
     const path = await import('path');
     const { fileURLToPath } = await import('url');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const configPath = path.join(__dirname, '..', '..', '..', 'server-config.json');
+    const { getServerConfigPath } = await import('../paths.js');
+    const configPath = getServerConfigPath();
     
     let config: any = {};
     try {

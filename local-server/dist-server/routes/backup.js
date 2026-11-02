@@ -16,13 +16,14 @@ try {
 catch (e) {
     cryptoBackup = require('./backup-crypto.cjs');
 }
+import { getUploadsDir } from '../paths.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const router = Router();
-const upload = multer({ dest: path.join(__dirname, '../uploads/') });
+const UPLOADS_DIR = getUploadsDir();
+const upload = multer({ dest: UPLOADS_DIR });
 // Strictly store in ProgramData/whiz-pos/Backups/Server
 const BACKUPS_DIR = cryptoBackup.getProgramDataBackupsDir('Server');
-const UPLOADS_DIR = path.join(__dirname, '../uploads');
 /**
  * Authentication middleware supporting JWT tokens and API keys
  */
