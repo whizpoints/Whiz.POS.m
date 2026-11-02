@@ -151,6 +151,23 @@ export interface BusinessSetup {
   printDuplicateReceipts?: boolean;
   autoDeleteOldBackups?: boolean;
   backupRetentionDays?: number;
+  cloudBusinessId?: string;
+  cloudLocationId?: string;
+  cloudOutletId?: string;
+  cloudApiKey?: string;
+  cloudUrl?: string;
+  webportalUrl?: string;
+  mpesaPushUrl?: string;
+  mpesaStatusUrl?: string;
+  mpesaSearchUrl?: string;
+  mpesaConsumeUrl?: string;
+  mpesaQrUrl?: string;
+  itaxInvoiceUrl?: string;
+  itaxPingUrl?: string;
+  itaxInitUrl?: string;
+  itaxSyncUrl?: string;
+  kraInvoiceUrl?: string;
+  kraPingUrl?: string;
   mpesaConfig?: {
     enabled: boolean;
     backendUrl: string;

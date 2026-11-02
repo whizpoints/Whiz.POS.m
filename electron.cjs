@@ -571,31 +571,31 @@ ipcMain.handle('discover-local-server', async () => {
 
 ipcMain.handle('check-mpesa-payment', async (event, { amount, expectedName }) => {
   try {
-    const config = await readJsonFileFallback('server-config.json');
-    if (!config?.apiKey) return null;
-
-    // Check Cloud Backend for recent M-Pesa transactions
-    // In a real app, this would use a proper API URL, we'll assume localhost:3000 for now or whatever is configured
-    // For now we'll mock the URL or rely on a configured backend URL. 
-    // Assuming backend is at https://whizpoint.app or localhost:3000
-    const backendUrl = process.env.VITE_API_URL || 'http://localhost:3000';
+    const config = (await readJsonFileFallback('server-config.json')) || {};
+    const bizSetup = (await readJsonFileFallback('business-setup.json')) || {};
+    const backendUrl = (bizSetup.backOfficeUrl || bizSetup.cloudUrl || config.backOfficeUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
     
-    // We decode the businessId from the API key (which is a JWT in our monolith)
-    let businessId = '';
-    try {
-      const payload = JSON.parse(Buffer.from(config.apiKey.split('.')[1], 'base64').toString());
-      businessId = payload.businessId;
-    } catch (e) {}
+    let businessId = bizSetup.cloudBusinessId || bizSetup.businessId || config.cloudBusinessId || '';
+    if (!businessId && config?.apiKey) {
+      try {
+        const payload = JSON.parse(Buffer.from(config.apiKey.split('.')[1], 'base64').toString());
+        businessId = payload.businessId;
+      } catch (e) {}
+    }
+    if (!businessId) return null;
 
-    const res = await fetch(`${backendUrl}/api/mpesa/transactions?businessId=${businessId}`);
+    const res = await fetch(`${backendUrl}/api/mpesa/payments/search?businessId=${businessId}`, {
+      signal: AbortSignal.timeout(4000)
+    });
     if (!res.ok) return null;
     
     const txns = await res.json();
+    if (!Array.isArray(txns)) return null;
     
     // Find a transaction matching the exact amount within the last 5 minutes
     const fiveMinsAgo = new Date(Date.now() - 5 * 60000);
     const match = txns.find(t => 
-      t.amount === amount && 
+      Math.abs(Number(t.amount) - Number(amount)) < 0.01 && 
       new Date(t.timestamp) > fiveMinsAgo &&
       t.status === 'COMPLETED'
     );

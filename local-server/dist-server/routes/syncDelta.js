@@ -3,6 +3,8 @@ import { Router } from 'express';
 import db from '../db.js';
 import * as jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
+import fs from 'fs';
+import { getServerConfigPath } from '../paths.js';
 const router = Router();
 // Middleware to authenticate sync requests
 const authenticate = async (req, res, next) => {
@@ -183,12 +185,45 @@ router.get('/', async (req, res) => {
                 transactions: [], // Intentionally empty: fresh terminals do not download historical ledgers
                 outlets,
                 terminals,
-                businessSetup: businessData && new Date(businessData.updatedAt) > sinceDate ? {
-                    ...(typeof businessData.settings === 'string' ? JSON.parse(businessData.settings) : businessData.settings),
-                    businessName: businessData.name,
-                    // Always override locationId with the real StoreLocation ID to prevent stale backup values
-                    locationId: req.user.locationId || (await db.selectFrom('StoreLocation').select('id').where('businessId', '=', businessId).executeTakeFirst())?.id || undefined
-                } : null
+                businessSetup: businessData && new Date(businessData.updatedAt) > sinceDate ? (() => {
+                    let bSettings = {};
+                    try {
+                        bSettings = typeof businessData.settings === 'string' ? JSON.parse(businessData.settings) : (businessData.settings || {});
+                    }
+                    catch (e) { }
+                    let serverConfig = {};
+                    try {
+                        const cfgPath = getServerConfigPath();
+                        if (fs.existsSync(cfgPath)) {
+                            serverConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+                        }
+                    }
+                    catch (e) { }
+                    const cloudBaseUrl = (bSettings.backOfficeUrl || serverConfig.backOfficeUrl || process.env.CLOUD_API_URL || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+                    const cloudBusinessId = bSettings.cloudBusinessId || serverConfig.cloudBusinessId || businessId;
+                    const cloudApiKey = bSettings.backOfficeApiKey || serverConfig.apiKey || serverConfig.cloudToken || businessData.apiKey;
+                    return {
+                        ...bSettings,
+                        businessName: businessData.name,
+                        cloudBusinessId,
+                        cloudApiKey,
+                        backOfficeUrl: cloudBaseUrl,
+                        cloudUrl: cloudBaseUrl,
+                        webportalUrl: cloudBaseUrl,
+                        mpesaPushUrl: `${cloudBaseUrl}/api/mpesa/stkpush`,
+                        mpesaStatusUrl: `${cloudBaseUrl}/api/mpesa/status`,
+                        mpesaSearchUrl: `${cloudBaseUrl}/api/mpesa/payments/search?businessId=${cloudBusinessId}`,
+                        mpesaConsumeUrl: `${cloudBaseUrl}/api/mpesa/payments/consume`,
+                        mpesaQrUrl: `${cloudBaseUrl}/api/mpesa/qrcode`,
+                        itaxInvoiceUrl: `${cloudBaseUrl}/api/kra/invoice`,
+                        itaxPingUrl: `${cloudBaseUrl}/api/kra/ping`,
+                        itaxInitUrl: `${cloudBaseUrl}/api/kra/init-device`,
+                        itaxSyncUrl: `${cloudBaseUrl}/api/kra/sync-queue`,
+                        kraInvoiceUrl: `${cloudBaseUrl}/api/kra/invoice`,
+                        // Always override locationId with the real StoreLocation ID to prevent stale backup values
+                        locationId: req.user.locationId || undefined
+                    };
+                })() : null
             }
         });
     }

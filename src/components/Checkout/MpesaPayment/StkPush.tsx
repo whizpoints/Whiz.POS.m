@@ -28,7 +28,7 @@ export default function StkPush({ totalAmount }: Props) {
       return;
     }
 
-    const activeBusinessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.id;
+    const activeBusinessId = businessSetup?.cloudBusinessId || businessSetup?.businessId || (businessSetup as any)?.id;
 
     if (!activeBusinessId) {
       toast('Business context missing. Cannot send push. Please re-link your POS.', 'error');
@@ -38,12 +38,20 @@ export default function StkPush({ totalAmount }: Props) {
     setStatus('sending');
     
     try {
-      // Always route to Cloud URL (Web Portal) for STK push to handle HTTPS callbacks
-      const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
-      const res = await fetch(`${cloudUrl}/api/mpesa/stkpush`, {
+      // Direct Web Portal push URL for lightning-fast push & callbacks even when local server is offline
+      const pushUrl = businessSetup?.mpesaPushUrl 
+        || `${(businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '')}/api/mpesa/stkpush`;
+
+      const res = await fetch(pushUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: validPhone, amount: totalAmount, businessId: activeBusinessId, locationId: (businessSetup as any)?.locationId })
+        body: JSON.stringify({ 
+          phone: validPhone, 
+          amount: totalAmount, 
+          businessId: activeBusinessId, 
+          locationId: (businessSetup as any)?.locationId || (businessSetup as any)?.cloudLocationId 
+        }),
+        signal: AbortSignal.timeout(12000)
       });
       
       const data = await res.json();
@@ -94,4 +102,3 @@ export default function StkPush({ totalAmount }: Props) {
     </div>
   );
 }
-

@@ -156,7 +156,11 @@ export default function CheckoutModal() {
         transactionDesc: 'Payment for items'
       };
 
-      const backendUrl = config.backendUrl.replace(/\/$/, '');
+      const backendUrl = (businessSetup?.mpesaPushUrl?.replace(/\/api\/mpesa\/stkpush\/?$/, '') 
+        || businessSetup?.backOfficeUrl 
+        || businessSetup?.cloudUrl 
+        || config.backendUrl 
+        || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
       const response = await fetch(`${backendUrl}/api/mpesa/stkpush`, {
         method: 'POST',
         headers: {

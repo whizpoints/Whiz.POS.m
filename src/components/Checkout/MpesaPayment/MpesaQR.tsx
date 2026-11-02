@@ -16,7 +16,7 @@ export default function MpesaQR({ totalAmount }: Props) {
     let isMounted = true;
     
     const fetchQRCode = async () => {
-      const activeBusinessId = (businessSetup as any)?.businessId || (businessSetup as any)?.cloudBusinessId;
+      const activeBusinessId = (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.businessId || (businessSetup as any)?.id;
       if (!businessSetup || !activeBusinessId || totalAmount <= 0) return;
       
       setIsLoading(true);
@@ -24,21 +24,44 @@ export default function MpesaQR({ totalAmount }: Props) {
       
       try {
         const businessSetup = usePosStore.getState().businessSetup;
-        const cloudUrl = (businessSetup?.apiUrl || businessSetup?.backOfficeUrl || import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app').replace(/\/$/, '');
-        const res = await fetch(`${cloudUrl}/api/mpesa/qrcode`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            businessId: activeBusinessId,
-            locationId: (businessSetup as any)?.locationId,
-            amount: totalAmount,
-            refNo: `INV-${Date.now().toString().slice(-5)}`
-          })
-        });
+        const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+        const qrUrl = businessSetup?.mpesaQrUrl || `${webportalBase}/api/mpesa/qrcode`;
+
+        let res: Response | null = null;
+        try {
+          res = await fetch(qrUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              businessId: activeBusinessId,
+              locationId: (businessSetup as any)?.locationId || (businessSetup as any)?.cloudLocationId,
+              amount: totalAmount,
+              refNo: `INV-${Date.now().toString().slice(-5)}`
+            }),
+            signal: AbortSignal.timeout(5000)
+          });
+        } catch (cloudErr) {
+          const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
+          if (localServerBase) {
+            try {
+              res = await fetch(`${localServerBase}/api/mpesa/qrcode`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  businessId: activeBusinessId,
+                  locationId: (businessSetup as any)?.locationId,
+                  amount: totalAmount,
+                  refNo: `INV-${Date.now().toString().slice(-5)}`
+                }),
+                signal: AbortSignal.timeout(3000)
+              });
+            } catch (e) {}
+          }
+        }
         
-        if (!res.ok) {
+        if (!res || !res.ok) {
           throw new Error('Failed to generate QR Code');
         }
         

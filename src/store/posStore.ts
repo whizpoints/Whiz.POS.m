@@ -1178,9 +1178,14 @@ export const usePosStore = create<PosState>()(
 
         // 2. Otherwise try local-server / webportal REST endpoints
         const candidateUrls: string[] = [];
+        if (state.businessSetup?.itaxInvoiceUrl) {
+          candidateUrls.push(state.businessSetup.itaxInvoiceUrl.replace(/\/api\/kra\/invoice\/?$/, ''));
+        }
         if (state.businessSetup?.backOfficeUrl) candidateUrls.push(state.businessSetup.backOfficeUrl);
+        if (state.businessSetup?.cloudUrl) candidateUrls.push(state.businessSetup.cloudUrl);
+        if (state.businessSetup?.webportalUrl) candidateUrls.push(state.businessSetup.webportalUrl);
+        candidateUrls.push('https://backoffice.whizpoint.app');
         if (state.businessSetup?.apiUrl) candidateUrls.push(state.businessSetup.apiUrl);
-        candidateUrls.push('http://localhost:5173');
         candidateUrls.push('http://localhost:5050');
 
         const uniqueUrls = Array.from(new Set(candidateUrls.map(u => (u || '').trim().replace(/\/$/, '').replace(/\/api$/, '')))).filter(Boolean);
@@ -1781,6 +1786,9 @@ export const usePosStore = create<PosState>()(
           let newBusinessSetup = { ...(currentState.businessSetup || {}) };
           if (serverData.businessSetup) {
             const resolvedBizId = serverData.businessSetup.businessId || serverData.businessSetup.id || currentState.businessSetup?.businessId || currentState.businessSetup?.id;
+            const resolvedCloudBizId = serverData.businessSetup.cloudBusinessId || currentState.businessSetup?.cloudBusinessId || resolvedBizId;
+            const cloudBase = (serverData.businessSetup.backOfficeUrl || serverData.businessSetup.cloudUrl || currentState.businessSetup?.backOfficeUrl || currentState.businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+
             newBusinessSetup = {
               ...newBusinessSetup,
               ...serverData.businessSetup,
@@ -1795,8 +1803,24 @@ export const usePosStore = create<PosState>()(
               hospitalityReceiptPrinting: currentState.businessSetup?.hospitalityReceiptPrinting !== undefined ? currentState.businessSetup.hospitalityReceiptPrinting : (serverData.businessSetup.hospitalityReceiptPrinting ?? false),
               printDuplicateReceipts: currentState.businessSetup?.printDuplicateReceipts !== undefined ? currentState.businessSetup.printDuplicateReceipts : (serverData.businessSetup.printDuplicateReceipts ?? false),
               businessId: resolvedBizId,
+              cloudBusinessId: resolvedCloudBizId,
               id: resolvedBizId,
-              isSetup: true
+              isSetup: true,
+
+              // Explicitly assign unique Web Portal URLs for M-Pesa & iTax
+              backOfficeUrl: cloudBase,
+              cloudUrl: cloudBase,
+              webportalUrl: serverData.businessSetup.webportalUrl || cloudBase,
+              mpesaPushUrl: serverData.businessSetup.mpesaPushUrl || `${cloudBase}/api/mpesa/stkpush`,
+              mpesaStatusUrl: serverData.businessSetup.mpesaStatusUrl || `${cloudBase}/api/mpesa/status`,
+              mpesaSearchUrl: serverData.businessSetup.mpesaSearchUrl || `${cloudBase}/api/mpesa/payments/search?businessId=${resolvedCloudBizId}`,
+              mpesaConsumeUrl: serverData.businessSetup.mpesaConsumeUrl || `${cloudBase}/api/mpesa/payments/consume`,
+              mpesaQrUrl: serverData.businessSetup.mpesaQrUrl || `${cloudBase}/api/mpesa/qrcode`,
+              itaxInvoiceUrl: serverData.businessSetup.itaxInvoiceUrl || `${cloudBase}/api/kra/invoice`,
+              itaxPingUrl: serverData.businessSetup.itaxPingUrl || `${cloudBase}/api/kra/ping`,
+              itaxInitUrl: serverData.businessSetup.itaxInitUrl || `${cloudBase}/api/kra/init-device`,
+              itaxSyncUrl: serverData.businessSetup.itaxSyncUrl || `${cloudBase}/api/kra/sync-queue`,
+              kraInvoiceUrl: serverData.businessSetup.kraInvoiceUrl || `${cloudBase}/api/kra/invoice`
             };
             if (serverData.businessSetup.businessName) {
               newBusinessSetup.businessName = serverData.businessSetup.businessName;

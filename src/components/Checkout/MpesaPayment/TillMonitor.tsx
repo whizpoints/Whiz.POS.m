@@ -78,34 +78,39 @@ export default function TillMonitor({ totalAmount }: Props) {
         if (!isPolling || isManualOffline) return;
         
         const businessSetup = usePosStore.getState().businessSetup;
-        const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.id;
+        const businessId = businessSetup?.cloudBusinessId || businessSetup?.businessId || (businessSetup as any)?.id;
         if (!businessId) return;
 
-        const rawUrl = businessSetup?.apiUrl || businessSetup?.backOfficeUrl || import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
-        const primaryUrl = rawUrl.replace(/\/$/, '').replace(/\/api$/, '');
-        const cloudFallbackUrl = (import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app').replace(/\/$/, '');
+        // Direct Web Portal query for real-time M-Pesa callbacks even when local server is off
+        const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+        const webportalUrl = businessSetup?.mpesaSearchUrl 
+          ? (businessSetup.mpesaSearchUrl.includes('?') ? `${businessSetup.mpesaSearchUrl}&businessId=${businessId}` : `${businessSetup.mpesaSearchUrl}?businessId=${businessId}`)
+          : `${webportalBase}/api/mpesa/payments/search?businessId=${businessId}`;
+
+        const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
+        const localServerUrl = localServerBase ? `${localServerBase}/api/mpesa/payments/search?businessId=${businessId}` : null;
 
         let res: Response | null = null;
         try {
-          res = await fetch(`${primaryUrl}/api/mpesa/payments/search?businessId=${businessId}`, {
-            signal: AbortSignal.timeout(2500)
+          res = await fetch(webportalUrl, {
+            signal: AbortSignal.timeout(3500)
           });
         } catch (fetchErr) {
-          // If primary server failed or timed out, attempt cloud fallback
-          if (primaryUrl !== cloudFallbackUrl) {
+          // If webportal is unreachable (e.g. internet down), try local server if configured
+          if (localServerUrl) {
             try {
-              res = await fetch(`${cloudFallbackUrl}/api/mpesa/payments/search?businessId=${businessId}`, {
-                signal: AbortSignal.timeout(3000)
+              res = await fetch(localServerUrl, {
+                signal: AbortSignal.timeout(2000)
               });
-            } catch (cloudErr) {
+            } catch (localErr) {
               // Both failed, ignore for this poll interval
             }
           }
-          // Also trigger server discovery if the primary URL had connection error
+          // Also trigger server discovery if local server had connection error
           if (window.electron && typeof window.electron.discoverLocalServer === 'function') {
             window.electron.discoverLocalServer().then((discovered: any) => {
               const foundUrl = Array.isArray(discovered) ? discovered[0]?.url : (discovered?.url || (typeof discovered === 'string' ? discovered : null));
-              if (foundUrl && foundUrl !== primaryUrl) {
+              if (foundUrl && foundUrl !== localServerBase) {
                 usePosStore.getState().updateServerUrl(foundUrl);
               }
             }).catch(() => {});
@@ -192,28 +197,44 @@ export default function TillMonitor({ totalAmount }: Props) {
     const finalCustomerName = customCustomerName.trim() || detectedPayment.customerName || 'M-Pesa Customer';
 
     try {
-      // Mark payment as consumed on cloud/server to prevent double-use
+      // Mark payment as consumed on webportal/server to prevent double-use
       const businessSetup = usePosStore.getState().businessSetup;
-      const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.id;
-      const rawUrl = businessSetup?.apiUrl || businessSetup?.backOfficeUrl || import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
-      const cloudUrl = rawUrl.replace(/\/$/, '').replace(/\/api$/, '');
+      const businessId = businessSetup?.cloudBusinessId || businessSetup?.businessId || (businessSetup as any)?.id;
+      const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+      const consumeUrl = businessSetup?.mpesaConsumeUrl || `${webportalBase}/api/mpesa/payments/consume`;
 
-      const consumeRes = await fetch(`${cloudUrl}/api/mpesa/payments/consume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionId: detectedPayment.transactionId, businessId })
-      });
+      try {
+        const consumeRes = await fetch(consumeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactionId: detectedPayment.transactionId, businessId }),
+          signal: AbortSignal.timeout(4000)
+        });
 
-      if (!consumeRes.ok) {
-        const err = await consumeRes.json().catch(() => ({}));
-        if (consumeRes.status === 409) {
-          console.warn('[TillMonitor] Payment was already claimed, proceeding with sale:', detectedPayment.transactionId);
-        } else {
-          toast(err.error || 'Payment consume verification failed.', 'error');
+        if (!consumeRes.ok) {
+          const err = await consumeRes.json().catch(() => ({}));
+          if (consumeRes.status === 409) {
+            console.warn('[TillMonitor] Payment was already claimed, proceeding with sale:', detectedPayment.transactionId);
+          } else {
+            toast(err.error || 'Payment consume verification failed.', 'error');
+          }
+        }
+      } catch (cloudConsumeErr) {
+        // Fallback to local server if webportal had a connection issue
+        const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
+        if (localServerBase) {
+          try {
+            await fetch(`${localServerBase}/api/mpesa/payments/consume`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ transactionId: detectedPayment.transactionId, businessId }),
+              signal: AbortSignal.timeout(2000)
+            });
+          } catch (e) {}
         }
       }
     } catch (err) {
-      console.error('[TillMonitor] Failed to consume payment on server:', err);
+      console.error('[TillMonitor] Failed to consume payment:', err);
     }
     
     // Complete the transaction atomically with customer name recorded

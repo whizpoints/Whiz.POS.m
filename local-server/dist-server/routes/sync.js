@@ -4,6 +4,8 @@ import db from '../db.js';
 import { randomUUID } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { sendReceiptEmail } from '../services/emailService.js';
+import fs from 'fs';
+import { getServerConfigPath } from '../paths.js';
 const router = Router();
 // const prisma = new PrismaClient();
 // Middleware to authenticate sync requests
@@ -166,6 +168,31 @@ router.get('/', async (req, res) => {
                     bSettings = typeof business.settings === 'string' ? JSON.parse(business.settings) : (business.settings || {});
                 }
                 catch (e) { }
+                let serverConfig = {};
+                try {
+                    const cfgPath = getServerConfigPath();
+                    if (fs.existsSync(cfgPath)) {
+                        serverConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+                    }
+                }
+                catch (e) { }
+                const cloudBaseUrl = (bSettings.backOfficeUrl || serverConfig.backOfficeUrl || process.env.CLOUD_API_URL || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+                const cloudBusinessId = bSettings.cloudBusinessId || serverConfig.cloudBusinessId || business.id;
+                const cloudApiKey = bSettings.backOfficeApiKey || serverConfig.apiKey || serverConfig.cloudToken || business.apiKey;
+                const cloudLocationId = targetOutlet?.locationId || bSettings.cloudLocationId || serverConfig.outletId || locations[0]?.id || null;
+                const cloudOutletId = targetOutletId || bSettings.outletId || serverConfig.outletId || null;
+                // Unique Web Portal URLs for direct offline-first M-Pesa & iTax communication
+                const webportalUrl = cloudBaseUrl;
+                const mpesaPushUrl = `${cloudBaseUrl}/api/mpesa/stkpush`;
+                const mpesaStatusUrl = `${cloudBaseUrl}/api/mpesa/status`;
+                const mpesaSearchUrl = `${cloudBaseUrl}/api/mpesa/payments/search?businessId=${cloudBusinessId}`;
+                const mpesaConsumeUrl = `${cloudBaseUrl}/api/mpesa/payments/consume`;
+                const mpesaQrUrl = `${cloudBaseUrl}/api/mpesa/qrcode`;
+                const itaxInvoiceUrl = `${cloudBaseUrl}/api/kra/invoice`;
+                const itaxPingUrl = `${cloudBaseUrl}/api/kra/ping`;
+                const itaxInitUrl = `${cloudBaseUrl}/api/kra/init-device`;
+                const itaxSyncUrl = `${cloudBaseUrl}/api/kra/sync-queue`;
+                const kraInvoiceUrl = `${cloudBaseUrl}/api/kra/invoice`;
                 const effectivePin = business.kraPin || bSettings.kraPin || bSettings.etimsPin || '';
                 const till = mpesaConfig?.tillNumber || bSettings.mpesaTill || bSettings.tillNumber || '';
                 const paybill = mpesaConfig?.paybillNumber || bSettings.mpesaPaybill || bSettings.paybillNumber || '';
@@ -174,6 +201,26 @@ router.get('/', async (req, res) => {
                     ...bSettings,
                     id: business.id,
                     businessId: business.id,
+                    cloudBusinessId,
+                    cloudLocationId,
+                    cloudOutletId,
+                    cloudApiKey,
+                    backOfficeUrl: cloudBaseUrl,
+                    cloudUrl: cloudBaseUrl,
+                    webportalUrl,
+                    // M-Pesa Web Portal URLs
+                    mpesaPushUrl,
+                    mpesaStatusUrl,
+                    mpesaSearchUrl,
+                    mpesaConsumeUrl,
+                    mpesaQrUrl,
+                    // iTax / KRA Web Portal URLs
+                    itaxInvoiceUrl,
+                    itaxPingUrl,
+                    itaxInitUrl,
+                    itaxSyncUrl,
+                    kraInvoiceUrl,
+                    kraPingUrl: itaxPingUrl,
                     businessName: business.name || bSettings.businessName,
                     phone: bSettings.phone || business.phone || '',
                     email: bSettings.email || business.email || '',
@@ -209,6 +256,8 @@ router.get('/', async (req, res) => {
                     locations,
                     mpesaConfig: mpesaConfig ? {
                         enabled: !!(mpesaConfig.stkEnabled || mpesaConfig.c2bEnabled),
+                        backendUrl: cloudBaseUrl,
+                        apiKey: cloudApiKey,
                         type: mpesaConfig.merchantType === 'PAYBILL' ? 'Paybill' : 'Till',
                         partyB: mpesaConfig.merchantType === 'PAYBILL' ? mpesaConfig.paybillNumber : mpesaConfig.tillNumber,
                         shortcode: mpesaConfig.shortcode,
@@ -216,7 +265,12 @@ router.get('/', async (req, res) => {
                         consumerSecret: mpesaConfig.consumerSecret,
                         passkey: mpesaConfig.passkey,
                         environment: mpesaConfig.environment || 'sandbox'
-                    } : undefined,
+                    } : {
+                        enabled: true,
+                        backendUrl: cloudBaseUrl,
+                        apiKey: cloudApiKey,
+                        environment: 'sandbox'
+                    },
                     updatedAt: new Date().toISOString(),
                     createdAt: business.createdAt || new Date().toISOString()
                 };

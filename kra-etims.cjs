@@ -221,6 +221,12 @@ class KRAETimsService {
             endpointsToTry.push(`${normalizedUrl}/saveTrnsSalesOsdc`);
         }
 
+        // Support direct Web Portal iTax proxy endpoint
+        const webportalInvoiceUrl = settings.itaxInvoiceUrl || settings.kraInvoiceUrl || (settings.backOfficeUrl ? `${settings.backOfficeUrl.replace(/\/+$/, '')}/api/kra/invoice` : null);
+        if (webportalInvoiceUrl && !endpointsToTry.includes(webportalInvoiceUrl)) {
+            endpointsToTry.push(webportalInvoiceUrl);
+        }
+
         let result = null;
         let lastError = null;
 
@@ -228,15 +234,22 @@ class KRAETimsService {
             for (const targetUrl of endpointsToTry) {
                 try {
                     console.log(`[KRA] Submitting Invoice ${payload.invcNo} to ${targetUrl}...`);
+                    const headers = {
+                        'Content-Type': 'application/json',
+                        'tin': kraPin,
+                        'bhfId': branchId,
+                        'cmcKey': kraToken
+                    };
+                    if (targetUrl.includes('/api/kra')) {
+                        const token = settings.backOfficeApiKey || settings.apiKey || kraToken;
+                        if (token) headers['Authorization'] = `Bearer ${token}`;
+                        headers['x-business-id'] = settings.cloudBusinessId || settings.businessId || '';
+                    }
+
                     const response = await fetch(targetUrl, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'tin': kraPin,
-                            'bhfId': branchId,
-                            'cmcKey': kraToken
-                        },
-                        body: JSON.stringify(payload),
+                        headers,
+                        body: JSON.stringify({ ...payload, ...transaction }),
                         signal: AbortSignal.timeout(7000)
                     });
 
@@ -252,7 +265,7 @@ class KRAETimsService {
                         throw new Error(`KRA server (${targetUrl}) returned HTTP ${response.status} non-JSON: ${responseText.slice(0, 150)}`);
                     }
 
-                    if (result && (result.resultCd === '000' || result.resultCd === 0)) {
+                    if (result && (result.success || result.resultCd === '000' || result.resultCd === 0)) {
                         break;
                     } else if (result && result.resultCd) {
                         // KRA returned specific error code
@@ -267,8 +280,19 @@ class KRAETimsService {
                 }
             }
 
-            if (result && (result.resultCd === '000' || result.resultCd === 0)) {
-                console.log(`[KRA] Invoice ${payload.invcNo} confirmed by KRA:`, JSON.stringify(result));
+            if (result && (result.success || result.resultCd === '000' || result.resultCd === 0)) {
+                console.log(`[KRA] Invoice ${payload.invcNo} confirmed:`, JSON.stringify(result));
+                if (result.kraInvoiceNo) {
+                    return {
+                        success: true,
+                        offline: false,
+                        kraInvoiceNo: result.kraInvoiceNo,
+                        qrCode: result.qrCode || `${qrBase}${encodeURIComponent(result.signature || payload.invcNo)}`,
+                        signature: result.signature || result.controlCode || '',
+                        scuInvcNo: result.scuInvcNo || `SCU${Date.now().toString().slice(-6)}`,
+                        scuReceipt: result.scuReceipt || result
+                    };
+                }
                 const qrData = result.data?.intrlData || result.data?.rcptNo || payload.invcNo;
                 return {
                     success: true,
