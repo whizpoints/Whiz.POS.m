@@ -317,7 +317,7 @@ router.post('/', async (req: any, res: any) => {
                 }
               });
             } else {
-              await prisma.product.create({
+              const newProd = await prisma.product.create({
                 data: {
                   businessId, sku: String(sku), barcode: p.barcode ? String(p.barcode) : null,
                   name: String(p.name), category: p.category ? String(p.category) : null,
@@ -325,6 +325,19 @@ router.post('/', async (req: any, res: any) => {
                   updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date()
                 }
               });
+
+              if (targetLocationId && (p.stock !== undefined || p.initialStock !== undefined)) {
+                await prisma.productInventory.create({
+                  data: {
+                    productId: newProd.id,
+                    locationId: targetLocationId,
+                    outletId: targetScopeId ? null : (targetOutletId || null),
+                    scopeId: targetScopeId || null,
+                    stock: Number(p.stock ?? p.initialStock ?? 0),
+                    reorderLevel: Number(p.minStockLevel || 5)
+                  }
+                }).catch(() => {});
+              }
             }
             results.products++;
         } else {
@@ -340,7 +353,23 @@ router.post('/', async (req: any, res: any) => {
     if (incomingMovements.length > 0) {
       for (const log of incomingMovements) {
         if (!log.productId) continue;
-        
+
+        const movementType = String(log.type || log.reason || 'SALE').toUpperCase();
+        const isDeduction = ['SALE', 'TRANSFER_OUT', 'ADJUSTMENT_DOWN', 'SUBTRACT', 'OUT'].includes(movementType);
+        const isAddition = ['TRANSFER_IN', 'PO', 'INITIAL', 'RETURN', 'ADJUSTMENT_UP', 'ADD', 'IN'].includes(movementType);
+
+        let rawQty = Number(log.variance !== undefined ? log.variance : log.quantity);
+        if (isNaN(rawQty)) rawQty = 0;
+
+        let delta = 0;
+        if (isDeduction) {
+          delta = -Math.abs(rawQty);
+        } else if (isAddition) {
+          delta = Math.abs(rawQty);
+        } else {
+          delta = rawQty;
+        }
+
         const existing = await prisma.stockMovement.findFirst({ where: { businessId, id: String(log.id) } });
         if (!existing) {
           const productMatch = await prisma.product.findFirst({ 
@@ -360,8 +389,8 @@ router.post('/', async (req: any, res: any) => {
               outletId: targetOutletId || log.outletId || null,
               serverId: log.serverId || req.user.serverId || null,
               terminalId: log.terminalId || null,
-              type: log.type || log.reason || 'SALE',
-              quantity: Math.abs(Number(log.variance) || 0),
+              type: movementType,
+              quantity: Math.abs(rawQty),
               reference: String(log.reference || log.id),
               timestamp: new Date(log.timestamp || Date.now())
             }
@@ -398,7 +427,7 @@ router.post('/', async (req: any, res: any) => {
             await prisma.productInventory.update({
               where: { id: inventoryToUpdate.id },
               data: { 
-                stock: { increment: Number(log.variance || 0) },
+                stock: { increment: delta },
                 updatedAt: new Date()
               }
             });

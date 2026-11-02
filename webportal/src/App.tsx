@@ -28,6 +28,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage';
 import VerifyDocument from './pages/VerifyDocument';
 import ConnectServer from './pages/ConnectServer';
 import { BranchProvider, useBranchContext, clearBranchCache } from './context/BranchContext';
+import { resetPosStore } from './store/posStore';
 
 import Customers from './pages/Customers';
 import Sales from './pages/Sales';
@@ -153,6 +154,8 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
       localStorage.removeItem('whiz-token');
       localStorage.removeItem('whiz-user');
       localStorage.removeItem('whiz-business');
+      localStorage.removeItem('pos-store');
+      resetPosStore();
       return <Navigate to="/auth" replace />;
     }
   } catch (e) {
@@ -405,6 +408,8 @@ function DashboardLayout({ children }: { children: ReactNode }) {
     localStorage.removeItem('whiz-token');
     localStorage.removeItem('whiz-user');
     localStorage.removeItem('whiz-business');
+    localStorage.removeItem('pos-store');
+    resetPosStore();
     navigate('/auth');
   };
 

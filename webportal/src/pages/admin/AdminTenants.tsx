@@ -1,3 +1,4 @@
+import { resetPosStore } from '../../store/posStore';
 import { useState, useEffect } from 'react';
 import { Search, Eye, PowerOff, Building2, Play, AlertTriangle, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -71,6 +72,8 @@ export default function AdminTenants() {
       });
       const data = await res.json();
       if (res.ok) {
+        localStorage.removeItem('pos-store');
+        resetPosStore();
         localStorage.setItem('whiz-token', data.token);
         localStorage.setItem('whiz-user', JSON.stringify(data.user));
         toast.success(`Ghost Mode Activated: ${businessName}`, { icon: '👻' });

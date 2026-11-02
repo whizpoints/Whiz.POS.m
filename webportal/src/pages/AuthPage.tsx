@@ -1,3 +1,4 @@
+import { resetPosStore } from '../store/posStore';
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Mail, Lock, Building2, ArrowRight, Eye, EyeOff, LogOut, CheckCircle2, ShieldCheck, Activity, CreditCard, PieChart, AlertTriangle } from 'lucide-react';
@@ -54,7 +55,9 @@ export default function AuthPage() {
     const userStr = params.get('user');
       if (token && userStr) {
         try {
-          localStorage.setItem('whiz-token', token);
+          localStorage.removeItem('pos-store');
+        resetPosStore();
+        localStorage.setItem('whiz-token', token);
           localStorage.setItem('whiz-user', userStr);
           toast.success('Successfully logged in!');
           const parsed = JSON.parse(userStr);
@@ -91,6 +94,8 @@ export default function AuthPage() {
       if (event.data?.type === 'OAUTH_SUCCESS') {
         const { token, user } = event.data;
         
+        localStorage.removeItem('pos-store');
+        resetPosStore();
         localStorage.setItem('whiz-token', token);
         localStorage.setItem('whiz-user', JSON.stringify(user));
         
@@ -124,6 +129,8 @@ export default function AuthPage() {
       const data = await res.json();
 
       if (res.ok) {
+        localStorage.removeItem('pos-store');
+        resetPosStore();
         localStorage.setItem('whiz-token', data.token);
         localStorage.setItem('whiz-user', JSON.stringify(data.user));
         toast.success(isLogin ? 'Successfully logged in!' : 'Workspace created successfully!', { icon: '👏' });

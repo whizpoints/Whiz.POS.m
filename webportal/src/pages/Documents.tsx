@@ -117,23 +117,33 @@ export default function InvoiceGenerator() {
   useEffect(() => {
     if (businessSetup) {
       if (!paymentInfo && !documentSettings) {
-         setPaymentInfo(`Bank: Example Bank\nAcc: 123456789\nM-Pesa Till: ${businessSetup.phone}`);
+         const defaultBizPayment = businessSetup.settings?.mpesaTill
+           ? `M-PESA TILL: ${businessSetup.settings.mpesaTill}\nBUSINESS: ${businessSetup.name}`
+           : (businessSetup.phone ? `M-PESA: ${businessSetup.phone}\nBUSINESS: ${businessSetup.name}` : '');
+         setPaymentInfo(defaultBizPayment);
       }
     }
   }, [businessSetup, paymentInfo, documentSettings]);
 
   useEffect(() => {
     if (documentSettings && !currentDocId) {
-      setLogoImage(businessSetup?.documentLogoUrl || documentSettings.logoImage || null);
+      setLogoImage(businessSetup?.documentLogoUrl || documentSettings.logoImage || businessSetup?.logoUrl || null);
       setHeaderImage(documentSettings.headerImage || null);
       setUseCustomHeader(documentSettings.useCustomHeader || false);
-      setShowWatermark(documentSettings.showWatermark ?? true);
+      setShowWatermark(documentSettings.showWatermark ?? false);
       setBackgroundImage(businessSetup?.watermarkUrl || documentSettings.backgroundImage || null);
       
       setNotes(documentSettings.defaultNotes || "This is a computer generated document and doesn't need a stamp or signature for receiving.");
       setPaymentInfo(documentSettings.defaultPaymentInfo || '');
     } else if (!documentSettings && !currentDocId) {
+      setLogoImage(businessSetup?.documentLogoUrl || businessSetup?.logoUrl || null);
+      setBackgroundImage(businessSetup?.watermarkUrl || null);
+      setShowWatermark(false);
       setNotes("This is a computer generated document and doesn't need a stamp or signature for receiving.");
+      const defaultBizPayment = businessSetup?.settings?.mpesaTill
+        ? `M-PESA TILL: ${businessSetup.settings.mpesaTill}\nBUSINESS: ${businessSetup.name}`
+        : (businessSetup?.phone ? `M-PESA: ${businessSetup.phone}\nBUSINESS: ${businessSetup.name}` : '');
+      setPaymentInfo(defaultBizPayment);
     }
   }, [documentSettings, currentDocId, docType, businessSetup]);
 
@@ -184,6 +194,23 @@ export default function InvoiceGenerator() {
            usePosStore.setState({ businessSetup: profile });
            if (profile.settings?.documentDefaults) {
              usePosStore.setState({ documentSettings: profile.settings.documentDefaults });
+           } else {
+             // CRITICAL FIX: Reset documentSettings to clean, tenant-isolated defaults
+             const defaultBizPayment = profile.settings?.mpesaTill
+               ? `M-PESA TILL: ${profile.settings.mpesaTill}\nBUSINESS: ${profile.name}`
+               : (profile.phone ? `M-PESA: ${profile.phone}\nBUSINESS: ${profile.name}` : '');
+
+             usePosStore.setState({
+               documentSettings: {
+                 taxRate: 16,
+                 defaultNotes: "This is a computer generated document and doesn't need a stamp or signature for receiving.",
+                 currency: profile.settings?.currency || 'KES',
+                 logoImage: profile.documentLogoUrl || profile.logoUrl || null,
+                 backgroundImage: profile.watermarkUrl || null,
+                 showWatermark: false,
+                 defaultPaymentInfo: defaultBizPayment
+               }
+             });
            }
         }
       } catch (err) {}
@@ -707,10 +734,17 @@ export default function InvoiceGenerator() {
                  <button
                    onClick={() => {
                      setTempSettings({
-                         ...(documentSettings || {}),
-                         logoImage: businessSetup?.documentLogoUrl || documentSettings?.logoImage || null,
-                         backgroundImage: businessSetup?.watermarkUrl || documentSettings?.backgroundImage || null
-                     });
+                          taxRate: 16,
+                          defaultNotes: "This is a computer generated document and doesn't need a stamp or signature for receiving.",
+                          currency: businessSetup?.settings?.currency || 'KES',
+                          showWatermark: false,
+                          defaultPaymentInfo: businessSetup?.settings?.mpesaTill
+                            ? `M-PESA TILL: ${businessSetup.settings.mpesaTill}\nBUSINESS: ${businessSetup.name}`
+                            : (businessSetup?.phone ? `M-PESA: ${businessSetup.phone}\nBUSINESS: ${businessSetup?.name}` : ''),
+                          ...(documentSettings || {}),
+                          logoImage: businessSetup?.documentLogoUrl || documentSettings?.logoImage || businessSetup?.logoUrl || null,
+                          backgroundImage: businessSetup?.watermarkUrl || documentSettings?.backgroundImage || null
+                      });
                      setShowSettingsModal(true);
                    }}
                    className="text-xs text-sky-600 hover:text-sky-700 font-medium"
