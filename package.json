@@ -103,6 +103,8 @@
       "print-jobs.cjs",
       "sqlite-db.cjs",
       "kra-etims.cjs",
+      "backup-crypto.cjs",
+      "mpesa-daraja.cjs",
       "receipt-template.html",
       "closing-report-template.html",
       "startup-invoice-template.html"
