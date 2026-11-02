@@ -1,3 +1,5 @@
+process.on('unhandledRejection', (err) => console.error('[Process] Unhandled Rejection:', err));
+process.on('uncaughtException', (err) => console.error('[Process] Uncaught Exception:', err));
 import crypto from 'crypto';
 // @ts-nocheck
 import 'dotenv/config';
@@ -36,7 +38,8 @@ import ledgerRoutes from './routes/ledger.js';
 import setupRoutes from './routes/setup.js';
 import documentsRoutes from './routes/documents.js';
 import staffRoutes from './routes/staff.js';
-import backupRoutes from './routes/backup.js';
+import backupRoutes, { executeLocalServerBackup } from './routes/backup.js';
+import kraRoutes from './routes/kra.js';
 
 import { wafMiddleware } from './middleware/waf.js';
 
@@ -56,6 +59,12 @@ const io = new SocketIOServer(server, {
 io.on('connection', (socket) => {
   console.log('[Local Socket] POS Client connected:', socket.id);
   
+  socket.on('join_business', (businessId) => {
+    console.log(`[Local Socket] POS Client ${socket.id} joined room: business_${businessId}`);
+    socket.join(`business_${businessId}`);
+    socket.join(businessId);
+  });
+
   socket.on('stock_deducted', (data) => {
     // Broadcast stock updates to other local POS terminals
     socket.broadcast.emit('stock_updated', data);
@@ -95,6 +104,38 @@ try {
     io.emit('cloud_sync_received', data);
   });
 
+  cloudSocket.on('mpesa_payment_received', async (data) => {
+    console.log('[Cloud Socket] Received M-Pesa payment event:', data);
+    try {
+      if (data && data.transactionId) {
+        const existing = await db.selectFrom('MpesaTransaction')
+          .selectAll()
+          .where('transactionId', '=', data.transactionId)
+          .executeTakeFirst();
+        if (!existing) {
+          await db.insertInto('MpesaTransaction').values({
+            id: data.id || crypto.randomUUID(),
+            businessId: data.businessId,
+            locationId: data.locationId || null,
+            outletId: data.outletId || null,
+            transactionId: data.transactionId,
+            amount: Number(data.amount) || 0,
+            phoneNumber: String(data.phoneNumber || ''),
+            customerName: data.customerName || null,
+            status: 'UNLINKED',
+            isEnriched: data.isEnriched ? 1 : 0,
+            timestamp: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }).execute();
+        }
+      }
+    } catch (err) {
+      console.error('[Cloud Socket] Failed to record M-Pesa transaction locally:', err);
+    }
+    // Broadcast immediately to local POS terminals
+    io.emit('mpesa_payment_received', data);
+  });
+
   cloudSocket.on('disconnect', () => {
     console.log('[Cloud Socket] Disconnected from Cloud Server');
   });
@@ -106,8 +147,28 @@ const PORT = process.env.PORT || 5050;
 
 // Enable CORS for all origins dynamically (needed for Electron desktop POS clients with credentials)
 app.use(cors({
-  origin: '*',
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'X-API-KEY']
+  origin: (origin, callback) => callback(null, true),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-api-key',
+    'X-API-KEY',
+    'x-outlet-id',
+    'X-Outlet-Id',
+    'x-business-id',
+    'X-Business-Id',
+    'x-terminal-id',
+    'X-Terminal-Id',
+    'x-location-id',
+    'X-Location-Id',
+    'x-device-id',
+    'X-Device-Id',
+    'Accept',
+    'Origin',
+    'X-Requested-With'
+  ]
 }));
 
 app.use(express.json({ limit: '50mb' }));
@@ -149,6 +210,7 @@ app.use('/api/documents', documentsRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/users', staffRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/kra', kraRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -222,13 +284,15 @@ setInterval(async () => {
       
       const pushSinceStr = lastPushLog ? new Date(lastPushLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
       
-      const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements, rawReceipts] = await Promise.all([
+      const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements, rawReceipts, localOutlets, localTerminals] = await Promise.all([
          db.selectFrom('User').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
          db.selectFrom('Product').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
          db.selectFrom('Customer').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
          db.selectFrom('Supplier').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
          db.selectFrom('StockMovement').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
          db.selectFrom('Receipt').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+          db.selectFrom('Outlet').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+          db.selectFrom('Terminal').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
       ]);
 
       const localTransactions = [];
@@ -256,6 +320,8 @@ setInterval(async () => {
                   customers: localCustomers,
                   suppliers: localSuppliers,
                   transactions: localTransactions,
+                  outlets: localOutlets,
+                  terminals: localTerminals,
                   inventoryLogs: localStockMovements.map(sm => ({ ...sm, variance: sm.quantity })), // Map local quantity to cloud variance
                   businessSetup
               })
@@ -337,7 +403,28 @@ setInterval(async () => {
   } catch (err) {
     // console.error('[Sync Engine] Background sync failed:', err.message);
   }
-}, 5000); // Run every 5 seconds // Run every 60 seconds
+}, 15000); // Run every 15 seconds
+
+// -----------------------------------------
+// Automated High-Frequency Encrypted Backup Daemon
+// -----------------------------------------
+const BACKUP_INTERVAL_MS = 15 * 60 * 1000; // Run every 15 minutes
+setTimeout(async () => {
+  try {
+    console.log('[Backup Daemon] Running initial server startup backup...');
+    await executeLocalServerBackup();
+  } catch (e: any) {
+    console.warn('[Backup Daemon] Initial startup backup skipped:', e.message);
+  }
+}, 10000); // 10 seconds after boot
+
+setInterval(async () => {
+  try {
+    await executeLocalServerBackup();
+  } catch (e: any) {
+    console.error('[Backup Daemon] Automated 15-minute backup failed:', e.message);
+  }
+}, BACKUP_INTERVAL_MS);
 
 server.listen(Number(PORT), '0.0.0.0', () => {
   if (Number(PORT) === 3000) {

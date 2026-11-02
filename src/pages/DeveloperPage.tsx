@@ -68,11 +68,23 @@ const DeveloperPage = () => {
 
     // Hardware State
     const [isScanning, setIsScanning] = useState(false);
+    const [autoDeleteOldBackups, setAutoDeleteOldBackups] = useState(true);
+    const [backupRetentionDays, setBackupRetentionDays] = useState(7);
+    const [backupDir, setBackupDir] = useState('');
     const [discoveredDevices, setDiscoveredDevices] = useState<any[]>([]);
 
     useEffect(() => {
         if (isAuthenticated) {
             loadConfig();
+        if (window.electron && window.electron.getBackupSettings) {
+            window.electron.getBackupSettings().then(cfg => {
+                if (cfg) {
+                    setAutoDeleteOldBackups(cfg.autoDeleteOldBackups !== false);
+                    setBackupRetentionDays(cfg.backupRetentionDays || 7);
+                    setBackupDir(cfg.backupDir || '');
+                }
+            }).catch(() => {});
+        }
         }
     }, [isAuthenticated, businessSetup]);
 
@@ -159,7 +171,7 @@ const DeveloperPage = () => {
                 const configData = await window.electron.readData('business-setup.json');
                 config = typeof configData === 'string' ? JSON.parse(configData || '{}') : (configData || {});
             }
-            const fallback = businessSetup || {};
+            const fallback: any = businessSetup || {};
 
             setBackOfficeUrl(config.backOfficeUrl || config.apiUrl || fallback.backOfficeUrl || fallback.apiUrl || '');
             setBackOfficeApiKey(config.backOfficeApiKey || config.apiKey || fallback.backOfficeApiKey || fallback.apiKey || '');
@@ -341,6 +353,18 @@ const DeveloperPage = () => {
         }
     };
 
+    const handleToggleAutoDelete = async (enabled: boolean) => {
+        setAutoDeleteOldBackups(enabled);
+        if (window.electron && window.electron.saveBackupSettings) {
+            try {
+                await window.electron.saveBackupSettings({ autoDeleteOldBackups: enabled });
+                setSuccessMsg(enabled ? 'Auto-delete enabled: Backups older than 7 days will be pruned.' : 'Auto-delete disabled: All historical backups will be preserved permanently.');
+            } catch (e: any) {
+                setError(e.message);
+            }
+        }
+    };
+
     const handleBackup = async () => {
         if (!window.electron) {
             setError('Backup is only supported in Desktop mode');
@@ -353,7 +377,7 @@ const DeveloperPage = () => {
                 setSuccessMsg(`Backup saved to ${result.filePath}`);
             } else {
                 if (result.error !== 'User cancelled backup') {
-                    setError(result.error);
+                    setError(result.error || 'Backup failed');
                 }
             }
         } catch (e: any) {
@@ -383,7 +407,7 @@ const DeveloperPage = () => {
                 }, 2000);
             } else {
                 if (result.error !== 'User cancelled restore') {
-                    setError(result.error);
+                    setError(result.error || 'Restore failed');
                 }
             }
         } catch (e: any) {
@@ -1025,11 +1049,11 @@ const DeveloperPage = () => {
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                                 <div className="bg-gray-50 p-4 border-b border-gray-100 flex items-center gap-3">
                                     <HardDrive className="w-5 h-5 text-orange-600" />
-                                    <h2 className="text-lg font-bold text-gray-800">Local Snapshot Backup</h2>
+                                    <h2 className="text-lg font-bold text-gray-800">Encrypted High-Frequency POS Backup (.whizbak)</h2>
                                 </div>
                                 <div className="p-6">
                                     <p className="text-sm text-gray-500 mb-6">
-                                        Create a zip archive of all current local POS data (`business-setup.json`, `products.json`, etc.) or restore from a previous archive.
+                                        Create a tamper-proof, AES-256-GCM encrypted backup of all local POS data (products, sales, KRA eTIMS keys, and web portal API tokens) or restore from an existing <code className="text-blue-600 font-mono">.whizbak</code> file. Automated backups run silently every 15 minutes.
                                     </p>
                                     <div className="flex flex-wrap gap-4">
                                         <button
@@ -1045,8 +1069,32 @@ const DeveloperPage = () => {
                                             className="px-6 py-3 bg-gray-900 text-white hover:bg-black rounded-lg font-bold transition-colors flex items-center gap-2"
                                         >
                                             <HardDrive className="w-5 h-5" />
-                                            Restore Archive
+                                            Restore Encrypted Backup (.whizbak)
                                         </button>
+                                    </div>
+
+                                    {/* Retention Settings & Directory Info */}
+                                    <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
+                                        <div className="flex items-start gap-3">
+                                            <input
+                                                type="checkbox"
+                                                id="autoDeleteToggle"
+                                                checked={autoDeleteOldBackups}
+                                                onChange={(e) => handleToggleAutoDelete(e.target.checked)}
+                                                className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                            <label htmlFor="autoDeleteToggle" className="text-sm text-gray-700 cursor-pointer">
+                                                <span className="font-bold block text-gray-900">Auto-delete backups older than {backupRetentionDays} days</span>
+                                                <span className="text-gray-500 text-xs block mt-0.5">
+                                                    When enabled, the automated 15-minute daemon deletes backups older than 7 days to conserve disk space. Uncheck this if you have ample disk space and want to preserve all backups permanently.
+                                                </span>
+                                            </label>
+                                        </div>
+
+                                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs font-mono text-gray-600 flex items-center gap-2">
+                                            <span className="font-bold text-gray-700">Vault Storage:</span>
+                                            <span>{backupDir || 'C:\\ProgramData\\whiz-pos\\Backups\\POS'}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

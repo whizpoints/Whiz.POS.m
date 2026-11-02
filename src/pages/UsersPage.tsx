@@ -215,7 +215,7 @@ export default function UsersPage() {
                 <Switch 
                   id="isActive" 
                   checked={currentUser.isActive !== false}
-                  onCheckedChange={(checked) => setCurrentUser({...currentUser, isActive: checked})}
+                  onChange={(checked: boolean) => setCurrentUser({...currentUser, isActive: checked})}
                 />
                 <label htmlFor="isActiveCheck" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   Active Account

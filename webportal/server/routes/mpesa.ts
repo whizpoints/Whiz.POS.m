@@ -218,6 +218,33 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
       const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
       if (config) {
         const hasInitiator = !!(config.initiatorName && config.initiatorPassword);
+        
+        // Attempt to resolve customer name from known customers or previous transactions
+        let resolvedName = 'M-Pesa Customer';
+        try {
+          const phoneSuffix = String(phone).slice(-9);
+          const knownCustomer = await prisma.customer.findFirst({
+            where: {
+              businessId,
+              phone: { contains: phoneSuffix }
+            }
+          });
+          if (knownCustomer && knownCustomer.name) {
+            resolvedName = knownCustomer.name;
+          } else {
+            const pastTxn = await prisma.mpesaTransaction.findFirst({
+              where: {
+                businessId,
+                phoneNumber: { contains: phoneSuffix },
+                customerName: { not: null }
+              }
+            });
+            if (pastTxn && pastTxn.customerName && pastTxn.customerName !== 'Customer' && pastTxn.customerName !== 'Unknown') {
+              resolvedName = pastTxn.customerName;
+            }
+          }
+        } catch (e) {}
+
         const savedTxn = await prisma.mpesaTransaction.upsert({
           where: { transactionId: receipt },
           create: {
@@ -225,11 +252,15 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
             transactionId: receipt,
             amount: parseFloat(amount),
             phoneNumber: phone.toString(),
+            customerName: resolvedName,
             status: 'UNLINKED',
-            // If no initiator configured, treat as enriched immediately (we have the phone from STK)
+            // If no initiator configured, treat as enriched immediately
             isEnriched: !hasInitiator
           },
-          update: {}
+          update: {
+            customerName: resolvedName !== 'M-Pesa Customer' ? resolvedName : undefined,
+            phoneNumber: phone.toString()
+          }
         });
 
         // Emit real-time Socket.IO event so connected POS terminals are notified immediately
@@ -239,10 +270,11 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
             transactionId: receipt,
             amount: parseFloat(amount),
             phoneNumber: phone.toString(),
+            customerName: resolvedName,
             isEnriched: !hasInitiator,
             businessId
           });
-          console.log(`[M-Pesa Webhook] Socket.IO event emitted to business_${businessId}`);
+          console.log(`[M-Pesa Webhook] Socket.IO event emitted to business_${businessId} for ${resolvedName}`);
         }
 
         // Fetch Customer Name using Transaction Status API
@@ -267,13 +299,50 @@ router.post('/callback/c2b/validation/:businessId', async (req: any, res: any) =
   console.log(`[M-Pesa Webhook] C2B Validation received for business ${req.params.businessId}:`, JSON.stringify(req.body, null, 2));
   try {
     const { businessId } = req.params;
-    const { BusinessShortCode } = req.body;
+    const {
+      TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode
+    } = req.body;
     
     const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
     if (!config || config.shortcode !== BusinessShortCode) {
       return res.json({ "ResultCode": 1, "ResultDesc": "Rejected: Invalid ShortCode mapping" });
     }
     
+    const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || 'M-Pesa Customer';
+
+    if (TransID && TransAmount) {
+      await prisma.mpesaTransaction.upsert({
+        where: { transactionId: TransID },
+        create: {
+          businessId,
+          transactionId: TransID,
+          amount: parseFloat(TransAmount),
+          phoneNumber: MSISDN || '',
+          customerName,
+          status: 'UNLINKED',
+          isEnriched: true
+        },
+        update: {
+          customerName,
+          phoneNumber: MSISDN || undefined,
+          amount: parseFloat(TransAmount) || undefined
+        }
+      });
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`business_${businessId}`).emit('mpesa_payment_received', {
+          transactionId: TransID,
+          amount: parseFloat(TransAmount),
+          phoneNumber: MSISDN || '',
+          customerName,
+          isEnriched: true,
+          businessId
+        });
+        console.log(`[M-Pesa Webhook] C2B Validation emitted to business_${businessId}: ${TransID} for ${customerName}`);
+      }
+    }
+
     res.json({ "ResultCode": 0, "ResultDesc": "Accepted" });
   } catch (err) {
     res.json({ "ResultCode": 1, "ResultDesc": "Error" });
@@ -294,7 +363,7 @@ router.post('/callback/c2b/confirmation/:businessId', async (req: any, res: any)
       return res.json({ "ResultCode": 1, "ResultDesc": "Rejected" });
     }
 
-    const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ');
+    const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || 'M-Pesa Customer';
     
     await prisma.mpesaTransaction.upsert({
       where: { transactionId: TransID },
@@ -305,12 +374,29 @@ router.post('/callback/c2b/confirmation/:businessId', async (req: any, res: any)
         phoneNumber: MSISDN,
         customerName,
         status: 'UNLINKED',
-        isEnriched: !(config.initiatorName && config.initiatorPassword)
+        isEnriched: true
       },
-      update: {}
+      update: {
+        customerName,
+        phoneNumber: MSISDN,
+        amount: parseFloat(TransAmount)
+      }
     });
 
-    // Trigger Transaction Status Background Job
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`business_${businessId}`).emit('mpesa_payment_received', {
+        transactionId: TransID,
+        amount: parseFloat(TransAmount),
+        phoneNumber: MSISDN,
+        customerName,
+        isEnriched: true,
+        businessId
+      });
+      console.log(`[M-Pesa Webhook] C2B Confirmation emitted to business_${businessId}: ${TransID} for ${customerName}`);
+    }
+
+    // Trigger Transaction Status Background Job if needed for additional metadata
     if (config.initiatorName && config.initiatorPassword) {
       triggerTransactionStatus(config, TransID, businessId);
     }
@@ -470,17 +556,40 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
 router.post('/payments/consume', async (req: any, res: any) => {
   try {
     const { transactionId, businessId } = req.body;
-    if (!transactionId || !businessId) return res.status(400).json({ error: 'Missing parameters' });
+    if (!transactionId) return res.status(400).json({ error: 'Missing parameters' });
     
-    const result = await prisma.mpesaTransaction.updateMany({
-      where: { transactionId, businessId, status: 'UNLINKED' },
+    const cleanTxnId = String(transactionId).trim();
+    
+    // 1. Try to find the transaction for this business
+    let txn = await prisma.mpesaTransaction.findFirst({
+      where: {
+        transactionId: cleanTxnId,
+        ...(businessId ? { businessId } : {})
+      }
+    });
+
+    // Fallback: If not matched with businessId, find by transactionId alone
+    if (!txn) {
+      txn = await prisma.mpesaTransaction.findFirst({
+        where: { transactionId: cleanTxnId }
+      });
+    }
+
+    if (!txn) {
+      return res.status(404).json({ error: 'Transaction not found.' });
+    }
+
+    // Idempotent: If already LINKED, acknowledge success so cashier checkout is never blocked
+    if (txn.status === 'LINKED') {
+      return res.json({ success: true, alreadyConsumed: true, message: 'Transaction already claimed.' });
+    }
+
+    await prisma.mpesaTransaction.update({
+      where: { id: txn.id },
       data: { status: 'LINKED' }
     });
 
-    if (result.count === 0) {
-      return res.status(409).json({ error: 'Transaction already claimed or not found.' });
-    }
-    res.json({ success: true });
+    res.json({ success: true, message: 'Payment claimed successfully.' });
   } catch (err) {
     console.error('Consume error:', err);
     res.status(500).json({ error: 'Internal server error' });

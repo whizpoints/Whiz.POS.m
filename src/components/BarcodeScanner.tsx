@@ -79,8 +79,9 @@ export default function BarcodeScanner() {
     addToScanHistory(code);
 
     const product = products.find(p => 
-      p.id === code ||
-      (p.productId && p.productId === code) ||
+      String(p.id) === code ||
+      ((p as any).barcode && (p as any).barcode === code) ||
+      ((p as any).productId && (p as any).productId === code) ||
       (p.name || '').toLowerCase().includes(code.toLowerCase()) // Fallback for simulation
     );
 
@@ -109,7 +110,7 @@ export default function BarcodeScanner() {
     // Simulate barcode scanning with random product codes or just pick a random product
     const randomProduct = products[Math.floor(Math.random() * products.length)];
     if (randomProduct) {
-        processScan(randomProduct.id);
+        processScan(String(randomProduct.id));
     } else {
         // Fallback if no products
         const mockCode = '123456789';
@@ -119,7 +120,7 @@ export default function BarcodeScanner() {
 
   const handleManualSearch = () => {
     // Exact match first
-    const exactMatch = products.find(p => p.id === searchTerm || p.productId === searchTerm);
+    const exactMatch = products.find(p => String(p.id) === searchTerm || ((p as any).productId && (p as any).productId === searchTerm) || ((p as any).barcode && (p as any).barcode === searchTerm));
     if (exactMatch) {
         handleProductFound(exactMatch);
         setSearchTerm('');
@@ -369,7 +370,7 @@ export default function BarcodeScanner() {
                         </div>
                          <div>
                             <span className="text-xs text-gray-500 uppercase tracking-wider block">Code</span>
-                            <span className="font-medium text-gray-900 font-mono">{checkedProduct.productId || checkedProduct.id}</span>
+                            <span className="font-medium text-gray-900 font-mono">{(checkedProduct as any).productId || (checkedProduct as any).barcode || checkedProduct.id}</span>
                         </div>
                     </div>
 

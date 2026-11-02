@@ -8,39 +8,48 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 // Middleware to authenticate sync requests
 const authenticate = async (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
-  const apiKey = req.headers['x-api-key'];
+  const rawKey = req.headers['x-api-key'] || (authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : null);
 
-    if (apiKey) {
-      const server = await prisma.server.findFirst({ where: { apiKey } });
-      if (server) {
-        req.user = { businessId: server.businessId, serverId: server.id };
-        return next();
-      }
-      
-      const business = await prisma.business.findFirst({ where: { apiKey } });
-      if (business) {
-        req.user = { businessId: business.id };
-        return next();
-      }
-      const storeLoc = await prisma.storeLocation.findFirst({ where: { apiKey } });
-      if (storeLoc) {
-        req.user = { businessId: storeLoc.businessId, locationId: storeLoc.id };
-        return next();
-      }
-      return res.status(401).json({ error: 'Invalid API Key' });
-    }
-
-  if (!authHeader) {
+  if (!rawKey) {
     return res.status(401).json({ error: 'Missing authorization header or API key' });
   }
 
-  const token = authHeader.split(' ')[1];
+  // 1. Check if it's an API Key (Server, Terminal, Business, StoreLocation)
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const server = await prisma.server.findFirst({ where: { apiKey: rawKey } });
+    if (server) {
+      req.user = { businessId: server.businessId, serverId: server.id, role: 'SERVER' };
+      return next();
+    }
+
+    const terminal = await prisma.terminal.findFirst({ where: { apiKey: rawKey } });
+    if (terminal) {
+      req.user = { businessId: terminal.businessId, terminalId: terminal.id, outletId: terminal.outletId, role: 'TERMINAL' };
+      return next();
+    }
+
+    const business = await prisma.business.findFirst({ where: { apiKey: rawKey } });
+    if (business) {
+      req.user = { businessId: business.id, role: 'ADMIN' };
+      return next();
+    }
+
+    const storeLoc = await prisma.storeLocation.findFirst({ where: { apiKey: rawKey } });
+    if (storeLoc) {
+      req.user = { businessId: storeLoc.businessId, locationId: storeLoc.id, role: 'LOCATION' };
+      return next();
+    }
+  } catch (dbErr) {
+    console.error('[Auth DB Error]', dbErr);
+  }
+
+  // 2. Check if it's a valid JWT
+  try {
+    const payload: any = jwt.verify(rawKey, JWT_SECRET);
     req.user = payload;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return next();
+  } catch (jwtErr) {
+    return res.status(401).json({ error: 'Invalid or expired token / API key' });
   }
 };
 
@@ -66,6 +75,15 @@ router.get('/', async (req: any, res: any) => {
       if (out && out.scopeId) targetScopeId = out.scopeId;
     }
 
+    const userWhere: any = { businessId, updatedAt: { gt: sinceDate } };
+    if (outletId) {
+      userWhere.OR = [
+        { outletId: String(outletId) },
+        { role: 'ADMIN' },
+        { role: 'MANAGER' }
+      ];
+    }
+
     const [
       users,
       products,
@@ -74,21 +92,33 @@ router.get('/', async (req: any, res: any) => {
       suppliers,
       transactions,
       business,
-      mpesaConfigs
+      mpesaConfigs,
+      stockMovements,
+      outlets
     ] = await Promise.all([
-      prisma.user.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
-      prisma.product.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
+      prisma.user.findMany({ where: userWhere }),
+      prisma.product.findMany({ 
+        where: { 
+          businessId, 
+          updatedAt: { gt: sinceDate },
+          ...(outletId ? {
+            inventory: {
+              some: { outletId: String(outletId) }
+            }
+          } : {})
+        } 
+      }),
       prisma.productInventory.findMany({ 
           where: { 
-              OR: [
-                 ...(targetScopeId ? [{ scopeId: targetScopeId }] : []),
-                 { 
-                    locationId: locationId ? String(locationId) : undefined,
-                    outletId: outletId ? String(outletId) : undefined,
-                 }
-              ],
+              product: { businessId },
               updatedAt: { gt: sinceDate },
-              product: { businessId } // Ensure it belongs to the business
+              ...((locationId || outletId || targetScopeId) ? {
+                OR: [
+                  ...(targetScopeId ? [{ scopeId: targetScopeId }] : []),
+                  ...(locationId ? [{ locationId: String(locationId) }] : []),
+                  ...(outletId ? [{ outletId: String(outletId) }] : [])
+                ]
+              } : {})
           },
           include: { product: true }
       }),
@@ -96,7 +126,9 @@ router.get('/', async (req: any, res: any) => {
       prisma.supplier.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
       prisma.receipt.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
       prisma.business.findUnique({ where: { id: businessId } }),
-      prisma.mpesaConfig.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } })
+      prisma.mpesaConfig.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
+      prisma.stockMovement.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
+      prisma.outlet.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } })
     ]);
 
     res.json({
@@ -106,6 +138,8 @@ router.get('/', async (req: any, res: any) => {
         users,
         products,
         inventory,
+        stockMovements,
+        outlets,
         customers,
         suppliers,
         transactions,
@@ -133,6 +167,9 @@ router.post('/', async (req: any, res: any) => {
       suppliers,
       transactions,
       inventoryLogs,
+      stockMovements,
+      outlets,
+      terminals,
       businessSetup
     } = req.body;
 
@@ -204,6 +241,63 @@ router.post('/', async (req: any, res: any) => {
       }
     }
 
+    // 1.5 Outlets
+    if (outlets && Array.isArray(outlets)) {
+      for (const o of outlets) {
+        if (!o.name) continue;
+        const targetLocId = targetLocationId || o.locationId;
+        const loc = (targetLocId && targetLocId !== 'ALL')
+          ? (await prisma.storeLocation.findFirst({ where: { id: targetLocId, businessId } }) || await prisma.storeLocation.findFirst({ where: { businessId } }))
+          : await prisma.storeLocation.findFirst({ where: { businessId } });
+        if (!loc) continue;
+
+        await prisma.outlet.upsert({
+          where: { id: o.id },
+          create: {
+            id: o.id,
+            businessId,
+            locationId: loc.id,
+            name: o.name,
+            createdAt: o.createdAt ? new Date(o.createdAt) : new Date(),
+            updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date()
+          },
+          update: {
+            name: o.name,
+            locationId: loc.id,
+            updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date()
+          }
+        });
+      }
+    }
+
+    // 1.6 Terminals
+    if (terminals && Array.isArray(terminals)) {
+      for (const term of terminals) {
+        if (!term.name) continue;
+        await prisma.terminal.upsert({
+          where: { id: term.id },
+          create: {
+            id: term.id,
+            businessId,
+            outletId: term.outletId || null,
+            name: term.name,
+            macAddress: term.macAddress || 'LAN-NODE',
+            status: term.status || 'APPROVED',
+            apiKey: term.apiKey || null,
+            createdAt: term.createdAt ? new Date(term.createdAt) : new Date(),
+            updatedAt: term.updatedAt ? new Date(term.updatedAt) : new Date()
+          },
+          update: {
+            name: term.name,
+            status: term.status || 'APPROVED',
+            outletId: term.outletId || null,
+            apiKey: term.apiKey || undefined,
+            updatedAt: term.updatedAt ? new Date(term.updatedAt) : new Date()
+          }
+        });
+      }
+    }
+
     // 2. Products
     if (products && Array.isArray(products)) {
       for (const p of products) {
@@ -239,9 +333,12 @@ router.post('/', async (req: any, res: any) => {
       }
     }
     
-    // 2.5 Inventory Logs
-    if (inventoryLogs && Array.isArray(inventoryLogs)) {
-      for (const log of inventoryLogs) {
+    // 2.5 Inventory Logs & Stock Movements
+    const incomingMovements = (stockMovements && Array.isArray(stockMovements) ? stockMovements.map(m => ({ ...m, variance: m.quantity })) : []).concat(
+      inventoryLogs && Array.isArray(inventoryLogs) ? inventoryLogs : []
+    );
+    if (incomingMovements.length > 0) {
+      for (const log of incomingMovements) {
         if (!log.productId) continue;
         
         const existing = await prisma.stockMovement.findFirst({ where: { businessId, id: String(log.id) } });
@@ -329,35 +426,46 @@ router.post('/', async (req: any, res: any) => {
                          data: { status: safeStatus as any, updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date() }
                       });
                   } else {
-                      const createdReceipt = await prisma.receipt.create({
-                         data: {
-                            id: t.id,
-                            businessId, 
-                            locationId: targetLocationId || t.locationId || null, 
-                            outletId: null,
-                            serverId: t.serverId || req.user.serverId || null,
-                            terminalId: t.terminalId || null,
-                            receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
-                            paymentMethod: String(t.paymentMethod || 'CASH'), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
-                            mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null, status: safeStatus as any,
-                            createdAt: t.timestamp ? new Date(t.timestamp) : undefined,
-                            updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date()
-                         }
-                      });
-                      
-                      if (t.items && Array.isArray(t.items)) {
-                          const receiptItemsToCreate = t.items.map((item: any) => ({
-                              receiptId: createdReceipt.id,
-                              productName: item.productName || item.product?.name || 'Unknown Item',
-                              quantity: Number(item.quantity) || 1,
-                              unitPrice: Number(item.unitPrice || item.product?.price) || 0,
-                              totalPrice: Number(item.totalPrice || (Number(item.quantity) || 1) * (Number(item.unitPrice || item.product?.price) || 0))
-                          }));
+                      try {
+                          const createdReceipt = await prisma.receipt.create({
+                             data: {
+                                id: String(t.id),
+                                businessId, 
+                                locationId: targetLocationId || t.locationId || null, 
+                                outletId: null,
+                                serverId: t.serverId || req.user.serverId || null,
+                                terminalId: t.terminalId || null,
+                                receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
+                                paymentMethod: String(t.paymentMethod || "CASH"), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
+                                mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null, status: safeStatus as any,
+                                createdAt: t.timestamp ? new Date(t.timestamp) : undefined,
+                                updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date()
+                             }
+                          });
                           
-                          if (receiptItemsToCreate.length > 0) {
-                              await prisma.receiptItem.createMany({
-                                  data: receiptItemsToCreate
+                          if (t.items && Array.isArray(t.items)) {
+                              const receiptItemsToCreate = t.items.map((item: any) => ({
+                                  receiptId: createdReceipt.id,
+                                  productName: item.productName || item.product?.name || "Unknown Item",
+                                  quantity: Number(item.quantity) || 1,
+                                  unitPrice: Number(item.unitPrice || item.product?.price) || 0,
+                                  totalPrice: Number(item.totalPrice || (Number(item.quantity) || 1) * (Number(item.unitPrice || item.product?.price) || 0))
+                              }));
+                              
+                              if (receiptItemsToCreate.length > 0) {
+                                  await prisma.receiptItem.createMany({
+                                      data: receiptItemsToCreate
+                                  });
+                              }
+                          }
+                      } catch (createErr: any) {
+                          if (createErr && (createErr.code === "P2002" || String(createErr).includes("UNIQUE constraint"))) {
+                              await prisma.receipt.update({
+                                 where: { id: String(t.id) },
+                                 data: { status: safeStatus as any, updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date() }
                               });
+                          } else {
+                              console.warn("[SyncDelta] Error creating receipt:", createErr);
                           }
                       }
                   }
@@ -396,16 +504,28 @@ router.post('/', async (req: any, res: any) => {
     if (businessSetup) {
        const b = await prisma.business.findUnique({ where: { id: businessId } });
        if (b) {
-           let currentSettings = typeof b.settings === 'object' && b.settings !== null ? b.settings : {};
+           let currentSettings: any = {};
+           try {
+             if (typeof b.settings === 'string') currentSettings = JSON.parse(b.settings || '{}');
+             else if (typeof b.settings === 'object' && b.settings !== null) currentSettings = b.settings;
+           } catch(e) {}
            const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : businessSetup;
            const mergedSettings = { ...currentSettings, ...incomingSetup };
            
+           const updateData: any = { 
+               settings: JSON.stringify(mergedSettings), 
+               updatedAt: new Date() 
+           };
+           if (incomingSetup.businessName || incomingSetup.name) {
+               updateData.name = incomingSetup.businessName || incomingSetup.name;
+           }
+           if (incomingSetup.kraPin || incomingSetup.etimsPin) {
+               updateData.kraPin = incomingSetup.kraPin || incomingSetup.etimsPin;
+           }
+
            await prisma.business.update({
               where: { id: businessId },
-              data: { 
-                  settings: mergedSettings, 
-                  updatedAt: new Date() 
-              }
+              data: updateData
            });
        }
     }

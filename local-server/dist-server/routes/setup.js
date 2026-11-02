@@ -61,7 +61,7 @@ router.post('/sync', async (req, res) => {
                 id: 'local_admin_1', // must provide id if schema doesn't autogenerate string uuid natively
                 email: 'admin@whizpoint.com',
                 name: 'Local Admin',
-                password: 'hashed_password_placeholder', // Usually synced from cloud
+                password: '$2b$10$wY9/9jP2f9sUoBv9gG2VSeNqfQ37iT0s0zXbYxP9e1.iVv4vP9y6S', // bcrypt for admin1234
                 pin: '1234', // Default PIN if none provided
                 role: 'ADMIN',
                 businessId: localBusiness.id,

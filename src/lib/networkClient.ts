@@ -14,19 +14,24 @@ export class NetworkClient {
   /**
    * Discovers the Local Admin Server via mDNS on the network.
    */
-  static async discoverLocalServer(): Promise<string | null> {
-    if (this.resolvedLanIp) return this.resolvedLanIp;
+  static async discoverLocalServer(force: boolean = false): Promise<string | null> {
+    if (!force && this.resolvedLanIp) return this.resolvedLanIp;
     if (this.isDiscovering) return null; // Prevent concurrent discovery loops
     this.isDiscovering = true;
 
     try {
-      // @ts-ignore
-      const ip = await window.electron.discoverLocalServer();
-      if (ip) {
-        this.resolvedLanIp = ip;
+      if (window.electron && typeof window.electron.discoverLocalServer === 'function') {
+        const res = await window.electron.discoverLocalServer();
+        const ip = Array.isArray(res) ? (res[0]?.url || null) : (typeof res === 'string' ? res : (res as any)?.url || null);
+        if (ip) {
+          this.resolvedLanIp = ip;
+          usePosStore.getState().updateServerUrl(ip);
+        }
+        this.isDiscovering = false;
+        return ip;
       }
       this.isDiscovering = false;
-      return ip;
+      return null;
     } catch (err) {
       console.error('[mDNS] Discovery failed:', err);
       this.isDiscovering = false;
@@ -46,7 +51,7 @@ export class NetworkClient {
     // For future expansion: state.syncTarget could be added to allow toggling
     const target: SyncTarget = 'LAN_ADMIN'; // Switch to Local Server mode!
 
-    if (target === 'CLOUD') {
+    if ((target as string) === 'CLOUD') {
       const rawUrl = setup.backOfficeUrl || setup.apiUrl || '';
       let apiUrl = rawUrl.replace(/\/$/, '');
       apiUrl = apiUrl.replace(/\/api$/, '');
@@ -56,13 +61,13 @@ export class NetworkClient {
       return { baseUrl: apiUrl, apiKey };
     } else {
       // LAN_ADMIN routing
-      let lanIp = this.resolvedLanIp || setup.lanAdminIp || setup.apiUrl;
+      let lanIp = this.resolvedLanIp || (setup as any).lanAdminIp || setup.apiUrl;
       
       if (!lanIp) {
         // Attempt auto-discovery
         lanIp = await this.discoverLocalServer();
         if (!lanIp) {
-           lanIp = 'http://localhost:5173'; // Fallback to Local Admin Server port
+           lanIp = 'http://localhost:5050'; // Fallback to Local Admin Server port
         }
       }
       return { baseUrl: lanIp, apiKey: setup.apiKey || '' };
@@ -75,16 +80,30 @@ export class NetworkClient {
       throw new Error("Network client unconfigured. Missing API URL or Key.");
     }
 
+    const state = usePosStore.getState();
+    const outletId = state.businessSetup?.outletId;
+
     const url = `${config.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.apiKey}`,
       'X-API-KEY': config.apiKey,
-      ...options.headers,
+      ...(outletId ? { 'x-outlet-id': outletId, 'X-Outlet-Id': outletId } : {}),
+      ...(options.headers as Record<string, string> || {}),
     };
 
-    return fetch(url, { ...options, headers });
+    try {
+      return await fetch(url, { ...options, headers });
+    } catch (err) {
+      console.warn(`[NetworkClient] Fetch to ${url} failed. Attempting force discovery...`);
+      const newIp = await this.discoverLocalServer(true);
+      if (newIp && newIp !== config.baseUrl) {
+        const retryUrl = `${newIp}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+        return await fetch(retryUrl, { ...options, headers });
+      }
+      throw err;
+    }
   }
 
   static async pushDeltaSync(payload: any) {
@@ -97,9 +116,10 @@ export class NetworkClient {
   }
 
   static async pullDeltaSync(sinceTimestamp: string, locationId?: string, outletId?: string) {
+    const effectiveOutletId = outletId || usePosStore.getState().businessSetup?.outletId;
     let endpoint = `/api/sync/delta?since=${encodeURIComponent(sinceTimestamp)}`;
     if (locationId) endpoint += `&locationId=${encodeURIComponent(locationId)}`;
-    if (outletId) endpoint += `&outletId=${encodeURIComponent(outletId)}`;
+    if (effectiveOutletId) endpoint += `&outletId=${encodeURIComponent(effectiveOutletId)}`;
 
     const response = await this.fetchApi(endpoint, { method: 'GET' });
     if (!response.ok) throw new Error(`Pull Sync failed: ${response.status}`);

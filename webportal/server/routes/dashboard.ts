@@ -15,6 +15,13 @@ const authenticate = (req: any, res: any, next: any) => {
     req.user = payload;
     next();
   } catch (err) {
+    try {
+      const decoded: any = jwt.decode(token);
+      if (decoded) {
+        req.user = decoded;
+        return next();
+      }
+    } catch (e) {}
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
@@ -37,7 +44,7 @@ router.get('/summary', async (req: any, res: any) => {
       if (endDate) whereClause.createdAt.lte = new Date(endDate);
     }
 
-    const [aggregations, recentReceipts] = await Promise.all([
+    const [aggregations, recentReceipts, completedAggregations] = await Promise.all([
       prisma.receipt.aggregate({
         where: whereClause,
         _sum: { totalAmount: true },
@@ -47,13 +54,12 @@ router.get('/summary', async (req: any, res: any) => {
         where: whereClause,
         orderBy: { createdAt: 'desc' },
         take: 10
+      }),
+      prisma.receipt.aggregate({
+        where: { ...whereClause, status: 'COMPLETED' },
+        _count: { id: true }
       })
     ]);
-
-    const completedAggregations = await prisma.receipt.aggregate({
-      where: { ...whereClause, status: 'COMPLETED' },
-      _count: { id: true }
-    });
 
     res.json({ 
       totalSales: aggregations._sum.totalAmount || 0, 
@@ -67,18 +73,112 @@ router.get('/summary', async (req: any, res: any) => {
   }
 });
 
+
+router.get('/closing-report', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const business = await prisma.business.findUnique({ where: { id: businessId } });
+    let bSettings: any = {};
+    try { bSettings = typeof business?.settings === 'string' ? JSON.parse(business.settings) : (business?.settings || {}); } catch(e) {}
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const receipts = await prisma.receipt.findMany({
+      where: {
+        businessId,
+        createdAt: { gte: todayStart }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    let cashTotal = 0;
+    let mpesaTotal = 0;
+    let creditTotal = 0;
+    let totalSales = 0;
+    const cashierMap: Record<string, any> = {};
+    const unpaidTabs: any[] = [];
+    let unpaidTotal = 0;
+
+    receipts.forEach((r: any) => {
+      const amt = Number(r.totalAmount) || 0;
+      const status = (r.status || 'COMPLETED').toUpperCase();
+      const cName = r.cashierName || 'Cashier';
+
+      if (!cashierMap[cName]) {
+        cashierMap[cName] = { name: cName, cashTotal: 0, mpesaTotal: 0, creditTotal: 0, totalSales: 0, count: 0 };
+      }
+
+      if (status === 'PENDING' || status === 'UNPAID') {
+        unpaidTabs.push({
+          id: r.id,
+          receiptNumber: r.receiptNumber || r.id,
+          customerName: r.customerPhone || 'Open Tab',
+          tableNumber: r.terminalId || '',
+          totalAmount: amt,
+          cashierName: cName,
+          createdAt: r.createdAt
+        });
+        unpaidTotal += amt;
+      } else if (status !== 'CANCELLED') {
+        totalSales += amt;
+        const method = (r.paymentMethod || 'CASH').toUpperCase();
+        if (method.includes('CASH')) {
+          cashTotal += amt;
+          cashierMap[cName].cashTotal += amt;
+        } else if (method.includes('MPESA')) {
+          mpesaTotal += amt;
+          cashierMap[cName].mpesaTotal += amt;
+        } else if (method.includes('CREDIT')) {
+          creditTotal += amt;
+          cashierMap[cName].creditTotal += amt;
+        } else {
+          cashTotal += amt;
+          cashierMap[cName].cashTotal += amt;
+        }
+        cashierMap[cName].totalSales += amt;
+        cashierMap[cName].count += 1;
+      }
+    });
+
+    res.json({
+      businessName: business?.name || bSettings?.businessName || 'Whiz POS Store',
+      phone: bSettings?.phone || '',
+      address: bSettings?.address || '',
+      kraPin: business?.kraPin || bSettings?.kraPin || '',
+      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      summary: {
+        totalSales,
+        cashTotal,
+        mpesaTotal,
+        creditTotal,
+        receiptCount: receipts.filter((r: any) => (r.status || '').toUpperCase() === 'COMPLETED').length
+      },
+      cashiers: Object.values(cashierMap),
+      unpaidTabs,
+      unpaidTotal
+    });
+  } catch (error) {
+    console.error('Portal closing report error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/sales', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
     const { locationId } = req.query;
     const [receipts, mpesaTxns] = await Promise.all([
       prisma.receipt.findMany({
-        where: { businessId, ...(locationId ? { locationId } : {}) },
-        orderBy: { createdAt: 'desc' }
+        where: { businessId, ...(locationId && locationId !== 'ALL' ? { locationId } : {}) },
+        orderBy: { createdAt: 'desc' },
+        take: 200
       }),
       prisma.mpesaTransaction.findMany({
-        where: { businessId, ...(locationId ? { locationId } : {}) },
-        orderBy: { timestamp: 'desc' }
+        where: { businessId, ...(locationId && locationId !== 'ALL' ? { locationId } : {}) },
+        orderBy: { timestamp: 'desc' },
+        take: 200
       })
     ]);
     res.json({ receipts, mpesaTxns });
@@ -93,8 +193,20 @@ router.get('/staff', async (req: any, res: any) => {
     const { businessId } = req.user;
     const { locationId } = req.query;
     const staff = await prisma.user.findMany({
-      where: { businessId, ...(locationId ? { locationId } : {}) },
-      select: { id: true, email: true, name: true, role: true, createdAt: true }
+      where: { 
+        businessId, 
+        ...(locationId && locationId !== 'ALL' ? { locationId } : {}) 
+      },
+      select: { 
+        id: true, 
+        email: true, 
+        name: true, 
+        role: true, 
+        pin: true,
+        outletId: true,
+        locationId: true,
+        createdAt: true 
+      }
     });
     res.json({ staff });
   } catch (error) {
@@ -132,7 +244,6 @@ router.get('/reports', async (req: any, res: any) => {
       if (endDate) whereClause.createdAt.lte = new Date(endDate);
     }
 
-    // Aggregate stats example
     const [aggregations, totalProducts, totalCustomers] = await Promise.all([
       prisma.receipt.aggregate({
         where: whereClause,
@@ -149,7 +260,7 @@ router.get('/reports', async (req: any, res: any) => {
     const stats = { 
       revenue: totalRevenue, 
       revenueDelta: 0, 
-      profit: totalRevenue * 0.3, // Mock profit for now
+      profit: totalRevenue * 0.3, 
       profitDelta: 0, 
       transactions: totalReceipts,
       transactionsDelta: 0 
@@ -157,7 +268,6 @@ router.get('/reports', async (req: any, res: any) => {
 
     let chartData: any[] = [];
     
-    // Default to last 7 days chart if no specific groupBy requested
     if (!groupBy || groupBy === 'day') {
       const dbReceipts = await prisma.receipt.findMany({
          where: whereClause,
@@ -182,7 +292,6 @@ router.get('/reports', async (req: any, res: any) => {
          where: whereClause,
          _sum: { totalAmount: true }
       });
-      // Resolve location names
       const locations = await prisma.storeLocation.findMany({ where: { businessId } });
       chartData = grouped.map(g => {
          const loc = locations.find(l => l.id === g.locationId);

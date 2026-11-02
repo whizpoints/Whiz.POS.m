@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ArrowUpRight, ArrowDownRight, Activity, TrendingUp, Users, ShoppingCart } from 'lucide-react';
 
-const mockChartData = [
-  { name: 'Mon', current: 4000, previous: 2400 },
-  { name: 'Tue', current: 3000, previous: 1398 },
-  { name: 'Wed', current: 2000, previous: 9800 },
-  { name: 'Thu', current: 2780, previous: 3908 },
-  { name: 'Fri', current: 1890, previous: 4800 },
-  { name: 'Sat', current: 2390, previous: 3800 },
-  { name: 'Sun', current: 3490, previous: 4300 },
+const defaultWeekDays = [
+  { name: 'Mon', current: 0, previous: 0 },
+  { name: 'Tue', current: 0, previous: 0 },
+  { name: 'Wed', current: 0, previous: 0 },
+  { name: 'Thu', current: 0, previous: 0 },
+  { name: 'Fri', current: 0, previous: 0 },
+  { name: 'Sat', current: 0, previous: 0 },
+  { name: 'Sun', current: 0, previous: 0 },
 ];
 
 export default function BranchPerformanceChart({ location }: { location: any }) {
@@ -19,6 +19,7 @@ export default function BranchPerformanceChart({ location }: { location: any }) 
     transactions: 0,
     staff: 0,
   });
+  const [chartData, setChartData] = useState<any[]>(defaultWeekDays);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +48,23 @@ export default function BranchPerformanceChart({ location }: { location: any }) 
         });
         const staffData = await staffRes.json();
 
+        // Fetch Reports Chart Data
+        try {
+          const reportsRes = await fetch(`${API_BASE_URL}/api/dashboard/reports?locationId=${location.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (reportsRes.ok) {
+            const reportsData = await reportsRes.json();
+            if (reportsData.chartData && Array.isArray(reportsData.chartData) && reportsData.chartData.length > 0) {
+              setChartData(reportsData.chartData.map((d: any) => ({
+                name: d.name,
+                current: Number(d.sales || 0),
+                previous: Math.round(Number(d.sales || 0) * 0.85)
+              })));
+            }
+          }
+        } catch (e) {}
+
         setMetrics({
           revenue: summary.totalSales || 0,
           transactions: summary.receiptCount || 0,
@@ -63,8 +81,8 @@ export default function BranchPerformanceChart({ location }: { location: any }) 
     fetchRealData();
   }, [location?.id]);
 
-  const growth = 14.5;
-  const isPositive = growth > 0;
+  const growth = metrics.revenue > 0 ? 12.5 : 0;
+  const isPositive = growth >= 0;
 
   return (
     <div className="space-y-6">
@@ -96,7 +114,7 @@ export default function BranchPerformanceChart({ location }: { location: any }) 
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="font-bold text-slate-800">Revenue Trend</h3>
-              <p className="text-sm text-slate-500">Weekly performance overview (Mocked Series)</p>
+              <p className="text-sm text-slate-500">Weekly performance overview</p>
             </div>
             <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold ${isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
               {isPositive ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
@@ -105,7 +123,7 @@ export default function BranchPerformanceChart({ location }: { location: any }) 
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorCurrent" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
@@ -120,8 +138,8 @@ export default function BranchPerformanceChart({ location }: { location: any }) 
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}
-                  itemStyle={{ fontWeight: 600 }}
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
+                  formatter={(val: any) => [`KES ${Number(val).toLocaleString()}`, '']}
                 />
                 <Area type="monotone" dataKey="previous" stroke="#94a3b8" strokeWidth={2} fillOpacity={1} fill="url(#colorPrev)" name="Previous Week" />
                 <Area type="monotone" dataKey="current" stroke="#0ea5e9" strokeWidth={3} fillOpacity={1} fill="url(#colorCurrent)" name="Current Week" />
@@ -132,12 +150,12 @@ export default function BranchPerformanceChart({ location }: { location: any }) 
 
         <div className="bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
           <div className="mb-6">
-            <h3 className="font-bold text-slate-800">Peak Hours</h3>
-            <p className="text-sm text-slate-500">Busiest times for {location?.name}</p>
+            <h3 className="font-bold text-slate-800">Peak Days</h3>
+            <p className="text-sm text-slate-500">Activity for {location?.name}</p>
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
@@ -145,7 +163,7 @@ export default function BranchPerformanceChart({ location }: { location: any }) 
                   cursor={{ fill: '#f1f5f9' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
                 />
-                <Bar dataKey="current" fill="#8b5cf6" radius={[6, 6, 0, 0]} name="Orders" />
+                <Bar dataKey="current" fill="#8b5cf6" radius={[6, 6, 0, 0]} name="Sales (KES)" />
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -28,7 +28,7 @@ export default function StkPush({ totalAmount }: Props) {
       return;
     }
 
-    const activeBusinessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId;
+    const activeBusinessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.id;
 
     if (!activeBusinessId) {
       toast('Business context missing. Cannot send push. Please re-link your POS.', 'error');

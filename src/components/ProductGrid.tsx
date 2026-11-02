@@ -27,7 +27,7 @@ export default function ProductGrid() {
 
   // Calculate product popularity based on sales quantity
   const productSalesCount = React.useMemo(() => {
-    const counts: Record<number, number> = {};
+    const counts: Record<string | number, number> = {};
     transactions.forEach(t => {
       t.items.forEach(item => {
         if (item.product && item.product.id) {

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePosStore } from '../store/posStore';
 import { cn } from '../lib/utils';
 import { Shield, ArrowRight, Delete, X, Fingerprint, Monitor } from 'lucide-react';
@@ -116,7 +116,7 @@ const LoginScreen = () => {
         soundManager.playSuccess();
         toast("Login Successful (Dev Mode)", "success");
         setSession(userToLogin, 'dev-token');
-        if (userToLogin.role === 'ADMIN' || userToLogin.role === 'MANAGER') {
+        if (String(userToLogin.role).toUpperCase() === 'ADMIN' || String(userToLogin.role).toUpperCase() === 'MANAGER') {
           navigate('/dashboard', { replace: true });
         } else {
           navigate('/', { replace: true });

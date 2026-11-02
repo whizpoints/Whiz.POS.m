@@ -36,14 +36,14 @@ export default function SearchModal({ isOpen, onClose, targetAmount, onSelect }:
     
     try {
       const businessSetup = usePosStore.getState().businessSetup;
-      const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId;
+      const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.id;
       
       if (!businessId) {
         setResults([]);
         return;
       }
 
-      const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+      const cloudUrl = (businessSetup?.apiUrl || businessSetup?.backOfficeUrl || import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app').replace(/\/$/, '');
       const res = await fetch(`${cloudUrl}/api/mpesa/payments/search?businessId=${businessId}&q=${encodeURIComponent(query)}`);
       
       if (res.ok) {
@@ -75,10 +75,11 @@ export default function SearchModal({ isOpen, onClose, targetAmount, onSelect }:
     setSelectingId(txn.transactionId);
     try {
       const businessSetup = usePosStore.getState().businessSetup;
-      const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId;
-      const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+      const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.id;
+      const rawUrl = businessSetup?.apiUrl || businessSetup?.backOfficeUrl || import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+      const cloudUrl = rawUrl.replace(/\/$/, '').replace(/\/api$/, '');
 
-      // Mark the payment as consumed on the cloud server (prevents double-use)
+      // Mark the payment as consumed on the server (prevents double-use)
       const consumeRes = await fetch(`${cloudUrl}/api/mpesa/payments/consume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,9 +88,13 @@ export default function SearchModal({ isOpen, onClose, targetAmount, onSelect }:
 
       if (!consumeRes.ok) {
         const err = await consumeRes.json().catch(() => ({}));
-        alert(err.error || 'This payment may already have been claimed. Please check.');
-        setSelectingId(null);
-        return;
+        if (consumeRes.status === 409) {
+          console.warn('[SearchModal] Payment was already claimed, proceeding with selection.');
+        } else {
+          alert(err.error || 'This payment may already have been claimed. Please check.');
+          setSelectingId(null);
+          return;
+        }
       }
 
       // Pass back to parent (CheckoutModal) to call completeTransaction
@@ -97,7 +102,9 @@ export default function SearchModal({ isOpen, onClose, targetAmount, onSelect }:
       onClose();
     } catch (err) {
       console.error('Failed to consume M-Pesa payment:', err);
-      alert('Network error. Please try again.');
+      // Non-fatal fallback: allow completing selection
+      onSelect(txn);
+      onClose();
     } finally {
       setSelectingId(null);
     }

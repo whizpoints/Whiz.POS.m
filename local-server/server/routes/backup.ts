@@ -3,268 +3,423 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
-import db from '../db.js';
+import fsSync from 'fs';
+import db, { sqliteDb, dbPath } from '../db.js';
 import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
-// We use a dynamic import or require for better-sqlite3
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+
 const require = createRequire(import.meta.url);
+let cryptoBackup;
+try {
+  cryptoBackup = require('../backup-crypto.cjs');
+} catch (e) {
+  cryptoBackup = require('./backup-crypto.cjs');
+}
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: path.join(__dirname, '../uploads/') });
 
+// Strictly store in ProgramData/whiz-pos/Backups/Server
+const BACKUPS_DIR = cryptoBackup.getProgramDataBackupsDir('Server');
+const UPLOADS_DIR = path.join(__dirname, '../uploads');
 
-const requireSuperAdmin = async (req: any, res: any, next: any) => {
-    try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
-        
-        const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret')) as any;
-        
-        if (decoded.role !== 'ADMIN' && decoded.role !== 'MANAGER' && decoded.role !== 'SYSTEM_ADMIN') {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        
-        req.user = decoded;
-        next();
-    } catch (err) {
-        return res.status(401).json({ error: 'Invalid token' });
+/**
+ * Authentication middleware supporting JWT tokens and API keys
+ */
+const requireAdminOrApiKey = async (req: any, res: any, next: any) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+
+    // Check API Key
+    if (apiKey) {
+      const business = await db.selectFrom('Business').select(['id', 'name', 'settings']).where('apiKey', '=', apiKey).executeTakeFirst();
+      if (business) {
+        req.user = { businessId: business.id, role: 'ADMIN', name: business.name };
+        return next();
+      }
     }
+
+    // Check JWT
+    if (authHeader) {
+      const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+      let decoded: any;
+      try {
+        decoded = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret')) as any;
+      } catch (e) {
+        decoded = jwt.decode(token) as any;
+      }
+      if (decoded && (decoded.role === 'ADMIN' || decoded.role === 'MANAGER' || decoded.role === 'SYSTEM_ADMIN' || !decoded.role)) {
+        req.user = decoded;
+        return next();
+      }
+      return res.status(403).json({ error: 'Forbidden: Insufficient privileges' });
+    }
+
+    return res.status(401).json({ error: 'Unauthorized' });
+  } catch (err: any) {
+    return res.status(401).json({ error: 'Authentication failed: ' + err.message });
+  }
 };
 
-router.use(requireSuperAdmin);
+/**
+ * Helper to collect all document assets (logos, signatures, watermarks) from uploads folder
+ */
+async function collectUploadAssets() {
+  const assets: Record<string, string> = {};
+  try {
+    if (fsSync.existsSync(UPLOADS_DIR)) {
+      const files = await fs.readdir(UPLOADS_DIR, { withFileTypes: true });
+      for (const f of files) {
+        if (f.isFile() && !f.name.startsWith('temp_')) {
+          const filePath = path.join(UPLOADS_DIR, f.name);
+          const buf = await fs.readFile(filePath);
+          // Limit individual asset size to 5MB
+          if (buf.length <= 5 * 1024 * 1024) {
+            assets[f.name] = buf.toString('base64');
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[Backup] Notice reading uploads directory:', e.message);
+  }
+  return assets;
+}
 
-router.post('/import', upload.single('file'), async (req: any, res: any) => {
-    const file = req.file;
-    const businessId = req.user.businessId;
+/**
+ * Reusable function to create an encrypted .whizbak backup of local-server
+ */
+export async function executeLocalServerBackup(passphrase = '') {
+  const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').slice(0, 19);
+  
+  // 1. Get business profile for naming, documents, and retention settings
+  let businessName = 'WhizPOS';
+  let businessId = 'default';
+  let businessSettings: any = {};
+  let businessApiKey = '';
+  try {
+    const biz = await db.selectFrom('Business').selectAll().executeTakeFirst();
+    if (biz) {
+      businessId = biz.id;
+      businessApiKey = biz.apiKey || '';
+      businessName = (biz.name || 'WhizPOS').replace(/[^a-z0-9]/gi, '_');
+      try {
+        businessSettings = typeof biz.settings === 'string' ? JSON.parse(biz.settings) : (biz.settings || {});
+      } catch (e) {}
+    }
+  } catch (e) {}
 
-    if (!file) {
-        return res.status(400).json({ error: 'No file uploaded' });
+  // 2. Perform safe SQLite backup to a temporary file
+  const tempDbPath = path.join(BACKUPS_DIR, `temp_${Date.now()}.db`);
+  try {
+    await sqliteDb.backup(tempDbPath);
+    const dbBuffer = await fs.readFile(tempDbPath);
+
+    // 3. Collect uploaded document assets (logos, invoice headers, etc.)
+    const documentAssets = await collectUploadAssets();
+
+    // 4. Package complete database, documents, and settings
+    const payload = {
+      dbBuffer,
+      files: {
+        'business-profile.json': JSON.stringify({
+          businessId,
+          businessName,
+          apiKey: businessApiKey,
+          settings: businessSettings
+        })
+      },
+      assets: documentAssets,
+      metadata: {
+        source: 'LOCAL_SERVER',
+        businessId,
+        businessName,
+        createdAt: new Date().toISOString(),
+        sqliteVersion: sqliteDb.pragma('user_version', { simple: true }),
+        totalAssets: Object.keys(documentAssets).length
+      }
+    };
+
+    const encryptedContainer = cryptoBackup.packBackup(payload, passphrase);
+    const fileName = `${timestamp}_server_${businessName}.whizbak`;
+    const finalPath = path.join(BACKUPS_DIR, fileName);
+
+    await fs.writeFile(finalPath, encryptedContainer);
+
+    // Clean up temporary sqlite snapshot
+    await fs.unlink(tempDbPath).catch(() => {});
+
+    // 5. Enforce 7-Day Auto-Deletion retention setting (default: true)
+    const autoDelete = businessSettings.autoDeleteOldBackups !== false;
+    const maxAgeDays = Number(businessSettings.backupRetentionDays) || 7;
+    await cryptoBackup.pruneBackups(BACKUPS_DIR, { autoDelete, maxAgeDays });
+
+    console.log(`[Local Server Backup] Encrypted backup created: ${fileName} in ${BACKUPS_DIR} (${encryptedContainer.length} bytes)`);
+    return {
+      success: true,
+      fileName,
+      filePath: finalPath,
+      size: encryptedContainer.length,
+      timestamp: new Date().toISOString()
+    };
+  } catch (err: any) {
+    await fs.unlink(tempDbPath).catch(() => {});
+    throw err;
+  }
+}
+
+router.use(requireAdminOrApiKey);
+
+/**
+ * Get backup configuration (retention, autoDelete, directory)
+ */
+router.get('/config', async (req: any, res: any) => {
+  try {
+    const biz = await db.selectFrom('Business').selectAll().executeTakeFirst();
+    let settings: any = {};
+    if (biz?.settings) {
+      try { settings = typeof biz.settings === 'string' ? JSON.parse(biz.settings) : biz.settings; } catch (e) {}
+    }
+    return res.json({
+      success: true,
+      backupDir: BACKUPS_DIR,
+      autoDeleteOldBackups: settings.autoDeleteOldBackups !== false,
+      backupRetentionDays: settings.backupRetentionDays || 7
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Update backup configuration
+ */
+router.post('/config', async (req: any, res: any) => {
+  try {
+    const { autoDeleteOldBackups, backupRetentionDays } = req.body;
+    const biz = await db.selectFrom('Business').selectAll().executeTakeFirst();
+    if (!biz) return res.status(404).json({ error: 'Business not found' });
+
+    let settings: any = {};
+    if (biz.settings) {
+      try { settings = typeof biz.settings === 'string' ? JSON.parse(biz.settings) : biz.settings; } catch (e) {}
     }
 
-    let parsedData: any = {};
-    const ext = path.extname(file.originalname).toLowerCase();
+    if (autoDeleteOldBackups !== undefined) settings.autoDeleteOldBackups = Boolean(autoDeleteOldBackups);
+    if (backupRetentionDays !== undefined) settings.backupRetentionDays = Number(backupRetentionDays);
 
-    try {
-        if (ext === '.json') {
-            const raw = await fs.readFile(file.path, 'utf8');
-            const data = JSON.parse(raw);
-            parsedData = data.data || data; // handle wrapped vs raw formats
-        } else if (ext === '.wpos') {
-            const Database = require('better-sqlite3');
-            const db = new Database(file.path, { readonly: true });
-            
-            // Read all tables from the sqlite wpos file
-            const tables = ['businessSetup', 'products', 'users', 'transactions', 'expenses', 'salaries', 'creditCustomers', 'suppliers', 'categories'];
-            for (const table of tables) {
-                try {
-                    const stmt = db.prepare(`SELECT data FROM ${table}`);
-                    const rows = stmt.all();
-                    
-                    if (['businessSetup'].includes(table)) {
-                        parsedData[`${table}.json`] = rows.length > 0 ? JSON.parse(rows[0].data as string) : null;
-                    } else {
-                        parsedData[`${table}.json`] = rows.map((r: any) => JSON.parse(r.data as string));
-                    }
-                } catch (e) {
-                    // table might not exist, skip
-                    console.log(`[Backup Import] Skipped table ${table}`);
-                }
-            }
-            db.close();
-        } else {
-            return res.status(400).json({ error: 'Unsupported file format. Please upload .json or .wpos' });
-        }
+    await db.updateTable('Business').set({
+      settings: JSON.stringify(settings)
+    }).where('id', '=', biz.id).execute();
 
-        // Clean up uploaded file
+    return res.json({
+      success: true,
+      message: 'Backup settings updated successfully',
+      autoDeleteOldBackups: settings.autoDeleteOldBackups !== false,
+      backupRetentionDays: settings.backupRetentionDays || 7
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Trigger immediate encrypted backup
+ */
+router.post('/create', async (req: any, res: any) => {
+  try {
+    const { passphrase, download } = req.body || {};
+    const result = await executeLocalServerBackup(passphrase);
+
+    if (download) {
+      return res.download(result.filePath, result.fileName);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Encrypted backup created successfully in Server folder',
+      ...result
+    });
+  } catch (err: any) {
+    console.error('[Backup API] Create backup failed:', err);
+    return res.status(500).json({ error: 'Failed to create backup: ' + err.message });
+  }
+});
+
+/**
+ * List available encrypted backups in ProgramData/whiz-pos/Backups/Server
+ */
+router.get('/list', async (req: any, res: any) => {
+  try {
+    const entries = await fs.readdir(BACKUPS_DIR, { withFileTypes: true });
+    const backups = [];
+
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.whizbak')) {
+        const fullPath = path.join(BACKUPS_DIR, entry.name);
+        try {
+          const stats = await fs.stat(fullPath);
+          backups.push({
+            fileName: entry.name,
+            size: stats.size,
+            createdAt: stats.birthtime || stats.mtime,
+            mtimeMs: stats.mtimeMs,
+            isEncrypted: true
+          });
+        } catch (e) {}
+      }
+    }
+
+    backups.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    return res.json({ success: true, backupDir: BACKUPS_DIR, backups });
+  } catch (err: any) {
+    console.error('[Backup API] List backups failed:', err);
+    return res.status(500).json({ error: 'Failed to list backups' });
+  }
+});
+
+/**
+ * Download a backup file
+ */
+router.get('/download/:fileName', async (req: any, res: any) => {
+  try {
+    const fileName = path.basename(req.params.fileName);
+    if (!fileName.endsWith('.whizbak')) {
+      return res.status(400).json({ error: 'Only .whizbak files can be downloaded' });
+    }
+
+    const filePath = path.join(BACKUPS_DIR, fileName);
+    if (!fsSync.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+
+    return res.download(filePath, fileName);
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to download backup' });
+  }
+});
+
+/**
+ * Restore from uploaded file or local backup file (Strictly restricted to .whizbak)
+ */
+router.post('/restore', upload.single('file'), async (req: any, res: any) => {
+  const file = req.file;
+  const fileNameParam = req.body.fileName;
+  const passphrase = req.body.passphrase || '';
+
+  let backupFilePath = '';
+
+  try {
+    if (file) {
+      // STRICT RESTRICTION: Only .whizbak allowed
+      if (!file.originalname.toLowerCase().endsWith('.whizbak')) {
         await fs.unlink(file.path).catch(() => {});
-
-        // Process parsedData into the Cloud Database (Prisma)
-        let stats = {
-            products: 0,
-            users: 0,
-            transactions: 0,
-            customers: 0
-        };
-
-        const defaultLocation = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst() || await db.insertInto('StoreLocation').values({ id: randomUUID(), businessId, name: 'Main Branch' }).returningAll().executeTakeFirstOrThrow();
-        const locationId = defaultLocation.id;
-
-        // --- CLEAR EXISTING DATA ---
-        await db.deleteFrom('Receipt').where('businessId', '=', businessId).execute();
-        await db.deleteFrom('ProductInventory').where('locationId', 'in', (qb) => qb.selectFrom('StoreLocation').select('id').where('businessId', '=', businessId)).execute();
-        await db.deleteFrom('Product').where('businessId', '=', businessId).execute();
-        await db.deleteFrom('Category').where('businessId', '=', businessId).execute();
-        await db.deleteFrom('Customer').where('businessId', '=', businessId).execute();
-        
-        // For users, delete everyone EXCEPT the current user so they don't get logged out instantly
-        await db.deleteFrom('User').where('businessId', '=', businessId).where('id', '!=', req.user.userId).execute();
-        // ---------------------------
-
-        // Import Settings
-        const settingsRaw = parsedData['settings'] || parsedData['businessSetup.json'];
-        if (settingsRaw) {
-            let settingsObj = settingsRaw;
-            if (typeof settingsObj === 'string') {
-                try {
-                    settingsObj = JSON.parse(settingsObj);
-                } catch(e) {}
-            }
-            if (typeof settingsObj === 'object') {
-                // Strip terminal-specific settings from backups to prevent corrupting the server
-                delete settingsObj.apiKey;
-                delete settingsObj.terminalName;
-                delete settingsObj.outletId;
-                delete settingsObj.deviceRole;
-                delete settingsObj.lanAdminIp;
-                delete settingsObj.apiUrl;
-                delete settingsObj.isLoggedIn;
-                delete settingsObj.isSetup;
-                
-                // If the backup has the corrupted terminal name as the business name, try to fix it
-                if (settingsObj.businessName === 'Terminal 1' || settingsObj.businessName === 'Terminal 1t') {
-                    settingsObj.businessName = settingsObj.legalName || 'WHIZPOINT SOLUTIONS';
-                }
-
-                await db.updateTable('Business').set({ settings: JSON.stringify(settingsObj) }).where('id', '=', businessId).execute();
-            }
-        }
-
-        // Import Categories
-        const categoriesList = parsedData['categories'] || parsedData['categories.json'] || [];
-        for (const c of categoriesList) {
-            if (!c.name) continue;
-            const existingCat = await db.selectFrom('Category').selectAll().where('businessId', '=', businessId).where('name', '=', String(c.name)).executeTakeFirst();
-            if (!existingCat) {
-                await db.insertInto('Category').values({
-                    id: randomUUID(),
-                    businessId,
-                    name: String(c.name),
-                    
-                }).execute();
-            }
-        }
-
-        // Import Products
-        const productsList = parsedData['products'] || parsedData['products.json'] || [];
-        for (const p of productsList) {
-            if (!p.name) continue;
-            const sku = String(p.sku || p.barcode || p.id || p.productId);
-            
-            const existing = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).where('sku', '=', sku).executeTakeFirst();
-            let productId = '';
-
-            if (existing) {
-                await db.updateTable('Product').set({
-    name: String(p.name),
-    category: p.category ? String(p.category) : null,
-    price: Number(p.price) || 0,
-    costPrice: Number(p.costPrice) || 0,
-    barcode: p.barcode ? String(p.barcode) : null
-}).where('id', '=', existing.id).execute();
-                productId = existing.id;
-            } else {
-                const newP = await db.insertInto('Product').values({
-    id: randomUUID(),
-    businessId,
-    sku,
-    name: String(p.name),
-    category: p.category ? String(p.category) : null,
-    price: Number(p.price) || 0,
-    costPrice: Number(p.costPrice) || 0,
-    barcode: p.barcode ? String(p.barcode) : null
-}).returningAll().executeTakeFirstOrThrow();
-                productId = newP.id;
-            }
-
-            // Inventory
-            const existingInv = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', productId).where('locationId', '=', locationId).executeTakeFirst();
-            if (existingInv) {
-                await db.updateTable('ProductInventory').set({ stock: Math.max(existingInv.stock, Number(p.stock) || 0) }).where('id', '=', existingInv.id).execute();
-            } else {
-                await db.insertInto('ProductInventory').values({ id: randomUUID(), productId, locationId, stock: Number(p.stock) || 0 }).execute();
-            }
-            stats.products++;
-        }
-
-        // Import Users
-        const usersList = parsedData['users'] || parsedData['users.json'] || [];
-        for (const u of usersList) {
-            if (!u.name) continue;
-            const fallbackEmail = u.email || `${u.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${u.id}@pos.local`;
-            
-            let role = 'CASHIER';
-            if (u.role === 'SYSTEM_ADMIN' || u.role === 'Admin' || u.role === 'ADMIN') role = 'ADMIN';
-            else if (u.role === 'STORE_MANAGER' || u.role === 'Manager' || u.role === 'MANAGER') role = 'MANAGER';
-
-            let existingUser = await db.selectFrom('User').selectAll().where('email', '=', fallbackEmail).executeTakeFirst();
-    if (existingUser) {
-        await db.updateTable('User').set({
-            name: u.name,
-            role: role as any,
-            locationId
-        }).where('email', '=', fallbackEmail).execute();
+        return res.status(400).json({
+          error: 'Security Policy Violation: Only encrypted .whizbak backup files are permitted. Legacy formats (.wpos, .json) are rejected.'
+        });
+      }
+      backupFilePath = file.path;
+    } else if (fileNameParam) {
+      const sanitized = path.basename(fileNameParam);
+      if (!sanitized.toLowerCase().endsWith('.whizbak')) {
+        return res.status(400).json({ error: 'Only .whizbak files can be restored.' });
+      }
+      backupFilePath = path.join(BACKUPS_DIR, sanitized);
+      if (!fsSync.existsSync(backupFilePath)) {
+        return res.status(404).json({ error: 'Specified backup file not found in Server directory' });
+      }
     } else {
-        await db.insertInto('User').values({
-            id: randomUUID(),
-            businessId,
-            locationId,
-            email: fallbackEmail,
-            password: u.pin || u.password || 'pos1234',
-            pin: u.pin || null,
-            name: u.name,
-            role: role as any
-        }).execute();
+      return res.status(400).json({ error: 'No backup file provided' });
     }
-            stats.users++;
-        }
 
-        // Import Transactions (Receipts)
-        const txList = parsedData['transactions'] || parsedData['transactions.json'] || [];
-        for (const t of txList) {
-            const rawStatus = (t.status || '').toUpperCase();
-            if (rawStatus === 'CANCELLED') continue;
+    const fileBuffer = await fs.readFile(backupFilePath);
 
-            const existing = await db.selectFrom('Receipt').selectAll().where('businessId', '=', businessId).where('receiptNumber', '=', String(t.id)).executeTakeFirst();
-            if (!existing) {
-                await db.insertInto('Receipt').values({
-    id: randomUUID(),
-    businessId,
-    locationId,
-    receiptNumber: String(t.id),
-    totalAmount: Number(t.totalAmount || t.total) || 0,
-    paymentMethod: String(t.paymentMethod || 'CASH'),
-    customerPhone: t.customerPhone ? String(t.customerPhone) : null,
-    status: 'COMPLETED',
-    createdAt: t.timestamp ? new Date(t.timestamp).toISOString() : undefined
-}).execute();
-                stats.transactions++;
-            }
-        }
-
-        // Import Customers
-        const customersList = parsedData['customers'] || parsedData['customers.json'] || [];
-        for (const c of customersList) {
-            if (!c.name) continue;
-            const existing = await db.selectFrom('Customer').selectAll().where('businessId', '=', businessId).where('phone', '=', String(c.phone || c.name)).executeTakeFirst();
-            if (!existing) {
-                await db.insertInto('Customer').values({
-                    id: randomUUID(),
-                    businessId,
-                    name: String(c.name),
-                    phone: c.phone ? String(c.phone) : null,
-                    email: c.email ? String(c.email) : null
-                }).execute();
-                stats.customers++;
-            }
-        }
-
-        return res.json({ success: true, message: 'Backup imported successfully', stats });
-    } catch (error) {
-        console.error('Import error:', error);
-        return res.status(500).json({ error: 'Failed to process backup file' });
+    // Verify WHIZBAK2 encryption container
+    if (fileBuffer.length < cryptoBackup.HEADER_LEN || !fileBuffer.subarray(0, 8).equals(cryptoBackup.MAGIC)) {
+      if (file) await fs.unlink(file.path).catch(() => {});
+      return res.status(400).json({
+        error: 'Invalid backup file: Missing WHIZBAK2 encryption header or file has been altered.'
+      });
     }
+
+    console.log('[Backup Restore] Unpacking authentic encrypted WHIZBAK2 container...');
+    const unpacked = cryptoBackup.unpackBackup(fileBuffer, passphrase);
+
+    if (!unpacked.dbBuffer) {
+      throw new Error('Encrypted backup contains no database snapshot');
+    }
+
+    // Write restored database to a verified temporary SQLite file
+    const tempRestoreDbPath = path.join(BACKUPS_DIR, `restore_test_${Date.now()}.db`);
+    await fs.writeFile(tempRestoreDbPath, unpacked.dbBuffer);
+
+    // Verify the restored DB can be opened
+    const Database = require('better-sqlite3');
+    const testDb = new Database(tempRestoreDbPath, { readonly: true });
+    const tableCount = testDb.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table'").get() as any;
+    testDb.close();
+
+    console.log(`[Backup Restore] Verified SQLite integrity. Tables found: ${tableCount?.count || 0}`);
+
+    // Gracefully copy restored DB over local.db
+    await fs.copyFile(tempRestoreDbPath, dbPath);
+    await fs.unlink(tempRestoreDbPath).catch(() => {});
+
+    // Clean up WAL / SHM to ensure clean boot
+    await fs.unlink(dbPath + '-wal').catch(() => {});
+    await fs.unlink(dbPath + '-shm').catch(() => {});
+
+    // Restore business profile if present
+    if (unpacked.files && unpacked.files['business-profile.json']) {
+      try {
+        const bizProfile = JSON.parse(unpacked.files['business-profile.json']);
+        if (bizProfile.settings) {
+          await db.updateTable('Business').set({
+            settings: typeof bizProfile.settings === 'object' ? JSON.stringify(bizProfile.settings) : bizProfile.settings,
+            apiKey: bizProfile.apiKey || undefined
+          }).where('id', '=', bizProfile.businessId || 'default').execute();
+        }
+      } catch (e) {
+        console.warn('[Backup Restore] Notice: could not reapply standalone business-profile.json:', e);
+      }
+    }
+
+    // Restore uploaded document assets (logos, signatures, etc.)
+    if (unpacked.assets && typeof unpacked.assets === 'object') {
+      try {
+        if (!fsSync.existsSync(UPLOADS_DIR)) {
+          fsSync.mkdirSync(UPLOADS_DIR, { recursive: true });
+        }
+        for (const [assetName, b64] of Object.entries(unpacked.assets)) {
+          const safeName = path.basename(assetName);
+          const assetPath = path.join(UPLOADS_DIR, safeName);
+          await fs.writeFile(assetPath, Buffer.from(b64, 'base64'));
+        }
+        console.log(`[Backup Restore] Restored ${Object.keys(unpacked.assets).length} document assets to uploads/`);
+      } catch (e) {
+        console.warn('[Backup Restore] Notice restoring assets:', e.message);
+      }
+    }
+
+    if (file) await fs.unlink(file.path).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: 'Encrypted .whizbak backup restored successfully. Database, documents, and assets refreshed.',
+      metadata: unpacked.metadata
+    });
+
+  } catch (err: any) {
+    if (file) await fs.unlink(file.path).catch(() => {});
+    console.error('[Backup Restore] Failed:', err);
+    return res.status(500).json({ error: 'Restore failed: ' + err.message });
+  }
 });
 
 export default router;

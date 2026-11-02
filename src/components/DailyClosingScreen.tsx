@@ -3,7 +3,7 @@ import { usePosStore, ClosingReportData } from '../store/posStore';
 import { Calendar, Printer, Download, User, Hash, Clock, CreditCard as CreditCardIcon, Briefcase } from 'lucide-react';
 
 export default function DailyClosingScreen() {
-  const { getDailyClosingReport, setCurrentPage, businessSetup } = usePosStore();
+  const { getDailyClosingReport, setCurrentPage, businessSetup, openBills, currentCashier } = usePosStore();
   
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [report, setReport] = useState<ClosingReportData | null>(null);
@@ -24,6 +24,24 @@ export default function DailyClosingScreen() {
   const handlePrint = () => {
     if (report && businessSetup && window.electron) {
         window.electron.printClosingReport(report, businessSetup, showDetailed);
+    }
+  };
+
+  const handlePrintAuditStrip = () => {
+    if (businessSetup && window.electron && window.electron.printShiftAuditStrip) {
+      const state = usePosStore.getState();
+      const daySales = (state.transactions || []).filter(t => {
+        const tDate = new Date(t.timestamp).toLocaleDateString('en-CA');
+        return tDate === selectedDate;
+      });
+      const allBills = state.openBills || [];
+      window.electron.printShiftAuditStrip(report, daySales, allBills, businessSetup);
+    }
+  };
+
+  const handlePrintCashierSummary = (cashierName: string, cashierData: any) => {
+    if (businessSetup && window.electron && (window.electron as any).printCashierSummary) {
+      (window.electron as any).printCashierSummary(cashierName, cashierData, openBills || [], businessSetup, selectedDate);
     }
   };
 
@@ -90,11 +108,39 @@ export default function DailyClosingScreen() {
                   <span>{reconciliationVisible ? 'Hide Rec.' : 'Reconcile'}</span>
               </button>
               <button
-                onClick={handlePrint}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                onClick={handlePrintAuditStrip}
+                className="flex items-center space-x-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 shadow-sm"
+                title="Print continuous itemized shift audit strip on receipt printer"
               >
                 <Printer size={18} />
-                <span>Print</span>
+                <span>Audit Strip</span>
+              </button>
+              {currentCashier && (
+                <button
+                  onClick={() => {
+                    const myStats = report.cashiers.find(c => c.cashierName.toLowerCase() === currentCashier.name.toLowerCase()) || {
+                      cashierName: currentCashier.name,
+                      cashTotal: 0,
+                      mpesaTotal: 0,
+                      creditTotal: 0,
+                      totalSales: 0,
+                      transactions: []
+                    };
+                    handlePrintCashierSummary(currentCashier.name, myStats);
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 shadow-sm"
+                  title="Print my own end of day shift slip (80mm receipt size)"
+                >
+                  <Printer size={18} />
+                  <span>My Shift Slip</span>
+                </button>
+              )}
+              <button
+                onClick={handlePrint}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold"
+              >
+                <Printer size={18} />
+                <span>Print All</span>
               </button>
             </div>
           </div>
@@ -195,11 +241,19 @@ export default function DailyClosingScreen() {
           {/* Cashier Breakdown - Conditionally Rendered */}
           {showDetailed && report.cashiers.map((cashier) => (
             <div key={cashier.cashierName} className="mb-8 last:mb-0">
-              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <div className="bg-gray-50 p-4 rounded-lg mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <h3 className="text-xl font-semibold flex items-center">
                   <User className="mr-2 text-blue-500" />
                   Cashier: {cashier.cashierName}
                 </h3>
+                <button
+                  onClick={() => handlePrintCashierSummary(cashier.cashierName, cashier)}
+                  className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-transform active:scale-95"
+                  title="Print this cashier's 80mm end of day summary slip"
+                >
+                  <Printer size={15} />
+                  <span>Print Cashier Slip</span>
+                </button>
               </div>
 
               <div className="overflow-x-auto">
@@ -246,6 +300,36 @@ export default function DailyClosingScreen() {
                   <p className="font-semibold text-green-900">Ksh. {cashier.totalSales.toFixed(2)}</p>
                 </div>
               </div>
+
+              {/* Unpaid / Open Tabs for this cashier */}
+              {(() => {
+                const cashierTabs = (openBills || []).filter(b => 
+                  (b.cashier && b.cashier.toLowerCase().includes(cashier.cashierName.toLowerCase())) ||
+                  (b.createdBy && b.createdBy.toLowerCase().includes(cashier.cashierName.toLowerCase()))
+                );
+                if (cashierTabs.length === 0) return null;
+                const tabTotal = cashierTabs.reduce((s, b) => s + (b.total || 0), 0);
+                return (
+                  <div className="mt-4 p-3.5 bg-red-50 border border-red-200 rounded-xl">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-bold text-red-800 uppercase tracking-wide">
+                        Active Unpaid / Open Tabs ({cashierTabs.length})
+                      </span>
+                      <span className="text-sm font-black text-red-900">
+                        Total Unpaid: Ksh {tabTotal.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-red-100">
+                      {cashierTabs.map(t => (
+                        <div key={t.id} className="flex justify-between py-1 text-xs text-red-800">
+                          <span><b>{t.tableNumber || t.id}</b> — {t.customerName || 'Walk-in Guest'}</span>
+                          <span className="font-bold">Ksh {Number(t.total || 0).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           ))}
 

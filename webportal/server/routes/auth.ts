@@ -81,7 +81,7 @@ router.post('/register', async (req, res) => {
     });
 
     const user = business.users[0];
-    const token = jwt.sign({ userId: user.id, businessId: business.id, role: user.role }, JWT_SECRET, { expiresIn: '3h' });
+    const token = jwt.sign({ userId: user.id, businessId: business.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
 
     // Send verification email
     const frontendUrl = req.headers.origin || process.env.CORS_ORIGINS?.split(',')[0] || 'https://backoffice.whizpoint.app';
@@ -255,8 +255,22 @@ router.post('/setup', async (req, res) => {
       
       const token = authHeader.split(' ')[1];
       const payload = jwt.verify(token, JWT_SECRET) as any;
+      const userId = payload.userId || payload.id;
+      if (!userId) return res.status(401).json({ error: 'Invalid token payload' });
       
-      const user = await prisma.user.findUnique({ where: { id: payload.userId }, include: { business: true } });
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          businessId: true,
+          business: {
+            select: { name: true, logoUrl: true }
+          }
+        }
+      });
       if (!user) return res.status(404).json({ error: 'User not found' });
       
       res.json({ id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId, businessName: user.business?.name, businessLogo: user.business?.logoUrl });
@@ -288,7 +302,7 @@ router.post('/login', async (req, res) => {
     const superAdmins = (process.env.SUPER_ADMIN_EMAILS || 'admin@whizpoint.app').split(',').map(e => e.trim());
     const isSuperAdmin = superAdmins.includes(user.email);
 
-    const token = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role, isSuperAdmin }, JWT_SECRET, { expiresIn: '3h' });
+    const token = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role, isSuperAdmin }, JWT_SECRET, { expiresIn: '30d' });
 
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, businessId: user.businessId, isSuperAdmin }, business: user.business });
   } catch (error) {
@@ -403,6 +417,11 @@ router.post('/unlink', async (req, res) => {
        return res.status(403).json({ error: 'Forbidden: Business ID mismatch' });
     }
 
+    if (existing.apiKey) {
+      await prisma.server.deleteMany({ where: { apiKey: existing.apiKey, businessId: existing.businessId } }).catch(() => {});
+      await prisma.terminal.deleteMany({ where: { apiKey: existing.apiKey, businessId: existing.businessId } }).catch(() => {});
+    }
+
     await prisma.storeLocation.update({
       where: { id: locationId },
       data: { 
@@ -411,6 +430,13 @@ router.post('/unlink', async (req, res) => {
         apiKey: null
       }
     });
+
+    try {
+      req.app.get('io')?.to(`business_${existing.businessId}`).emit('terminal_status_changed', {
+        action: 'UNLINKED',
+        locationId
+      });
+    } catch (e) {}
 
     res.json({ success: true });
   } catch (error: any) {
@@ -460,14 +486,68 @@ router.post('/validate-pairing', async (req, res) => {
       }
 
       // Burn the pairing code
-      const targetLoc = await prisma.storeLocation.findFirst({ where: { apiKey } });
-      if (targetLoc) await prisma.storeLocation.update({ where: { id: targetLoc.id },
+      await prisma.storeLocation.update({
+        where: { id: location.id },
         data: { pairingCode: null, pairingCodeExpiresAt: null }
       });
 
-      res.json({ success: true, message: 'Handshake complete' });
+      // Ensure default Outlet exists for this location
+      let outlet = await prisma.outlet.findFirst({ where: { locationId: location.id } });
+      if (!outlet) {
+        outlet = await prisma.outlet.create({
+          data: {
+            businessId: location.businessId,
+            locationId: location.id,
+            name: location.name + ' - Register 1'
+          }
+        });
+      }
+
+      // Upsert Server appliance record
+      const server = await prisma.server.upsert({
+        where: { apiKey },
+        update: {
+          name: location.name + ' Edge Server',
+          status: 'ONLINE',
+          lastHeartbeat: new Date(),
+          businessId: location.businessId
+        },
+        create: {
+          apiKey,
+          name: location.name + ' Edge Server',
+          status: 'ONLINE',
+          lastHeartbeat: new Date(),
+          businessId: location.businessId
+        }
+      });
+
+      // Also upsert terminal entry for visibility in the Devices list
+      const edgeMac = 'SVR-' + location.id.slice(-6).toUpperCase();
+      await prisma.terminal.upsert({
+        where: { macAddress: edgeMac },
+        update: {
+          name: location.name + ' Appliance',
+          status: 'APPROVED',
+          apiKey,
+          outletId: outlet.id,
+          serverId: server.id,
+          businessId: location.businessId
+        },
+        create: {
+          macAddress: edgeMac,
+          name: location.name + ' Appliance',
+          status: 'APPROVED',
+          apiKey,
+          outletId: outlet.id,
+          serverId: server.id,
+          businessId: location.businessId
+        }
+      });
+
+      res.json({ success: true, message: 'Handshake complete', outletId: outlet.id, serverId: server.id });
     } catch (error) {
-      res.status(500).json({ error: 'Confirmation failed' });
+      console.error('Pairing confirmation error:', error);
+      res.status(500).json({ error: 'Confirmation failed: ' + (error.message || error) });
     }
   });
 

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, NavLink, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { FileText,
   ShieldCheck, BarChart3, Menu, X, LogIn,
   Package, Users, UserCog, FileBarChart,
@@ -18,6 +18,7 @@ import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import SettingsPage from './pages/Settings';
 import OutletsDevices from './pages/OutletsDevices';
+import OutletDetails from './pages/OutletDetails';
 import Pricing from './pages/Pricing';
 import FAQ from './pages/FAQ';
 import Docs from './pages/Docs';
@@ -26,7 +27,7 @@ import Inventory from './pages/Inventory';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import VerifyDocument from './pages/VerifyDocument';
 import ConnectServer from './pages/ConnectServer';
-import { BranchProvider, useBranchContext } from './context/BranchContext';
+import { BranchProvider, useBranchContext, clearBranchCache } from './context/BranchContext';
 
 import Customers from './pages/Customers';
 import Sales from './pages/Sales';
@@ -43,6 +44,7 @@ import AdminLayout from './pages/admin/AdminLayout';
 import AdminOverview from './pages/admin/AdminOverview';
 import AdminTenants from './pages/admin/AdminTenants';
 import AdminBroadcasts from './pages/admin/AdminBroadcasts';
+import AdminSecurity from './pages/admin/AdminSecurity';
 
 function AdminWrapper({ children }: { children: ReactNode }) {
   return (
@@ -52,7 +54,7 @@ function AdminWrapper({ children }: { children: ReactNode }) {
   );
 }
 
-function DashboardWrapper({ children }: { children: ReactNode }) {
+function DashboardWrapper({ children }: { children?: ReactNode }) {
   return (
     <ProtectedRoute>
       <BranchProvider>
@@ -209,27 +211,30 @@ function App() {
           <Route path="/privacy" element={<PublicLayout><PrivacyPage /></PublicLayout>} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/V/:code" element={<PublicLayout><VerifyDocument /></PublicLayout>} />
-          <Route path="/connect/server/:requestId" element={<ProtectedRoute><DashboardWrapper><ConnectServer /></DashboardWrapper></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardWrapper><Dashboard /></DashboardWrapper></ProtectedRoute>} />
-          <Route path="/dashboard/settings" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
-          <Route path="/dashboard/outlets" element={<DashboardWrapper><OutletsDevices /></DashboardWrapper>} />
-          <Route path="/dashboard/inventory" element={<DashboardWrapper><Inventory /></DashboardWrapper>} />
-          <Route path="/dashboard/sales" element={<DashboardWrapper><Sales /></DashboardWrapper>} />
-          <Route path="/dashboard/customers" element={<DashboardWrapper><Customers /></DashboardWrapper>} />
-          <Route path="/dashboard/staff" element={<DashboardWrapper><Staff /></DashboardWrapper>} />
-          <Route path="/dashboard/suppliers" element={<DashboardWrapper><Suppliers /></DashboardWrapper>} />
-          <Route path="/dashboard/reports" element={<DashboardWrapper><Reports /></DashboardWrapper>} />
-          <Route path="/dashboard/reconciliation" element={<DashboardWrapper><MpesaReconciliation /></DashboardWrapper>} />
-          <Route path="/dashboard/documents" element={<DashboardWrapper><Documents /></DashboardWrapper>} />
-          <Route path="/dashboard/security" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
-          <Route path="/dashboard/docs/mpesa" element={<DashboardWrapper><MpesaDocs /></DashboardWrapper>} />
+          <Route element={<DashboardWrapper />}>
+            <Route path="/connect/server/:requestId" element={<ConnectServer />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/settings" element={<SettingsPage />} />
+            <Route path="/dashboard/outlets" element={<OutletsDevices />} />
+            <Route path="/dashboard/outlets/:id" element={<OutletDetails />} />
+            <Route path="/dashboard/inventory" element={<Inventory />} />
+            <Route path="/dashboard/sales" element={<Sales />} />
+            <Route path="/dashboard/customers" element={<Customers />} />
+            <Route path="/dashboard/staff" element={<Staff />} />
+            <Route path="/dashboard/suppliers" element={<Suppliers />} />
+            <Route path="/dashboard/reports" element={<Reports />} />
+            <Route path="/dashboard/reconciliation" element={<MpesaReconciliation />} />
+            <Route path="/dashboard/documents" element={<Documents />} />
+            <Route path="/dashboard/security" element={<SettingsPage />} />
+            <Route path="/dashboard/docs/mpesa" element={<MpesaDocs />} />
+          </Route>
 
           {/* Super Admin Routes */}
           <Route path="/admin" element={<Navigate to="/admin/overview" />} />
           <Route path="/admin/overview" element={<AdminWrapper><AdminOverview /></AdminWrapper>} />
           <Route path="/admin/tenants" element={<AdminWrapper><AdminTenants /></AdminWrapper>} />
           <Route path="/admin/broadcasts" element={<AdminWrapper><AdminBroadcasts /></AdminWrapper>} />
-          <Route path="/admin/security" element={<AdminWrapper><div className="p-8 text-white">Security & Backup Module Coming Soon</div></AdminWrapper>} />
+          <Route path="/admin/security" element={<AdminWrapper><AdminSecurity /></AdminWrapper>} />
 
           <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />
           </Routes>
@@ -396,8 +401,10 @@ function DashboardLayout({ children }: { children: ReactNode }) {
   }, [user?.businessId]);
 
   const handleLogout = () => {
+    clearBranchCache();
     localStorage.removeItem('whiz-token');
     localStorage.removeItem('whiz-user');
+    localStorage.removeItem('whiz-business');
     navigate('/auth');
   };
 
@@ -603,7 +610,7 @@ function DashboardLayout({ children }: { children: ReactNode }) {
           </header>
 
           <main className="flex-1 no-pad-x px-4 py-4 md:px-0 md:py-0">
-            {children}
+            {children || <Outlet />}
           </main>
         </div>
       </div>

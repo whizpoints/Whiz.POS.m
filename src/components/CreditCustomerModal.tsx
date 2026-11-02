@@ -33,7 +33,10 @@ const CreditCustomerModal: React.FC<CreditCustomerModalProps> = ({ isOpen, onClo
       id: `CUST${Date.now()}`,
       name: newCustomerName,
       phone: newCustomerPhone,
-      creditSales: [],
+      totalCredit: 0,
+      paidAmount: 0,
+      balance: 0,
+      transactions: [],
       createdAt: new Date().toISOString(),
       lastUpdated: new Date().toISOString(),
     };

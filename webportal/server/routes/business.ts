@@ -12,32 +12,48 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const authenticate = async (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
-  const apiKey = req.headers['x-api-key'] || (authHeader ? authHeader.split(' ')[1] : null);
+  const rawKey = req.headers['x-api-key'] || (authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : null);
 
-  if (!apiKey) return res.status(401).json({ error: 'Missing authorization header or API key' });
+  if (!rawKey) {
+    return res.status(401).json({ error: 'Missing authorization header or API key' });
+  }
 
+  // 1. Check if it's an API Key (Server, Terminal, Business, StoreLocation)
   try {
-    // Try to verify as JWT (Web Portal)
-    const payload = jwt.verify(apiKey, JWT_SECRET);
+    const server = await prisma.server.findFirst({ where: { apiKey: rawKey } });
+    if (server) {
+      req.user = { businessId: server.businessId, serverId: server.id, role: 'SERVER' };
+      return next();
+    }
+
+    const terminal = await prisma.terminal.findFirst({ where: { apiKey: rawKey } });
+    if (terminal) {
+      req.user = { businessId: terminal.businessId, terminalId: terminal.id, outletId: terminal.outletId, role: 'TERMINAL' };
+      return next();
+    }
+
+    const business = await prisma.business.findFirst({ where: { apiKey: rawKey } });
+    if (business) {
+      req.user = { businessId: business.id, role: 'ADMIN' };
+      return next();
+    }
+
+    const storeLoc = await prisma.storeLocation.findFirst({ where: { apiKey: rawKey } });
+    if (storeLoc) {
+      req.user = { businessId: storeLoc.businessId, locationId: storeLoc.id, role: 'LOCATION' };
+      return next();
+    }
+  } catch (dbErr) {
+    console.error('[Auth DB Error]', dbErr);
+  }
+
+  // 2. Check if it's a valid JWT
+  try {
+    const payload: any = jwt.verify(rawKey, JWT_SECRET);
     req.user = payload;
     return next();
-  } catch (err) {
-    // Fallback: Verify as API Key (Desktop POS)
-    try {
-      const business = await prisma.business.findFirst({ where: { apiKey } });
-      if (business) {
-        req.user = { businessId: business.id };
-        return next();
-      }
-
-      const storeLoc = await prisma.storeLocation.findFirst({ where: { apiKey } });
-      if (storeLoc) {
-        req.user = { businessId: storeLoc.businessId, locationId: storeLoc.id };
-        return next();
-      }
-    } catch (dbErr) {}
-    
-    return res.status(401).json({ error: 'Invalid token or API key' });
+  } catch (jwtErr) {
+    return res.status(401).json({ error: 'Invalid or expired token / API key' });
   }
 };
 
@@ -71,7 +87,7 @@ router.get('/profile', async (req: any, res: any) => {
     const { businessId } = req.user;
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, name: true, email: true, logoUrl: true, documentLogoUrl: true, watermarkUrl: true, createdAt: true, settings: true, apiKey: true }
+      select: { id: true, name: true, email: true, kraPin: true, logoUrl: true, documentLogoUrl: true, watermarkUrl: true, createdAt: true, settings: true, apiKey: true }
     });
     if (!business) return res.status(404).json({ error: 'Business not found' });
     res.json(business);
@@ -84,9 +100,10 @@ router.get('/profile', async (req: any, res: any) => {
 router.post('/profile', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { name, settings, apiKey, documentLogoUrl, watermarkUrl } = req.body;
+    const { name, settings, apiKey, documentLogoUrl, watermarkUrl, kraPin } = req.body;
     
     let mergedSettings = settings;
+    let effectiveKraPin = kraPin;
     if (settings) {
       const existing = await prisma.business.findUnique({ where: { id: businessId }, select: { settings: true } });
       if (existing && existing.settings) {
@@ -95,6 +112,9 @@ router.post('/profile', async (req: any, res: any) => {
           const newSettings = typeof settings === 'string' ? JSON.parse(settings) : settings;
           if (newSettings.emailAppPassword && !newSettings.emailAppPassword.includes(':')) {
              newSettings.emailAppPassword = encrypt(newSettings.emailAppPassword);
+          }
+          if (newSettings.etimsPin || newSettings.kraPin) {
+             effectiveKraPin = newSettings.etimsPin || newSettings.kraPin;
           }
           mergedSettings = JSON.stringify({ ...oldSettings, ...newSettings });
         } catch(e) {}
@@ -106,11 +126,12 @@ router.post('/profile', async (req: any, res: any) => {
       data: {
         ...(name && { name }),
         ...(mergedSettings && { settings: mergedSettings }),
+        ...(effectiveKraPin && { kraPin: effectiveKraPin }),
         ...(apiKey !== undefined && { apiKey }),
         ...(documentLogoUrl !== undefined && { documentLogoUrl }),
         ...(watermarkUrl !== undefined && { watermarkUrl })
       },
-      select: { id: true, name: true, settings: true, apiKey: true, documentLogoUrl: true, watermarkUrl: true }
+      select: { id: true, name: true, kraPin: true, settings: true, apiKey: true, documentLogoUrl: true, watermarkUrl: true }
     });
     res.json({ success: true, business });
   } catch (error) {

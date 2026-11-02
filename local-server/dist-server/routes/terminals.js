@@ -4,7 +4,16 @@ import db from '../db.js';
 import { randomUUID } from 'crypto';
 import crypto from 'crypto';
 const router = Router();
-// const prisma = new PrismaClient();
+const getLocalBusiness = async () => {
+    return await db.selectFrom('Business').selectAll().executeTakeFirst();
+};
+const getLocalLocation = async (businessId) => {
+    let location = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
+    if (!location) {
+        location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
+    }
+    return location;
+};
 // POS Client calls this to request connection
 router.post('/register', async (req, res) => {
     const { macAddress, name } = req.body;
@@ -12,6 +21,9 @@ router.post('/register', async (req, res) => {
         return res.status(400).json({ error: 'Missing macAddress or name' });
     }
     try {
+        const business = await getLocalBusiness();
+        const businessId = business?.id || null;
+        const now = new Date().toISOString();
         // Upsert terminal request
         let terminal = await db.selectFrom('Terminal')
             .selectAll()
@@ -19,16 +31,22 @@ router.post('/register', async (req, res) => {
             .executeTakeFirst();
         if (terminal) {
             terminal = await db.updateTable('Terminal')
-                // @ts-ignore
-                .set({ name, status: 'PENDING' })
+                .set({ name, status: 'PENDING', businessId: businessId || undefined, updatedAt: now })
                 .where('macAddress', '=', macAddress)
                 .returningAll()
                 .executeTakeFirstOrThrow();
         }
         else {
             terminal = await db.insertInto('Terminal')
-                // @ts-ignore
-                .values({ id: randomUUID(), macAddress, name, status: 'PENDING' })
+                .values({
+                id: randomUUID(),
+                macAddress,
+                name,
+                status: 'PENDING',
+                businessId: businessId || undefined,
+                createdAt: now,
+                updatedAt: now
+            })
                 .returningAll()
                 .executeTakeFirstOrThrow();
         }
@@ -48,12 +66,16 @@ router.post('/:id/approve', async (req, res) => {
         if (!terminalRequest)
             return res.status(404).json({ error: 'Terminal not found' });
         // Find primary business and location
-        const business = await db.selectFrom('Business').selectAll().executeTakeFirst();
-        const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
-        if (!business || !location) {
-            return res.status(400).json({ error: 'Business or Location not setup yet' });
+        const business = await getLocalBusiness();
+        if (!business) {
+            return res.status(400).json({ error: 'Business not setup yet' });
+        }
+        const location = await getLocalLocation(business.id);
+        if (!location) {
+            return res.status(400).json({ error: 'Store location not setup yet' });
         }
         const apiKey = crypto.randomBytes(32).toString('hex');
+        const now = new Date().toISOString();
         // Find if outlet already exists for this terminal name
         let outlet = await db.selectFrom('Outlet')
             .selectAll()
@@ -62,17 +84,23 @@ router.post('/:id/approve', async (req, res) => {
             .executeTakeFirst();
         if (!outlet) {
             outlet = await db.insertInto('Outlet')
-                // @ts-ignore
                 .values({
                 id: randomUUID(),
                 name: terminalRequest.name,
                 businessId: business.id,
-                locationId: location.id
+                locationId: terminalRequest.locationId || location.id,
+                createdAt: now,
+                updatedAt: now
             }).returningAll().executeTakeFirstOrThrow();
         }
         const updatedTerminal = await db.updateTable('Terminal')
-            // @ts-ignore
-            .set({ status: 'APPROVED', apiKey, outletId: outlet.id })
+            .set({
+            status: 'APPROVED',
+            apiKey,
+            outletId: outlet.id,
+            businessId: business.id,
+            updatedAt: now
+        })
             .where('id', '=', id)
             .returningAll()
             .executeTakeFirstOrThrow();
@@ -86,10 +114,15 @@ router.post('/:id/approve', async (req, res) => {
 // Admin calls this to get all terminals
 router.get('/', async (req, res) => {
     try {
-        const terminals = await db.selectFrom('Terminal')
-            .selectAll()
-            .orderBy('createdAt', 'desc')
-            .execute();
+        const business = await getLocalBusiness();
+        let query = db.selectFrom('Terminal').selectAll();
+        if (business) {
+            query = query.where((eb) => eb.or([
+                eb('businessId', '=', business.id),
+                eb('businessId', 'is', null)
+            ]));
+        }
+        const terminals = await query.orderBy('createdAt', 'desc').execute();
         res.json(terminals);
     }
     catch (error) {
@@ -100,15 +133,16 @@ router.get('/', async (req, res) => {
 router.post('/:id/reject', async (req, res) => {
     const { id } = req.params;
     try {
+        const now = new Date().toISOString();
         const terminal = await db.updateTable('Terminal')
-            // @ts-ignore
-            .set({ status: 'REJECTED' })
+            .set({ status: 'REJECTED', updatedAt: now })
             .where('id', '=', id)
             .returningAll()
             .executeTakeFirstOrThrow();
         res.json({ success: true, terminal });
     }
     catch (error) {
+        console.error('Reject error:', error);
         res.status(500).json({ error: 'Failed to reject terminal' });
     }
 });
@@ -131,20 +165,19 @@ router.delete('/:id', async (req, res) => {
     try {
         const terminal = await db.selectFrom('Terminal').selectAll().where('id', '=', id).executeTakeFirst();
         if (terminal) {
-            // Find and delete the associated outlet
-            const outlet = await db.selectFrom('Outlet')
-                .selectAll()
-                .where('name', '=', terminal.name)
-                .where('businessId', '=', terminal.businessId || '') // Provide default to satisfy TS if missing
-                .executeTakeFirst();
-            if (outlet) {
-                await db.deleteFrom('Outlet').where('id', '=', outlet.id).execute();
+            // Find and delete the associated outlet if needed
+            if (terminal.outletId) {
+                await db.deleteFrom('Outlet').where('id', '=', terminal.outletId).execute();
+            }
+            else {
+                await db.deleteFrom('Outlet').where('name', '=', terminal.name).execute();
             }
             await db.deleteFrom('Terminal').where('id', '=', id).execute();
         }
         res.json({ success: true });
     }
     catch (error) {
+        console.error('Delete terminal error:', error);
         res.status(500).json({ error: 'Failed to delete terminal' });
     }
 });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getApiBaseUrl } from '../../lib/utils';
 
 interface BatchAssignModalProps {
   isOpen: boolean;
@@ -32,7 +33,7 @@ export default function BatchAssignModal({
   
   const filteredProducts = unassignedProducts.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const toggleSelect = (id: string) => {
@@ -58,11 +59,13 @@ export default function BatchAssignModal({
     setIsSubmitting(true);
     
     try {
-      const res = await fetch(`/api/outlets/${outletId}/products/batch`, {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/outlets/${outletId}/products/batch`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${localStorage.getItem('whiz-token')}` 
+          'Authorization': `Bearer ${token}` 
         },
         body: JSON.stringify({ 
           productIds: Array.from(selectedIds), 
@@ -89,92 +92,109 @@ export default function BatchAssignModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div>
-            <h2 className="text-xl font-bold">Assign Products in Batch</h2>
-            <p className="text-sm text-gray-500">Select multiple products to assign to this outlet</p>
+            <h2 className="text-xl font-bold text-gray-900">Batch Assign Products</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Select products to assign to this outlet. Already assigned items are excluded.
+            </p>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors">
-            <X className="w-5 h-5" />
+          <button 
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+          >
+            <X size={20} />
           </button>
         </div>
 
-        <div className="p-4 border-b bg-gray-50">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        {/* Search & Actions Bar */}
+        <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input 
               type="text" 
-              placeholder="Search products to assign..." 
+              placeholder="Search products by name or SKU..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          <button 
+            onClick={toggleSelectAll}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 whitespace-nowrap"
+          >
+            {selectedIds.size === filteredProducts.length ? 'Deselect All' : 'Select All Shown'}
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Product List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {filteredProducts.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              No available products match your search.
+              {searchTerm ? 'No matching products found.' : 'All organization products are already assigned to this outlet.'}
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="flex items-center p-3 hover:bg-gray-50 rounded-lg cursor-pointer border-b mb-2" onClick={toggleSelectAll}>
-                <input 
-                  type="checkbox" 
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  checked={selectedIds.size > 0 && selectedIds.size === filteredProducts.length}
-                  onChange={toggleSelectAll}
-                />
-                <span className="ml-3 font-semibold">Select All ({filteredProducts.length})</span>
-              </div>
-              
-              {filteredProducts.map(p => (
-                <label key={p.id} className="flex items-center p-3 hover:bg-gray-50 rounded-lg cursor-pointer border border-transparent hover:border-gray-200 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    checked={selectedIds.has(p.id)}
-                    onChange={() => toggleSelect(p.id)}
-                  />
-                  <div className="ml-3 flex-1 flex justify-between items-center">
+            filteredProducts.map((p) => {
+              const isSelected = selectedIds.has(p.id);
+              return (
+                <div 
+                  key={p.id} 
+                  onClick={() => toggleSelect(p.id)}
+                  className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                    isSelected 
+                      ? 'border-blue-500 bg-blue-50/50' 
+                      : 'border-gray-100 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      checked={isSelected}
+                      onChange={() => {}} // Handled by div click
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
                     <div>
-                      <p className="font-medium">{p.name}</p>
-                      <p className="text-xs text-gray-500">SKU: {p.sku} | Category: {p.category || 'Uncategorized'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-sm">KES {p.price.toLocaleString()}</p>
+                      <p className="font-medium text-sm text-gray-900">{p.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {p.sku || 'No SKU'} • {p.category || 'General'}
+                      </p>
                     </div>
                   </div>
-                </label>
-              ))}
-            </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-sm text-gray-900">KES {Number(p.price || 0).toFixed(2)}</p>
+                    <p className="text-xs text-gray-500">Total Stock: {p.stock ?? 0}</p>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
 
-        <div className="p-6 border-t bg-gray-50 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-600">
-            {selectedIds.size} products selected
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+          <span className="text-sm text-gray-600">
+            <strong>{selectedIds.size}</strong> product(s) selected
           </span>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button 
-              type="button" 
               onClick={onClose}
-              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 text-sm font-medium transition-colors"
             >
               Cancel
             </button>
             <button 
-              type="button"
               onClick={handleSubmit}
               disabled={selectedIds.size === 0 || isSubmitting}
-              className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors disabled:opacity-50"
             >
-              {isSubmitting ? 'Assigning...' : `Assign ${selectedIds.size} Products`}
+              {isSubmitting ? 'Assigning...' : `Assign Selected (${selectedIds.size})`}
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );

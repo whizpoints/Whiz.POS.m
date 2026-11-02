@@ -127,6 +127,34 @@
 
 
 
+/* App-wide text selection prevention: UI headers, menus, labels, cards are not selectable.
+   Selection is enabled strictly inside editable fields (input, textarea, contenteditable, .selectable) */
+*, *::before, *::after {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable=""],
+.selectable,
+.selectable * {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 html, body {
   height: 100%;
 }
@@ -1089,9 +1117,9 @@ h1, h2, h3, h4, h5, h6 {
 
 /* === SIDEBAR === */
 .sidebar {
-  width: 232px;
+  width: 285px;
   background: var(--bg-glass);
-  backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(200%);
   border-right: 1px solid var(--border-glass);
   display: flex;
   flex-direction: column;
@@ -1100,19 +1128,20 @@ h1, h2, h3, h4, h5, h6 {
   position: sticky;
   top: 0;
   z-index: 40;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-header {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 13px 14px 12px 14px;
+  gap: 14px;
+  padding: 22px 20px 18px 20px;
   border-bottom: 1px solid var(--border-glass);
 }
 
 .sidebar-logo {
-  width: 34px;
-  height: 34px;
+  width: 46px;
+  height: 46px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1135,11 +1164,11 @@ h1, h2, h3, h4, h5, h6 {
 
 .sidebar-brand {
   font-family: var(--font-heading);
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 900;
   letter-spacing: -0.03em;
   color: var(--text-primary);
-  line-height: 1;
+  line-height: 1.15;
 }
 
 .sidebar-brand span {
@@ -1149,50 +1178,51 @@ h1, h2, h3, h4, h5, h6 {
 .sidebar-nav {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 8px;
+  padding: 18px 16px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
 }
 
 .nav-section {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 800;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  padding: 12px 10px 6px 10px;
+  letter-spacing: 0.08em;
+  padding: 18px 14px 8px 14px;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 500;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
   text-decoration: none;
-  line-height: 1.3;
+  line-height: 1.35;
   border: 1px solid transparent;
   position: relative;
 }
 
 .nav-link svg {
-  width: 17px;
-  height: 17px;
-  stroke-width: 2;
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.2;
   flex-shrink: 0;
   color: var(--text-muted);
-  transition: color var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
 .nav-link:hover {
-  background: color-mix(in oklab, var(--accent-primary) 8%, transparent);
+  background: color-mix(in oklab, var(--accent-primary) 12%, transparent);
   color: var(--text-primary);
+  transform: translateX(3px);
 }
 
 .nav-link:hover svg {
@@ -1202,8 +1232,9 @@ h1, h2, h3, h4, h5, h6 {
 .nav-link.active {
   background: var(--accent-primary-soft);
   color: var(--accent-primary);
-  border-color: color-mix(in oklab, var(--accent-primary) 20%, transparent);
-  font-weight: 600;
+  border-color: color-mix(in oklab, var(--accent-primary) 30%, transparent);
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
 .nav-link.active svg {
@@ -1213,58 +1244,60 @@ h1, h2, h3, h4, h5, h6 {
 .nav-link.active::before {
   content: '';
   position: absolute;
-  left: -9px;
+  left: -16px;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 18px;
+  width: 5px;
+  height: 26px;
   background: var(--accent-primary);
   border-radius: 0 var(--radius-full) var(--radius-full) 0;
 }
 
 .sidebar-footer {
-  padding: 10px 10px 12px 10px;
+  padding: 16px 18px 18px 18px;
   border-top: 1px solid var(--border-glass);
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 12px;
 }
 
 .user-avatar {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
+  color: white;
+  font-size: 15px;
+  font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
-  font-family: var(--font-heading);
-  font-weight: 700;
-  font-size: 13px;
   flex-shrink: 0;
+  letter-spacing: -0.02em;
 }
 
 .user-meta {
   flex: 1;
   min-width: 0;
+  line-height: 1.25;
 }
 
 .user-name {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-primary);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-role {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* === TOPBAR / NAVBAR === */

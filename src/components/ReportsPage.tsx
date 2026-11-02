@@ -208,7 +208,7 @@ export default function ReportsPage() {
     const rows = mpesaSales.map(t => [
       t.mpesaCode || `***${t.id.slice(-6).toUpperCase()}`,
       new Date(t.timestamp).toLocaleString(),
-      `${t.customerName || 'Walk-in'} - ${t.customerPhone || '0700000000'}`,
+      `${t.customerName || 'Walk-in'} - ${t.phoneNumber || '0700000000'}`,
       'Completed',
       t.total.toString(),
       '0',

@@ -149,7 +149,7 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
     return (
       <div
         ref={ref}
-        className="bg-white relative text-slate-800 leading-normal origin-top mx-auto shadow-2xl font-sans tracking-wide"
+        className="bg-white relative text-slate-800 leading-normal origin-top mx-auto shadow-2xl font-sans tracking-wide selectable"
         style={{
           width: '210mm',
           minHeight: '297mm',

@@ -4,6 +4,7 @@ import { Router } from 'express';
 
 import db from '../db.js';
 import { randomUUID } from 'crypto';
+import { invalidateBusinessCache } from '../middleware/auth.js';
 
 const router = Router();
 // const prisma = new PrismaClient();
@@ -204,17 +205,21 @@ router.post('/save', async (req: any, res: any) => {
         }
 
         await db.deleteFrom('Business').where('id', '=', oldId).execute();
+        invalidateBusinessCache();
     } else if (existingBusiness) {
         await db.updateTable('Business').set({ apiKey, settings: newSettingsStr }).where('id', '=', existingBusiness.id).execute();
     }
   
       let newToken = null;
       if (cloudBusinessId) {
+        invalidateBusinessCache();
         const user = await db.selectFrom('User').selectAll().where('businessId', '=', cloudBusinessId).executeTakeFirst();
-        if (user) {
-          const jwt = (await import('jsonwebtoken')).default;
-          newToken = jwt.sign({ userId: user.id, businessId: user.businessId, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '7d' });
-        }
+        const jwt = (await import('jsonwebtoken')).default;
+        newToken = jwt.sign(
+          { userId: user ? user.id : 'admin', businessId: cloudBusinessId, role: user ? user.role : 'ADMIN' },
+          process.env.JWT_SECRET || 'fallback_secret',
+          { expiresIn: '30d' }
+        );
       }
 
       res.json({ success: true, newToken });

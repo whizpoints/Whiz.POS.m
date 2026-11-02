@@ -55,7 +55,7 @@ function startBackendServer() {
   
   if (isDev) {
     // In dev, we bypass `npx` overhead and call the local tsx directly
-    serverProcess = spawn('node', ['./node_modules/tsx/dist/cli.mjs', 'server/index.ts'], {
+    serverProcess = spawn('node', ['./node_modules/tsx/dist/cli.mjs', 'watch', 'server/index.ts'], {
       cwd: path.join(__dirname, '..'),
       stdio: 'inherit',
       shell: false,
@@ -97,6 +97,7 @@ function createWindow() {
     },
     autoHideMenuBar: true
   });
+  mainWindow.setMenu(null);
 
   const isDev = !app.isPackaged;
 
@@ -120,7 +121,9 @@ function createWindow() {
 
   // Force external links to open in the OS default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+      shell.openExternal(url);
+    }
     return { action: 'deny' };
   });
 

@@ -2,22 +2,8 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
-import jwt from 'jsonwebtoken';
+import { authenticate } from '../middleware/auth.js';
 const router = Router();
-const authenticate = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader)
-        return res.status(401).json({ error: 'Missing authorization header' });
-    const token = authHeader.split(' ')[1];
-    try {
-        const payload = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret'));
-        req.user = payload;
-        next();
-    }
-    catch (err) {
-        return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-};
 router.use(authenticate);
 // Get all customers
 router.get('/', async (req, res) => {

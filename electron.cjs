@@ -10,7 +10,8 @@ const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const sqliteDb = require('./sqlite-db.cjs');
 const { initDB, migrateLegacyData, readJsonFileFallback, writeJsonFileFallback, backupDB, closeDB } = sqliteDb;
-const { generateReceipt, generateClosingReport, generateBusinessSetup } = require(path.join(__dirname, 'print-jobs.cjs'));
+const cryptoBackup = require('./backup-crypto.cjs');
+const { generateReceipt, generateClosingReport, generateBusinessSetup, generateCustomerBill, generateCashierSlip, generateShiftAuditStrip, generateCashierSummarySlip } = require(path.join(__dirname, 'print-jobs.cjs'));
 const kraService = require('./kra-etims.cjs');
 const { MongoClient } = require('mongodb');
 const { dialog } = require('electron'); // For file dialogs
@@ -474,37 +475,98 @@ let syncInterval = null;
 const SYNC_INTERVAL_MS = 30000;
 let isSyncing = false;
 
-ipcMain.handle('discover-local-server', async () => {
-  return new Promise((resolve) => {
-    try {
-      const Bonjour = require('bonjour-service').default;
-      const bonjour = new Bonjour();
-      let timeoutId;
-      const servers = [];
+function notifyServerDiscovered(serverInfo) {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('server-discovered', serverInfo);
+  }
+}
 
+async function probeServerUrl(url, timeoutMs = 800) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(`${url}/api/health`, { signal: controller.signal });
+    clearTimeout(timeout);
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function discoverActiveServer() {
+  const discovered = [];
+  const checkedUrls = new Set();
+
+  // 1. Check local loopback and local IPv4 network interfaces on port 5050
+  const localCandidates = ['http://127.0.0.1:5050', 'http://localhost:5050'];
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const net of interfaces[name] || []) {
+      if (net.family === 'IPv4' && !net.internal && net.address) {
+        localCandidates.push(`http://${net.address}:5050`);
+      }
+    }
+  }
+
+  for (const candidate of localCandidates) {
+    if (checkedUrls.has(candidate)) continue;
+    checkedUrls.add(candidate);
+    const isAlive = await probeServerUrl(candidate, 600);
+    if (isAlive) {
+      console.log(`[Auto-Discovery] Detected active local server at ${candidate}`);
+      const entry = { name: 'Whiz POS Local Server', url: candidate };
+      discovered.push(entry);
+      notifyServerDiscovered(entry);
+      // Prioritize LAN IP (e.g. 192.168.x.x) over loopback
+      if (!candidate.includes('127.0.0.1') && !candidate.includes('localhost')) {
+        return discovered;
+      }
+    }
+  }
+
+  // 2. Concurrently search via mDNS Bonjour for server on the LAN
+  try {
+    const Bonjour = require('bonjour-service').default;
+    const bonjour = new Bonjour();
+    await new Promise((resolve) => {
       const browser = bonjour.find({ type: 'whizpos-admin' }, (service) => {
         const ip = service.addresses?.find(a => a.includes('.')) || service.host;
-        const port = service.port;
-        const name = service.name || 'Whiz POS Admin Server';
-        console.log(`[mDNS] Discovered Local Admin Server: ${name} at http://${ip}:${port}`);
-        
-        servers.push({
-           name,
-           url: `http://${ip}:${port}`
-        });
+        const port = service.port || 5050;
+        const url = `http://${ip}:${port}`;
+        if (!checkedUrls.has(url)) {
+          checkedUrls.add(url);
+          console.log(`[mDNS] Discovered Local Admin Server: ${service.name} at ${url}`);
+          const entry = { name: service.name || 'Whiz POS Admin Server', url, ip, port };
+          discovered.push(entry);
+          notifyServerDiscovered(entry);
+        }
       });
 
-      timeoutId = setTimeout(() => {
-        browser.stop();
-        bonjour.destroy();
-        resolve(servers.length > 0 ? servers : null);
-      }, 3000);
+      setTimeout(() => {
+        try {
+          browser.stop();
+          bonjour.destroy();
+        } catch (e) {}
+        resolve();
+      }, 1500);
+    });
+  } catch (err) {
+    console.warn('[mDNS] Discovery failed:', err.message);
+  }
 
-    } catch (err) {
-      console.error('[mDNS] Discovery failed:', err);
-      resolve(null);
-    }
-  });
+  return discovered.length > 0 ? discovered : null;
+}
+
+// Background auto-discovery interval to detect server IP changes seamlessly
+setInterval(async () => {
+  try {
+    await discoverActiveServer();
+  } catch (e) {}
+}, 25000);
+
+ipcMain.handle('discover-local-server', async () => {
+  return await discoverActiveServer();
 });
 
 ipcMain.handle('check-mpesa-payment', async (event, { amount, expectedName }) => {
@@ -1012,6 +1074,60 @@ function startApiServer() {
         }
     });
 
+    // --- KRA eTIMS Express API Endpoints (Local & Remote) ---
+    apiApp.post('/api/kra/invoice', async (req, res) => {
+        try {
+            const transaction = req.body;
+            if (!transaction) return res.status(400).json({ error: 'Missing transaction body' });
+            const products = await readJsonFileFallback('products.json');
+            const businessSetup = await readJsonFileFallback('business-setup.json');
+            const result = await kraService.submitInvoice(transaction, products, businessSetup);
+            res.json(result);
+        } catch (err) {
+            console.error('[KRA API] Invoice submission failed:', err);
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    apiApp.post('/api/kra/ping', async (req, res) => {
+        try {
+            const businessSetup = await readJsonFileFallback('business-setup.json');
+            const result = await kraService.ping(businessSetup);
+            res.json(result);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    apiApp.post('/api/kra/init-device', async (req, res) => {
+        try {
+            const businessSetup = await readJsonFileFallback('business-setup.json');
+            const result = await kraService.initDevice(businessSetup);
+            res.json(result);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    apiApp.get('/api/kra/stats', async (req, res) => {
+        try {
+            const stats = await kraService.getStats();
+            res.json(stats);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    apiApp.post('/api/kra/sync-queue', async (req, res) => {
+        try {
+            const businessSetup = await readJsonFileFallback('business-setup.json');
+            const result = await kraService.syncQueue(businessSetup);
+            res.json(result);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
     server = apiApp.listen(5173, '0.0.0.0', () => {
         console.log('API server started on port 5173');
     });
@@ -1300,30 +1416,124 @@ app.whenReady().then(async () => {
 
   // --- Developer & Direct DB Sync ---
 
-  // --- Automated Backup Daemon ---
-  setInterval(async () => {
+  // --- Reusable Encrypted POS Backup Generator ---
+  async function executePosEncryptedBackup(targetPath = null) {
+      // Strictly store in ProgramData/whiz-pos/Backups/POS
+      const posBackupsDir = cryptoBackup.getProgramDataBackupsDir('POS');
+
+      let businessName = 'WhizPOS';
+      let businessSetup = {};
       try {
-          let businessName = 'Business';
-          try {
-              const config = await readJsonFileFallback('business-setup.json');
-              if (config && config.businessName) {
+          const config = await readJsonFileFallback('business-setup.json');
+          if (config) {
+              businessSetup = config;
+              if (config.businessName) {
                   businessName = config.businessName.replace(/[^a-z0-9]/gi, '_');
               }
-          } catch (e) {}
+          }
+      } catch (e) {}
 
-          const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').slice(0, 16); // YYYY-MM-DD_HH-MM
-          const fileName = `${timestamp}_backup_${businessName}.wpos`;
+      let serverConfig = {};
+      try {
+          serverConfig = await readJsonFileFallback('server-config.json');
+      } catch (e) {}
 
-          // Documents folder
-          const docsPath = app.getPath('documents');
-          const backupPath = path.join(docsPath, fileName);
+      // Collect all local JSON document files from userDataPath
+      const docFiles = {};
+      try {
+          const uEntries = await fs.readdir(userDataPath, { withFileTypes: true });
+          for (const ent of uEntries) {
+              if (ent.isFile() && ent.name.endsWith('.json')) {
+                  try {
+                      const content = await fs.readFile(path.join(userDataPath, ent.name), 'utf-8');
+                      docFiles[ent.name] = content;
+                  } catch (e) {}
+              }
+          }
+      } catch (e) {}
 
-          await backupDB(backupPath);
-          console.log(`[Daemon] Automated backup created: ${backupPath}`);
-      } catch (error) {
-          console.error('[Daemon] Automated backup failed:', error);
+      // Ensure critical config files are present
+      docFiles['server-config.json'] = JSON.stringify(serverConfig);
+      docFiles['business-setup.json'] = JSON.stringify(businessSetup);
+
+      // Collect asset files (logos, receipts, etc.)
+      const docAssets = {};
+      try {
+          const assetsDir = path.join(userDataPath, 'assets');
+          if (fsSync.existsSync(assetsDir)) {
+              const aEntries = await fs.readdir(assetsDir, { withFileTypes: true });
+              for (const aEnt of aEntries) {
+                  if (aEnt.isFile()) {
+                      const aBuf = await fs.readFile(path.join(assetsDir, aEnt.name));
+                      if (aBuf.length <= 5 * 1024 * 1024) {
+                          docAssets[aEnt.name] = aBuf.toString('base64');
+                      }
+                  }
+              }
+          }
+      } catch (e) {}
+
+      const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').slice(0, 19);
+      const tempDbPath = path.join(posBackupsDir, `temp_snap_${Date.now()}.db`);
+
+      try {
+          // 1. Checkpoint WAL and capture SQLite database cleanly (all tables, sales, products, documents)
+          await backupDB(tempDbPath);
+          const dbBuffer = await fs.readFile(tempDbPath);
+
+          // 2. Package database, all documents, assets, and settings
+          const payload = {
+              dbBuffer,
+              files: docFiles,
+              assets: docAssets,
+              metadata: {
+                  source: 'POS_DESKTOP',
+                  businessName,
+                  createdAt: new Date().toISOString(),
+                  totalDocuments: Object.keys(docFiles).length,
+                  totalAssets: Object.keys(docAssets).length
+              }
+          };
+
+          const encryptedBuffer = cryptoBackup.packBackup(payload);
+          const defaultFileName = `${timestamp}_pos_${businessName}.whizbak`;
+          const finalPath = targetPath || path.join(posBackupsDir, defaultFileName);
+
+          await fs.writeFile(finalPath, encryptedBuffer);
+
+          // Clean up temp snapshot
+          await fs.unlink(tempDbPath).catch(() => {});
+
+          // 3. 7-Day Auto-Deletion retention setting (default: true)
+          const autoDelete = (businessSetup.autoDeleteOldBackups !== false) && (serverConfig.autoDeleteOldBackups !== false);
+          const maxAgeDays = Number(businessSetup.backupRetentionDays) || Number(serverConfig.backupRetentionDays) || 7;
+          await cryptoBackup.pruneBackups(posBackupsDir, { autoDelete, maxAgeDays });
+
+          console.log(`[POS Backup] Encrypted backup created: ${finalPath} (${encryptedBuffer.length} bytes)`);
+          return { success: true, filePath: finalPath, fileName: path.basename(finalPath), size: encryptedBuffer.length };
+      } catch (err) {
+          await fs.unlink(tempDbPath).catch(() => {});
+          throw err;
       }
-  }, 60 * 60 * 1000); // 60 minutes
+  }
+
+  // --- Automated High-Frequency Encrypted Backup Daemon (Every 15 minutes) ---
+  setTimeout(async () => {
+      try {
+          console.log('[Daemon] Initial POS startup encrypted backup running in ProgramData/whiz-pos/Backups/POS...');
+          await executePosEncryptedBackup();
+      } catch (e) {
+          console.warn('[Daemon] Initial POS backup skipped:', e.message);
+      }
+  }, 10000); // 10 seconds after boot
+
+  setInterval(async () => {
+      try {
+          await executePosEncryptedBackup();
+      } catch (error) {
+          console.error('[Daemon] Automated POS backup failed:', error.message);
+      }
+  }, 15 * 60 * 1000); // 15 minutes
 
   // --- Cloud Sync Daemon ---
   setInterval(async () => {
@@ -1389,7 +1599,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('backup-data', async () => {
     try {
-        let businessName = 'Business';
+        const posBackupsDir = cryptoBackup.getProgramDataBackupsDir('POS');
+        let businessName = 'WhizPOS';
         try {
             const config = await readJsonFileFallback('business-setup.json');
             if (config && config.businessName) {
@@ -1397,21 +1608,22 @@ app.whenReady().then(async () => {
             }
         } catch (e) {}
 
-        const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').slice(0, 16); // YYYY-MM-DD_HH-MM
-        const defaultFileName = `${timestamp}_backup_${businessName}.wpos`;
+        const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').slice(0, 16);
+        const defaultFileName = `${timestamp}_pos_${businessName}.whizbak`;
+        const defaultPath = path.join(posBackupsDir, defaultFileName);
 
         const { canceled, filePath } = await dialog.showSaveDialog({
-            title: 'Save Backup',
-            defaultPath: defaultFileName,
-            filters: [{ name: 'Whiz POS Backup', extensions: ['wpos'] }]
+            title: 'Save Encrypted Whiz POS Backup',
+            defaultPath,
+            filters: [
+                { name: 'Whiz POS Encrypted Backup (*.whizbak)', extensions: ['whizbak'] }
+            ]
         });
 
         if (canceled || !filePath) return { success: false, error: 'Cancelled' };
 
-        // Use proper SQLite backup mechanism to capture WAL data safely
-        await backupDB(filePath);
-
-        return { success: true, filePath };
+        const result = await executePosEncryptedBackup(filePath);
+        return { success: true, filePath: result.filePath, size: result.size };
     } catch (e) {
         console.error("Backup failed", e);
         return { success: false, error: e.message };
@@ -1420,12 +1632,13 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('restore-data', async () => {
       try {
+          const posBackupsDir = cryptoBackup.getProgramDataBackupsDir('POS');
           const { canceled, filePaths } = await dialog.showOpenDialog({
-              title: 'Select Backup File',
+              title: 'Select Encrypted Whiz POS Backup (.whizbak)',
+              defaultPath: posBackupsDir,
               properties: ['openFile'],
               filters: [
-                  { name: 'Whiz POS Backup', extensions: ['wpos'] },
-                  { name: 'Legacy JSON Backup', extensions: ['json'] }
+                  { name: 'Whiz POS Encrypted Backup (*.whizbak)', extensions: ['whizbak'] }
               ]
           });
 
@@ -1433,39 +1646,96 @@ app.whenReady().then(async () => {
 
           const backupPath = filePaths[0];
 
-          if (backupPath.endsWith('.json')) {
-              const backupContent = await fs.readFile(backupPath, 'utf-8');
-              const backup = JSON.parse(backupContent);
-
-              if (!backup.data) throw new Error("Invalid backup file format");
-
-              for (const [filename, content] of Object.entries(backup.data)) {
-                  await writeJsonFileFallback(filename, content);
-              }
-          } else if (backupPath.endsWith('.wpos')) {
-              // Gracefully close connection to prevent locking or corruption during overwrite
-              closeDB();
-
-              const dbPath = path.join(userDataPath, 'whizpos.db');
-              const walPath = dbPath + '-wal';
-              const shmPath = dbPath + '-shm';
-
-              // Overwrite main DB file
-              await fs.copyFile(backupPath, dbPath);
-
-              // Remove previous WAL & SHM to ensure clean boot from restored file
-              try { await fs.unlink(walPath); } catch(e) {}
-              try { await fs.unlink(shmPath); } catch(e) {}
-
-              // Re-initialize DB
-              initDB(userDataPath);
-          } else {
-              throw new Error("Unsupported backup format");
+          // STRICT RESTRICTION: Only .whizbak allowed
+          if (!backupPath.toLowerCase().endsWith('.whizbak')) {
+              throw new Error("Security Restriction: Only authentic .whizbak encrypted backup files are allowed.");
           }
 
-          return { success: true };
+          const fileBuffer = await fs.readFile(backupPath);
+
+          // Verify encrypted WHIZBAK2 container
+          if (fileBuffer.length < cryptoBackup.HEADER_LEN || !fileBuffer.subarray(0, 8).equals(cryptoBackup.MAGIC)) {
+              throw new Error("Invalid or corrupted backup file: Missing WHIZBAK2 encryption header.");
+          }
+
+          console.log('[Restore] Unpacking authentic encrypted WHIZBAK2 container...');
+          const unpacked = cryptoBackup.unpackBackup(fileBuffer);
+
+          if (!unpacked.dbBuffer) {
+              throw new Error('Encrypted backup contains no valid database snapshot');
+          }
+
+          // Safely close connection before replacing files
+          closeDB();
+
+          const dbPath = path.join(userDataPath, 'whizpos.db');
+          const walPath = dbPath + '-wal';
+          const shmPath = dbPath + '-shm';
+
+          // Write database
+          await fs.writeFile(dbPath, unpacked.dbBuffer);
+
+          // Remove previous WAL & SHM to ensure clean boot from restored file
+          try { await fs.unlink(walPath); } catch(e) {}
+          try { await fs.unlink(shmPath); } catch(e) {}
+
+          // Restore configuration & document files
+          if (unpacked.files) {
+              for (const [filename, content] of Object.entries(unpacked.files)) {
+                  try {
+                      await writeJsonFileFallback(filename, typeof content === 'string' ? JSON.parse(content) : content);
+                  } catch (e) {
+                      console.warn(`[Restore] Notice restoring ${filename}:`, e.message);
+                  }
+              }
+          }
+
+          // Restore assets (logos, signatures, etc.)
+          if (unpacked.assets && typeof unpacked.assets === 'object') {
+              try {
+                  const assetsDir = path.join(userDataPath, 'assets');
+                  await fs.mkdir(assetsDir, { recursive: true });
+                  for (const [assetName, b64] of Object.entries(unpacked.assets)) {
+                      const safeName = path.basename(assetName);
+                      await fs.writeFile(path.join(assetsDir, safeName), Buffer.from(b64, 'base64'));
+                  }
+              } catch (e) {
+                  console.warn('[Restore] Notice restoring assets:', e.message);
+              }
+          }
+
+          // Re-initialize DB
+          initDB(userDataPath);
+          console.log('[Restore] Encrypted backup restored and verified successfully from:', backupPath);
+          return { success: true, metadata: unpacked.metadata };
       } catch (e) {
           console.error("Restore failed", e);
+          return { success: false, error: e.message };
+      }
+  });
+
+  ipcMain.handle('get-backup-settings', async () => {
+      const posBackupsDir = cryptoBackup.getProgramDataBackupsDir('POS');
+      let autoDeleteOldBackups = true;
+      let backupRetentionDays = 7;
+      try {
+          const cfg = await readJsonFileFallback('business-setup.json');
+          if (cfg) {
+              if (cfg.autoDeleteOldBackups !== undefined) autoDeleteOldBackups = Boolean(cfg.autoDeleteOldBackups);
+              if (cfg.backupRetentionDays !== undefined) backupRetentionDays = Number(cfg.backupRetentionDays);
+          }
+      } catch (e) {}
+      return { autoDeleteOldBackups, backupRetentionDays, backupDir: posBackupsDir };
+  });
+
+  ipcMain.handle('save-backup-settings', async (event, settings) => {
+      try {
+          let cfg = (await readJsonFileFallback('business-setup.json')) || {};
+          if (settings.autoDeleteOldBackups !== undefined) cfg.autoDeleteOldBackups = Boolean(settings.autoDeleteOldBackups);
+          if (settings.backupRetentionDays !== undefined) cfg.backupRetentionDays = Number(settings.backupRetentionDays);
+          await writeJsonFileFallback('business-setup.json', cfg);
+          return { success: true, settings: { autoDeleteOldBackups: cfg.autoDeleteOldBackups, backupRetentionDays: cfg.backupRetentionDays } };
+      } catch (e) {
           return { success: false, error: e.message };
       }
   });
@@ -1586,8 +1856,13 @@ app.whenReady().then(async () => {
   ipcMain.on('print-receipt', async (event, transaction, businessSetup, isReprint = false) => {
       let finalTransaction = { ...transaction };
 
-      // Core KRA eTIMS feature: intercept new sales
-      if (!isReprint && !finalTransaction.kraInvoiceNo) {
+      // Core KRA eTIMS feature: intercept new sales if not already signed with real KRA receipt
+      const alreadyHasRealKra = finalTransaction.kraDetails &&
+                                finalTransaction.kraDetails.receiptNumber &&
+                                !finalTransaction.kraDetails.receiptNumber.includes('OFFLINE') &&
+                                !finalTransaction.kraDetails.receiptNumber.includes('SBX');
+
+      if (!isReprint && !alreadyHasRealKra && !finalTransaction.kraInvoiceNo) {
           try {
               const products = await readJsonFileFallback('products.json');
               const kraResult = await kraService.submitInvoice(finalTransaction, products, businessSetup);
@@ -1596,6 +1871,15 @@ app.whenReady().then(async () => {
                   finalTransaction.kraInvoiceNo = kraResult.kraInvoiceNo;
                   finalTransaction.kraQrCode = kraResult.qrCode;
                   finalTransaction.kraSignature = kraResult.signature;
+                  finalTransaction.kraDetails = {
+                      invoiceNumber: kraResult.scuInvcNo || finalTransaction.id,
+                      receiptNumber: kraResult.kraInvoiceNo,
+                      qrCode: kraResult.qrCode,
+                      controlCode: kraResult.signature,
+                      date: new Date().toLocaleString(),
+                      offline: kraResult.offline || false,
+                      offlineReason: kraResult.offlineReason || null
+                  };
 
                   // We must update the transaction in the DB so it persists
                   const transactions = await readJsonFileFallback('transactions.json');
@@ -1610,8 +1894,47 @@ app.whenReady().then(async () => {
           }
       }
 
-      const htmlContent = await generateReceipt(finalTransaction, businessSetup, isReprint);
+      const htmlContent = await generateReceipt(finalTransaction, businessSetup, isReprint, false);
       printHtml(htmlContent);
+
+      // If duplicate receipt printing is enabled, print cashier copy after short delay
+      const isDuplicateEnabled = Boolean(
+          businessSetup?.printDuplicateReceipts ||
+          businessSetup?.duplicateReceipt ||
+          businessSetup?.printDuplicate
+      );
+
+      if (isDuplicateEnabled) {
+          setTimeout(async () => {
+              try {
+                  const cashierHtml = await generateReceipt(finalTransaction, businessSetup, isReprint, true);
+                  printHtml(cashierHtml);
+              } catch (err) {
+                  console.error('[Print] Failed to print duplicate cashier copy:', err);
+              }
+          }, 1100);
+      }
+  });
+
+  // --- KRA eTIMS IPC Handlers ---
+  ipcMain.handle('kra-ping', async (event, businessSetup) => {
+      return await kraService.ping(businessSetup);
+  });
+
+  ipcMain.handle('kra-init-device', async (event, businessSetup) => {
+      return await kraService.initDevice(businessSetup);
+  });
+
+  ipcMain.handle('kra-sync-queue', async (event, businessSetup) => {
+      return await kraService.syncQueue(businessSetup);
+  });
+
+  ipcMain.handle('kra-submit-invoice', async (event, transaction, products, businessSetup) => {
+      return await kraService.submitInvoice(transaction, products, businessSetup);
+  });
+
+  ipcMain.handle('kra-get-stats', async () => {
+      return await kraService.getStats();
   });
 
   /**
@@ -1640,6 +1963,68 @@ app.whenReady().then(async () => {
   ipcMain.on('print-closing-report', async (event, reportData, businessSetup, detailed = true) => {
       const htmlContent = await generateClosingReport(reportData, businessSetup, detailed);
       printHtml(htmlContent);
+  });
+
+  /**
+   * IPC Listener: 'print-customer-bill'
+   * Hospitality Bill Mode: Prints proforma bill for customer.
+   */
+  ipcMain.on('print-customer-bill', async (event, bill, businessSetup) => {
+      try {
+          const htmlContent = await generateCustomerBill(bill, businessSetup);
+          printHtml(htmlContent);
+
+          // Automatically print cashier copy slip for open bills / tabs
+          setTimeout(async () => {
+              try {
+                  const cashierHtml = await generateCashierSlip(bill, businessSetup);
+                  printHtml(cashierHtml);
+              } catch (err) {
+                  console.error('[Print] Failed to print duplicate cashier slip copy:', err);
+              }
+          }, 1100);
+      } catch (err) {
+          console.error('[Print] Failed to print customer bill:', err);
+      }
+  });
+
+  /**
+   * IPC Listener: 'print-cashier-slip'
+   * Hospitality Bill Mode: Prints compact duplicate slip for cashier.
+   */
+  ipcMain.on('print-cashier-slip', async (event, bill, businessSetup) => {
+      try {
+          const htmlContent = await generateCashierSlip(bill, businessSetup);
+          printHtml(htmlContent);
+      } catch (err) {
+          console.error('[Print] Failed to print cashier slip:', err);
+      }
+  });
+
+  /**
+   * IPC Listener: 'print-shift-audit-strip'
+   * Hospitality / Daily Closing: Continuous itemized shift audit strip.
+   */
+  ipcMain.on('print-shift-audit-strip', async (event, reportData, sales, openBills, businessSetup) => {
+      try {
+          const htmlContent = await generateShiftAuditStrip(reportData, sales, openBills, businessSetup);
+          printHtml(htmlContent);
+      } catch (err) {
+          console.error('[Print] Failed to print shift audit strip:', err);
+      }
+  });
+
+  /**
+   * IPC Listener: 'print-cashier-summary'
+   * Prints the individual cashier end-of-day sales slip in thermal receipt format.
+   */
+  ipcMain.on('print-cashier-summary', async (event, cashierName, cashierStats, unpaidBills, businessSetup, selectedDate) => {
+      try {
+          const htmlContent = await generateCashierSummarySlip(cashierName, cashierStats, unpaidBills, businessSetup, selectedDate);
+          printHtml(htmlContent);
+      } catch (err) {
+          console.error('[Print] Failed to print cashier summary slip:', err);
+      }
   });
 
   ipcMain.handle('generate-pdf', async (event, { htmlContent, paperSize, defaultFileName, author, applicationName }) => {
@@ -1801,6 +2186,18 @@ ipcMain.handle('complete-atomic-sale', async (event, saleData, paymentData) => {
         return { success: false, error: error.message };
     }
 });
+
+// Background KRA eTIMS queue sync loop (every 3 minutes)
+setInterval(async () => {
+    try {
+        const businessSetup = await readJsonFileFallback('business-setup.json');
+        if (businessSetup && (businessSetup.kraPin || businessSetup.etimsPin)) {
+            await kraService.syncQueue(businessSetup);
+        }
+    } catch (e) {
+        console.warn('[Daemon] Periodic KRA queue sync check skipped:', e.message);
+    }
+}, 3 * 60 * 1000);
 
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') {

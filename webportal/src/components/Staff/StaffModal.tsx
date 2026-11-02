@@ -71,8 +71,8 @@ export default function StaffModal({ isOpen, onClose, staff, onComplete }: Props
         onComplete();
         onClose();
       } else {
-        const data = await res.json();
-        toast.error(data.error || 'Operation failed');
+        const data = await res.json().catch(() => ({}));
+        toast.error(data?.error || 'Operation failed');
       }
     } catch (err) {
       toast.error('Network error');
@@ -127,8 +127,8 @@ export default function StaffModal({ isOpen, onClose, staff, onComplete }: Props
               </select>
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password {staff && <span className="text-gray-400 font-normal">(Leave blank to keep unchanged)</span>}</label>
-              <input type="password" required={!staff} className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password {staff ? <span className="text-gray-400 font-normal">(Leave blank to keep unchanged)</span> : <span className="text-gray-400 font-normal">(Optional for Cashiers)</span>}</label>
+              <input type="password" required={!staff && formData.role === 'Admin'} className="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="Required for Admin, optional for Cashiers" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
             </div>
           </div>
 

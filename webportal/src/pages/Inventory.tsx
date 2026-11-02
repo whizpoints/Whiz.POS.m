@@ -1,56 +1,95 @@
-let cachedProducts: any[] = [];
-let isInventoryLoaded = false;
 import { useState, useRef, useEffect } from 'react';
 
-import { Search, Package, Plus, Edit2, Trash2, ArrowRightLeft, FileUp, Download } from 'lucide-react';
+import { Search, Package, Plus, Edit2, Trash2, ArrowRightLeft, FileUp, Download, Warehouse, PackageCheck, AlertCircle, Barcode, Check, X, RotateCcw } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useBranchContext } from '../context/BranchContext';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { getApiBaseUrl } from '../lib/utils';
 import StockTransferModal from '../components/Inventory/StockTransferModal';
 import ProductModal from '../components/Inventory/ProductModal';
 import { Modal } from '../components/ui/modal';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../context/ConfirmContext';
+import { getCachedData, setCachedData } from '../lib/cache';
 
 export default function Inventory() {
   const { confirm } = useConfirm();
-  const [products, setProducts] = useState<any[]>(cachedProducts);
-  const [loading, setLoading] = useState(!isInventoryLoaded);
+  const { activeLocationId } = useBranchContext();
+  const [selectedOutletId, setSelectedOutletId] = useState<string>('ALL');
+  const cacheKey = `inventory_${activeLocationId || 'ALL'}_${selectedOutletId}`;
+  const [products, setProducts] = useState<any[]>(() => getCachedData(cacheKey, []));
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [quickAddProduct, setQuickAddProduct] = useState<string | null>(null);
   const [quickAddQty, setQuickAddQty] = useState('');
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [receiveForm, setReceiveForm] = useState({
+    productId: '',
+    quantity: '',
+    costPrice: '',
+    referenceNote: ''
+  });
+  const [isReceiving, setIsReceiving] = useState(false);
+  const [receiveSearch, setReceiveSearch] = useState('');
+  const [selectedReceiveProduct, setSelectedReceiveProduct] = useState<any | null>(null);
+  const receiveSearchInputRef = useRef<HTMLInputElement>(null);
+  const receiveQtyInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All Categories');
   const [searchQuery, setSearchQuery] = useState('');
+  const [outlets, setOutlets] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { activeLocationId } = useBranchContext();
 
-  useEffect(() => {
-    fetchProducts();
-  }, [activeLocationId]);
-
-  if (loading) return <LoadingSpinner message="Loading inventory data..." />;
+  const fetchOutlets = async () => {
+    if (!activeLocationId || activeLocationId === 'ALL') return;
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/outlets/${activeLocationId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOutlets(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchProducts = async () => {
     const token = localStorage.getItem('whiz-token');
     try {
-      
+      setIsRefreshing(true);
       const API_BASE_URL = getApiBaseUrl();
-      const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
+      let queryParams = [];
+      if (activeLocationId !== 'ALL') queryParams.push(`locationId=${activeLocationId}`);
+      if (selectedOutletId !== 'ALL') queryParams.push(`outletId=${selectedOutletId}`);
+      const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
       const res = await fetch(`${API_BASE_URL}/api/inventory${query}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      cachedProducts = data;
-      isInventoryLoaded = true;
-      setProducts(data);
-    } catch (err) {
-        console.error(err);
-      } finally {
-        if (!isInventoryLoaded) setLoading(false);
+      if (Array.isArray(data)) {
+        setProducts(data);
+        setCachedData(cacheKey, data);
       }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
+
+  useEffect(() => {
+    fetchOutlets();
+  }, [activeLocationId]);
+
+  useEffect(() => {
+    // Show cached products immediately
+    setProducts(getCachedData(cacheKey, []));
+    fetchProducts();
+  }, [activeLocationId, selectedOutletId, cacheKey]);
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
@@ -107,7 +146,8 @@ export default function Inventory() {
         body: JSON.stringify({
           productId: quickAddProduct,
           quantity: Number(quickAddQty),
-          locationId: activeLocationId === 'ALL' ? null : activeLocationId
+          locationId: activeLocationId === 'ALL' ? null : activeLocationId,
+          outletId: selectedOutletId === 'ALL' ? null : selectedOutletId
         })
       });
 
@@ -121,6 +161,93 @@ export default function Inventory() {
       }
     } catch (err) {
       toast.error('Network error');
+    }
+  };
+
+  const openReceiveModal = () => {
+    setReceiveSearch('');
+    setSelectedReceiveProduct(null);
+    setReceiveForm({ productId: '', quantity: '', costPrice: '', referenceNote: '' });
+    setIsReceiveModalOpen(true);
+    setTimeout(() => receiveSearchInputRef.current?.focus(), 150);
+  };
+
+  const handleSelectReceiveProduct = (prod: any) => {
+    setSelectedReceiveProduct(prod);
+    setReceiveForm(prev => ({
+      ...prev,
+      productId: prod.id,
+      costPrice: prod.costPrice ? String(prod.costPrice) : prev.costPrice
+    }));
+    setTimeout(() => receiveQtyInputRef.current?.focus(), 150);
+  };
+
+  const handleReceiveSearchChange = (val: string) => {
+    setReceiveSearch(val);
+    const trimmed = val.trim();
+    if (!trimmed) return;
+    const exactMatch = products.find(p => 
+      (p.barcode && p.barcode.toLowerCase() === trimmed.toLowerCase()) || 
+      (p.sku && p.sku.toLowerCase() === trimmed.toLowerCase())
+    );
+    if (exactMatch) {
+      handleSelectReceiveProduct(exactMatch);
+      setReceiveSearch('');
+    }
+  };
+
+  const handleReceiveSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (receiveMatchingProducts.length > 0) {
+        handleSelectReceiveProduct(receiveMatchingProducts[0]);
+        setReceiveSearch('');
+      }
+    }
+  };
+
+  const handleReceiveStockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const qty = parseInt(receiveForm.quantity, 10);
+    if (!receiveForm.productId || isNaN(qty) || qty <= 0) {
+      toast.error('Please select a product and enter a positive quantity');
+      return;
+    }
+
+    try {
+      setIsReceiving(true);
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/inventory/receive-stock`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          productId: receiveForm.productId,
+          quantity: qty,
+          costPrice: receiveForm.costPrice ? parseFloat(receiveForm.costPrice) : undefined,
+          referenceNote: receiveForm.referenceNote || undefined,
+          locationId: activeLocationId === 'ALL' ? null : activeLocationId
+        })
+      });
+
+      if (res.ok) {
+        toast.success(`Received ${qty} units into Central Store!`);
+        setIsReceiveModalOpen(false);
+        setReceiveForm({ productId: '', quantity: '', costPrice: '', referenceNote: '' });
+        setSelectedReceiveProduct(null);
+        setReceiveSearch('');
+        fetchProducts();
+      } else {
+        const d = await res.json();
+        toast.error(d.error || 'Failed to receive stock');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setIsReceiving(false);
     }
   };
 
@@ -175,8 +302,49 @@ export default function Inventory() {
       triggerDownload(`${API_BASE_URL}/api/inventory/template/products?token=${token}${query}`, 'Products_Template.xlsx');
     };
 
+  const receiveMatchingProducts = products.filter(p => {
+    if (!receiveSearch.trim()) return true;
+    const q = receiveSearch.toLowerCase().trim();
+    return (
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.sku && p.sku.toLowerCase().includes(q)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+      (p.category && p.category.toLowerCase().includes(q))
+    );
+  });
+
   return (
     <div className="space-y-4 animate-in px-4 py-4 md:p-6">
+      {/* Central Store Context Banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm text-blue-900 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-600 text-white rounded-lg shrink-0">
+            <Warehouse className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="font-semibold text-blue-950 flex items-center gap-2">
+              Central Store & Warehouse Receiving
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                Primary Supply Pool
+              </span>
+            </div>
+            <p className="text-xs text-blue-700 mt-0.5">
+              Incoming supplier deliveries enter Central Store. Distribute stock to POS terminals via{' '}
+              <Link to="/dashboard/outlets" className="underline font-semibold hover:text-blue-950">
+                Outlets & Terminals
+              </Link>.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button 
+            onClick={openReceiveModal}
+            className="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-1.5 shadow-sm"
+          >
+            <PackageCheck className="w-4 h-4" /> Receive Delivery (GRN)
+          </button>
+        </div>
+      </div>
       <section className="section">
         <div className="section-header">
           <div>
@@ -210,14 +378,30 @@ export default function Inventory() {
         </div>
 
         <div className="glass-panel overflow-hidden">
-          <div className="flex items-center justify-between gap-3 p-3 border-b border-[color:var(--border-glass)]">
-            <div className="search-box flex-1 max-w-md" style={{ minWidth: 0 }}>
-              <Search />
-              <input 
-                placeholder="Search SKU, barcode or name..." 
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 border-b border-[color:var(--border-glass)]">
+            <div className="flex items-center gap-2 flex-1 max-w-xl">
+              <div className="search-box flex-1" style={{ minWidth: 0 }}>
+                <Search />
+                <input 
+                  placeholder="Search SKU, barcode or name..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <select
+                    value={selectedOutletId}
+                    onChange={(e) => setSelectedOutletId(e.target.value)}
+                    className="input py-1.5 px-3 text-xs font-semibold rounded-xl bg-white border border-gray-200"
+                    title="Filter inventory for Central Warehouse or specific outlet registers"
+                  >
+                    <option value="ALL">All Stock (Consolidated)</option>
+                    <option value="CENTRAL">Central Warehouse / Store (Main Supply)</option>
+                    {outlets.map(o => (
+                      <option key={o.id} value={o.id}>Outlet: {o.name}</option>
+                    ))}
+                  </select>
+                </div>
             </div>
             <div className="flex items-center gap-1 flex-wrap">
               {['All Categories', ...Array.from(new Set(products.map(p => p.category || 'Uncategorized')))].map((c: string) => (
@@ -245,9 +429,7 @@ export default function Inventory() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr><td colSpan={7} className="text-center py-4">Loading...</td></tr>
-                ) : products.length > 0 ? (
+                {products.length > 0 ? (
                   products
                     .filter(p => selectedCategory === 'All Categories' || (p.category || 'Uncategorized') === selectedCategory)
                     .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -298,7 +480,7 @@ export default function Inventory() {
                 ) : (
                   <tr>
                     <td colSpan={7} className="text-center py-8 text-[color:var(--text-muted)]">
-                      No products found. Add your first product!
+                      {isRefreshing ? 'Fetching latest inventory...' : 'No products found. Add your first product!'}
                     </td>
                   </tr>
                 )}
@@ -307,9 +489,7 @@ export default function Inventory() {
           </div>
           
           <div className="md:hidden divide-y divide-[color:var(--border-glass)]">
-            {loading ? (
-              <div className="p-4 text-center">Loading...</div>
-            ) : products.length > 0 ? (
+            {products.length > 0 ? (
               products
                 .filter(p => selectedCategory === 'All Categories' || (p.category || 'Uncategorized') === selectedCategory)
                 .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -403,6 +583,208 @@ export default function Inventory() {
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setQuickAddProduct(null)} className="btn btn-ghost">Cancel</button>
             <button type="submit" className="btn btn-primary">Add Stock</button>
+          </div>
+        </form>
+      </Modal>
+      {/* Formal Goods Received Note (GRN) Modal */}
+      <Modal 
+        isOpen={isReceiveModalOpen} 
+        onClose={() => setIsReceiveModalOpen(false)} 
+        title="Receive Delivery into Central Store (GRN)"
+        className="max-w-2xl sm:max-w-3xl"
+      >
+        <form onSubmit={handleReceiveStockSubmit} className="space-y-4 mt-2">
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-blue-600 mt-0.5" />
+            <span>
+              Document supplier deliveries into Central Store. Stock increases your in-store warehouse pool and is logged under Stock Movements.
+            </span>
+          </div>
+
+          {/* Product Selection Section */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-800 mb-1.5">
+              Select Product to Receive *
+            </label>
+
+            {selectedReceiveProduct ? (
+              /* Selected Product Card */
+              <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <Check className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-gray-900 text-base truncate">
+                      {selectedReceiveProduct.name}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap text-xs text-gray-600 mt-0.5">
+                      <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                        SKU: {selectedReceiveProduct.sku}
+                      </span>
+                      {selectedReceiveProduct.barcode && (
+                        <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200 flex items-center gap-1">
+                          <Barcode className="w-3 h-3 text-gray-500" />
+                          {selectedReceiveProduct.barcode}
+                        </span>
+                      )}
+                      <span className="font-semibold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
+                        Current In-Store: {selectedReceiveProduct.inStoreStock ?? selectedReceiveProduct.stock ?? 0} units
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedReceiveProduct(null);
+                    setReceiveForm(prev => ({ ...prev, productId: '' }));
+                    setTimeout(() => receiveSearchInputRef.current?.focus(), 100);
+                  }}
+                  className="btn btn-sm btn-secondary bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 shrink-0 inline-flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Change
+                </button>
+              </div>
+            ) : (
+              /* Product Search Combobox */
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400 pointer-events-none" />
+                  <input
+                    ref={receiveSearchInputRef}
+                    type="text"
+                    value={receiveSearch}
+                    onChange={e => handleReceiveSearchChange(e.target.value)}
+                    onKeyDown={handleReceiveSearchKeyDown}
+                    placeholder="Search by product name, SKU, or scan barcode with scanner..."
+                    className="w-full pl-9 pr-8 py-2.5 border-2 border-blue-300 rounded-xl bg-white text-sm focus:outline-none focus:border-blue-600 transition-colors shadow-sm"
+                  />
+                  {receiveSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReceiveSearch('');
+                        receiveSearchInputRef.current?.focus();
+                      }}
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filtered Search Results Dropdown List */}
+                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-inner max-h-56 overflow-y-auto divide-y divide-gray-100">
+                  {receiveMatchingProducts.length > 0 ? (
+                    receiveMatchingProducts.slice(0, 50).map(p => (
+                      <div
+                        key={p.id}
+                        onClick={() => handleSelectReceiveProduct(p)}
+                        className="p-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between gap-3 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm text-gray-900 truncate">
+                            {p.name}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 font-mono mt-0.5">
+                            <span>SKU: {p.sku}</span>
+                            {p.barcode && <span>• Barcode: {p.barcode}</span>}
+                            {p.category && <span className="text-gray-400">({p.category})</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className="text-xs text-gray-500">In-Store</div>
+                            <div className="font-bold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              {p.inStoreStock ?? p.stock ?? 0} units
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-xs bg-blue-600 hover:bg-blue-700 text-white font-medium px-2.5 py-1 rounded-lg"
+                          >
+                            Select
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center text-sm text-gray-500">
+                      No products found matching "{receiveSearch}". Try another name or SKU.
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Tip: Barcode scanners will auto-select the product when scanned. Press Enter to select the top match.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Quantity Received (Units) *
+              </label>
+              <input
+                ref={receiveQtyInputRef}
+                type="number"
+                required
+                min="1"
+                placeholder="e.g. 100"
+                value={receiveForm.quantity}
+                onChange={e => setReceiveForm({ ...receiveForm, quantity: e.target.value })}
+                className="w-full p-2.5 border rounded-lg text-base font-semibold"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                New Cost Price (Optional, KES)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g. 450.00"
+                value={receiveForm.costPrice}
+                onChange={e => setReceiveForm({ ...receiveForm, costPrice: e.target.value })}
+                className="w-full p-2.5 border rounded-lg"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Supplier Delivery Note / Invoice Ref
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Invoice #9823 / Brookside Dairy"
+              value={receiveForm.referenceNote}
+              onChange={e => setReceiveForm({ ...receiveForm, referenceNote: e.target.value })}
+              className="w-full p-2.5 border rounded-lg"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t">
+            <button 
+              type="button" 
+              onClick={() => setIsReceiveModalOpen(false)} 
+              className="btn btn-ghost"
+              disabled={isReceiving}
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              className="btn btn-primary inline-flex items-center gap-1.5"
+              disabled={isReceiving || !receiveForm.productId || !receiveForm.quantity}
+            >
+              <PackageCheck className="w-4 h-4" />
+              {isReceiving ? 'Processing...' : 'Confirm Goods Received'}
+            </button>
           </div>
         </form>
       </Modal>

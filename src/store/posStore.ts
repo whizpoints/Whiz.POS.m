@@ -1,98 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-// Define the Electron API that will be exposed on the window object
-declare global {
-  interface Window {
-    /**
-     * The Electron interface exposed via `preload.js`.
-     * Provides secure access to native functionality.
-     */
-    electron: {
-      /**
-       * Saves data to a local JSON file.
-       */
-      saveData: (fileName: string, data: any) => Promise<{ success: boolean; error?: any }>;
-
-      /**
-       * Reads data from a local JSON file.
-       */
-      readData: (fileName: string) => Promise<{ success: boolean; data?: any; error?: any }>;
-
-      /**
-       * Prints a transaction receipt.
-       */
-      printReceipt: (transaction: Transaction, businessSetup: BusinessSetup, isReprint: boolean) => void;
-
-      /**
-       * Saves a temporary image to the persistent local storage.
-       */
-      saveImage: (tempPath: string) => Promise<{ success: boolean; path?: string; fileName?: string; error?: any }>;
-
-      /**
-       * Prints the daily closing report.
-       */
-      printClosingReport: (reportData: ClosingReportData, businessSetup: BusinessSetup, detailed?: boolean) => void;
-
-      /**
-       * Prints the initial business setup sheet.
-       */
-      printBusinessSetup: (businessSetup: BusinessSetup, adminUser: User) => void;
-
-      /**
-       * Retrieves the local API configuration (URL, Key, QR).
-       */
-      getApiConfig: () => Promise<{ apiUrl: string, apiKey: string, qrCodeDataUrl: string }>;
-
-      /**
-       * Uploads an image to the remote Back Office server.
-       */
-      uploadImage: (filePath: string, apiUrl: string, apiKey: string) => Promise<{ imageUrl: string }>;
-
-      /**
-       * Gets list of printers.
-       */
-      getPrinters: () => Promise<any[]>;
-
-      /**
-       * Listen for sync updates from mobile.
-       */
-      onMobileDataSync: (callback: (event: any, payload: any) => void) => void;
-
-      /**
-       * Listen for new mobile receipt requests.
-       */
-      onNewMobileReceipt: (callback: (event: any, receipt: any) => void) => void;
-
-      // Developer Tools
-      getDeveloperConfig: () => Promise<{ developerPin: string | null; mongoUri: string; backOfficeUrl: string; backOfficeApiKey: string }>;
-      saveDeveloperConfig: (config: { developerPin?: string; mongoUri?: string }) => Promise<{ success: boolean; error?: string }>;
-      directDbPush: (mongoUri: string) => Promise<{ success: boolean; error?: string }>;
-      directDbPull: (mongoUri: string) => Promise<{ success: boolean; data?: any; error?: string }>;
-      savePrinterSettings: (settings: { defaultPrinter: string }) => Promise<{ success: boolean }>;
-      getPrinterSettings: () => Promise<{ defaultPrinter: string }>;
-      getPrinters: () => Promise<any[]>;
-      checkForUpdate: () => void;
-      toggleFullscreen: () => void;
-      getConnectedDevices: () => Promise<{ ip: string; name: string; lastSeen: string }[]>;
-      backupData: () => Promise<{ success: boolean; filePath?: string; error?: string }>;
-      restoreData: () => Promise<{ success: boolean; error?: string }>;
-
-      auth: {
-        login: (userId: string, pin: string, deviceId?: string) => Promise<{ success: boolean; token?: string; user?: any; error?: string }>;
-        logout: (token: string) => Promise<{ success: boolean }>;
-        verify: (token: string) => Promise<{ success: boolean; user?: any }>;
-      };
-
-      userManagement: {
-        addUser: (userData: any) => Promise<{ success: boolean; error?: string }>;
-        updateUser: (userId: string, updates: any) => Promise<{ success: boolean; error?: string }>;
-        deleteUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
-      };
-    };
-  }
-}
-
 // Add SessionToken to interface
 interface PosState {
     // ... existing ...
@@ -156,11 +64,31 @@ export interface Product {
   available: boolean;
   stock?: number;
   minStock?: number;
+  minStockLevel?: number;
+  barcode?: string;
+  productId?: string;
+  expiryDate?: string;
+  batchNumber?: string;
+  supplier?: string;
 }
 
 export interface CartItem {
   product: Product;
   quantity: number;
+}
+
+export interface OpenBill {
+  id: string; // e.g. "BILL-1001"
+  tableNumber: string; // e.g. "Table 4" or "Bar 2"
+  customerName?: string;
+  items: CartItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  cashier: string;
+  createdAt: string;
+  status: 'open' | 'settled' | 'cancelled';
+  notes?: string;
 }
 
 export interface Transaction {
@@ -170,10 +98,24 @@ export interface Transaction {
   subtotal: number;
   tax: number;
   total: number;
-  paymentMethod: 'cash' | 'mpesa' | 'credit';
+  paymentMethod: 'cash' | 'mpesa' | 'credit' | 'card' | 'bank';
   cashier: string;
   creditCustomer?: string;
   status: 'completed' | 'pending' | 'refunded';
+  amountTendered?: number;
+  change?: number;
+  mpesaCode?: string;
+  phoneNumber?: string;
+  mpesaName?: string;
+  customerName?: string;
+  kraDetails?: {
+    qrCode?: string;
+    invoiceNumber?: string;
+    date?: string;
+    receiptNumber?: string;
+    url?: string;
+    controlCode?: string;
+  };
 }
 
 export interface CreditSale {
@@ -189,6 +131,9 @@ export interface CreditCustomer {
   phone: string;
   totalCredit: number;
   paidAmount: number;
+  company?: string;
+  email?: string;
+  address?: string;
   balance: number;
   transactions: string[]; // Store transaction IDs
   createdAt: string;
@@ -225,6 +170,27 @@ export interface User {
   role: 'admin' | 'manager' | 'cashier';
   isActive: boolean;
   createdAt: string;
+  password?: string;
+}
+
+
+export interface PurchaseOrderItem {
+  productId: number;
+  productName: string;
+  quantity: number;
+  costPrice: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  dateCreated: string;
+  dateExpected?: string;
+  items: PurchaseOrderItem[];
+  totalAmount: number;
+  status: 'draft' | 'ordered' | 'received' | 'cancelled';
+  notes?: string;
 }
 
 export interface Supplier {
@@ -259,8 +225,21 @@ export interface Salary {
 }
 
 export interface BusinessSetup {
+  mpesaEnv?: string;
+  cardMode?: string;
+  cardGateway?: string;
+  etimsEnv?: string;
+  developerPin?: string;
+  locationId?: string;
+  outletName?: string;
   businessName: string;
   businessId?: string;
+  id?: string;
+  terminalName?: string;
+  outletId?: string;
+  deviceRole?: string;
+  kraPin?: string;
+  etimsPin?: string;
   apiUrl?: string;
   apiKey?: string;
   backOfficeUrl?: string;
@@ -290,6 +269,15 @@ export interface BusinessSetup {
   locationName?: string;
   autoLogoffEnabled?: boolean;
   autoLogoffMinutes?: number;
+  kraEnabled?: boolean;
+  kraEndpoint?: string;
+  disableReceiptPrinting?: boolean;
+  showDeveloperFooter?: boolean;
+  billModeEnabled?: boolean;
+  hospitalityReceiptPrinting?: boolean;
+  printDuplicateReceipts?: boolean;
+  autoDeleteOldBackups?: boolean;
+  backupRetentionDays?: number;
   mpesaConfig?: {
     enabled: boolean;
     backendUrl: string;
@@ -347,6 +335,8 @@ export interface InventoryLog {
     cashierName: string;
     timestamp: string;
     reason?: string;
+    reference?: string;
+    type?: string;
 }
 
 export interface DailySummary {
@@ -384,6 +374,12 @@ interface PosState {
   businessSetup: BusinessSetup | null;
   mobileReceipts: any[];
   loyaltyCustomers: LoyaltyCustomer[];
+  openBills: OpenBill[];
+  isOpenBillsModalOpen: boolean;
+  isBillPromptOpen: boolean;
+  activeSettlingBillId: string | null;
+  savedCartBeforeSettling: CartItem[];
+  purchaseOrders: any[];
   
   // UI State
   isDataLoaded: boolean;
@@ -406,7 +402,6 @@ interface PosState {
   
   // Enhanced features state
   inventoryProducts: Product[];
-  loyaltyCustomers: any[];
   syncHistory: any[];
   categories: string[];
 
@@ -426,16 +421,32 @@ interface PosState {
   closeSetupWizard: () => void;
   openLogin: () => void;
   closeLogin: () => void;
+  openOpenBillsModal: () => void;
+  closeOpenBillsModal: () => void;
+  openBillPrompt: () => void;
+  closeBillPrompt: () => void;
+  startSettlingBill: (billId: string) => void;
+  cancelSettlingBill: () => void;
+  issueCustomerBill: (params: { tableNumber?: string; customerName?: string; notes?: string }) => Promise<OpenBill>;
+  settleBill: (billId: string, paymentMethod: 'cash' | 'mpesa' | 'credit', additionalData?: any, printFinalReceipt?: boolean) => Promise<void>;
+  cancelBill: (billId: string) => Promise<void>;
   openKeyboard: (inputElement: HTMLInputElement | HTMLTextAreaElement) => void;
   closeKeyboard: () => void;
   updateKeyboardTargetValue: (value: string) => void;
   setKeyboardInput: (value: string) => void;
   setCurrentPage: (page: PosState['currentPage']) => void;
+  toggleSidebar: () => void;
 
-  completeTransaction: (paymentMethod: 'cash' | 'mpesa' | 'credit', creditCustomer?: string, additionalData?: { amountTendered?: number; change?: number; mpesaCode?: string; phoneNumber?: string }) => Promise<void>;
+  openTransactionSuccessPopup: (transaction: Transaction) => void;
+  closeTransactionSuccessPopup: () => void;
+  completeTransaction: (paymentMethod: 'cash' | 'mpesa' | 'credit' | 'card' | 'bank', creditCustomer?: string, additionalData?: { amountTendered?: number; change?: number; mpesaCode?: string; phoneNumber?: string; customerName?: string; mpesaName?: string }) => Promise<void>;
+  saveExpense: (expense: Expense) => void;
+  loadUsers: () => Promise<void>;
   reprintTransaction: (transactionId: string) => void;
   reverseTransaction: (transactionId: string) => void;
   saveTransaction: (transaction: Transaction) => void;
+  updateTransaction: (transaction: Transaction) => void;
+  submitKraInvoice: (transaction: Transaction) => Promise<any>;
   saveCreditCustomer: (customer: CreditCustomer) => void;
   updateCreditCustomer: (id: string, updates: Partial<CreditCustomer>) => void;
   deleteCreditCustomer: (id: string) => void;
@@ -448,6 +459,7 @@ interface PosState {
   addSalary: (salary: Salary) => void;
   deleteSalary: (id: string) => void;
   saveBusinessSetup: (setup: BusinessSetup) => void;
+  updateServerUrl: (newUrl: string) => Promise<void>;
   addUser: (user: User) => void;
   updateUser: (id: string, updates: Partial<User>) => void;
   deleteUser: (id: string) => void;
@@ -484,11 +496,14 @@ interface PosState {
   setCategories: (categories: string[]) => void;
   addCategory: (category: string) => void;
   deleteCategory: (category: string) => void;
-  addLoyaltyCustomer: (customer: any) => void;
-  updateLoyaltyCustomer: (id: string, updates: any) => void;
   addSyncHistoryItem: (item: any) => void;
   loadInitialData: () => void;
   finishSetup: (businessData: Omit<BusinessSetup, 'createdAt'>, adminUser: Omit<User, 'createdAt' | 'isActive'>) => Promise<void>;
+  addPurchaseOrder: (po: PurchaseOrder) => void;
+  updatePurchaseOrder: (id: string, updates: Partial<PurchaseOrder>) => void;
+  deletePurchaseOrder: (id: string) => void;
+  receivePurchaseOrder: (id: string) => void;
+  syncStatus?: { isSyncing?: boolean; progress?: number; currentTask?: string; error?: string | null };
   pushDataToServer: () => Promise<void>;
   addCreditPayment: (customerId: string, amount: number, transactionId?: string) => void;
   addInventoryLog: (log: InventoryLog) => void;
@@ -500,6 +515,9 @@ interface PosState {
  * Handles all state management including products, transactions, users, cart, and sync.
  * Persists data to local storage via 'zustand/middleware'.
  */
+let isSyncFullInProgress = false;
+let isSyncPullInProgress = false;
+
 export const usePosStore = create<PosState>()(
   persist(
     (set, get) => ({
@@ -519,6 +537,69 @@ export const usePosStore = create<PosState>()(
       documents: [],
       businessSetup: null,
       currentCashier: null,
+      openBills: [],
+      isOpenBillsModalOpen: false,
+      isBillPromptOpen: false,
+      activeSettlingBillId: null,
+      savedCartBeforeSettling: [],
+      purchaseOrders: [],
+      inventoryProducts: [],
+      syncHistory: [],
+      addSyncHistoryItem: (item: any) => set(s => ({ syncHistory: [item, ...(s.syncHistory || [])] })),
+      syncStatus: { isSyncing: false, progress: 0, currentTask: '', error: null },
+      addPurchaseOrder: (po) => {
+        set((state) => {
+          const updated = [po, ...state.purchaseOrders];
+          saveDataToFile('purchase-orders.json', updated);
+          return { purchaseOrders: updated };
+        });
+      },
+      updatePurchaseOrder: (id, updates) => {
+        set((state) => {
+          const updated = state.purchaseOrders.map(p => p.id === id ? { ...p, ...updates } : p);
+          saveDataToFile('purchase-orders.json', updated);
+          return { purchaseOrders: updated };
+        });
+      },
+      deletePurchaseOrder: (id) => {
+        set((state) => {
+          const updated = state.purchaseOrders.filter(p => p.id !== id);
+          saveDataToFile('purchase-orders.json', updated);
+          return { purchaseOrders: updated };
+        });
+      },
+      receivePurchaseOrder: (id) => {
+        set((state) => {
+          const po = state.purchaseOrders.find(p => p.id === id);
+          if (!po || po.status === 'received') return {};
+          const updatedPoList = state.purchaseOrders.map(p => p.id === id ? { ...p, status: 'received' as const } : p);
+          saveDataToFile('purchase-orders.json', updatedPoList);
+
+          const updatedProducts = state.products.map(prod => {
+            const item = po.items.find((i: any) => i.productId === prod.id);
+            if (item) {
+              const oldStock = prod.stock || 0;
+              const newStock = oldStock + item.quantity;
+              state.addInventoryLog({
+                id: 'grn_' + Date.now() + '_' + prod.id,
+                productId: prod.id,
+                productName: prod.name,
+                oldStock,
+                newStock,
+                variance: item.quantity,
+                cashierName: state.currentCashier?.name || 'Admin',
+                timestamp: new Date().toISOString(),
+                reason: 'PURCHASE_RECEIPT',
+                reference: 'PO: ' + po.id
+              });
+              return { ...prod, stock: newStock };
+            }
+            return prod;
+          });
+          saveDataToFile('products.json', updatedProducts);
+          return { purchaseOrders: updatedPoList, products: updatedProducts };
+        });
+      },
       isDataLoaded: false,
       isCheckoutOpen: false,
       isSetupWizardOpen: true,
@@ -641,11 +722,132 @@ export const usePosStore = create<PosState>()(
 
       // UI operations
       openCheckout: () => set({ isCheckoutOpen: true }),
-      closeCheckout: () => set({ isCheckoutOpen: false }),
+      closeCheckout: () => {
+        const state = get();
+        if (state.activeSettlingBillId) {
+          set({
+            isCheckoutOpen: false,
+            cart: state.savedCartBeforeSettling,
+            savedCartBeforeSettling: [],
+            activeSettlingBillId: null
+          });
+        } else {
+          set({ isCheckoutOpen: false });
+        }
+      },
       openSetupWizard: () => set({ isSetupWizardOpen: true }),
       closeSetupWizard: () => set({ isSetupWizardOpen: false }),
       openLogin: () => set({ isLoginOpen: true }),
       closeLogin: () => set({ isLoginOpen: false }),
+
+      openOpenBillsModal: () => set({ isOpenBillsModalOpen: true }),
+      closeOpenBillsModal: () => set({ isOpenBillsModalOpen: false }),
+      openBillPrompt: () => set({ isBillPromptOpen: true }),
+      closeBillPrompt: () => set({ isBillPromptOpen: false }),
+
+      startSettlingBill: (billId: string) => {
+        const state = get();
+        const bill = (state.openBills || []).find(b => b.id === billId);
+        if (!bill) return;
+
+        const currentSavedCart = state.activeSettlingBillId ? state.savedCartBeforeSettling : [...state.cart];
+
+        set({
+          activeSettlingBillId: bill.id,
+          savedCartBeforeSettling: currentSavedCart,
+          cart: [...bill.items],
+          isCheckoutOpen: true
+        });
+      },
+
+      cancelSettlingBill: () => {
+        const state = get();
+        if (state.activeSettlingBillId) {
+          set({
+            activeSettlingBillId: null,
+            cart: state.savedCartBeforeSettling,
+            savedCartBeforeSettling: [],
+            isCheckoutOpen: false
+          });
+        }
+      },
+
+      issueCustomerBill: async ({ tableNumber, customerName, notes }) => {
+        const state = get();
+        if (!state.cart || state.cart.length === 0) {
+          throw new Error('Cart is empty');
+        }
+
+        const subtotal = state.cart.reduce((sum, item) => sum + ((item.product?.price || 0) * item.quantity), 0);
+        const taxRate = state.businessSetup?.taxRate ? state.businessSetup.taxRate / 100 : 0;
+        const tax = subtotal * taxRate;
+        const total = subtotal + tax;
+
+        const generatedRef = `Tab #${Date.now().toString().slice(-4)}`;
+        const newBill: OpenBill = {
+          id: `BILL-${Date.now().toString().slice(-6)}`,
+          tableNumber: (tableNumber && tableNumber.trim()) ? tableNumber.trim() : generatedRef,
+          customerName: customerName?.trim() || '',
+          items: [...state.cart],
+          subtotal,
+          tax,
+          total,
+          cashier: state.currentCashier?.name || 'Staff',
+          createdAt: new Date().toISOString(),
+          status: 'open',
+          notes
+        };
+
+        // Automatically print customer bill upon issuing (electron will print customer bill + cashier slip)
+        if (window.electron && state.businessSetup) {
+          try {
+            window.electron.printCustomerBill(newBill, state.businessSetup);
+          } catch (e) {
+            console.error('Failed to print bill slips:', e);
+          }
+        }
+
+        const updatedOpenBills = [newBill, ...(state.openBills || [])];
+        set({ openBills: updatedOpenBills, cart: [] });
+        await saveDataToFile('open-bills.json', updatedOpenBills);
+        return newBill;
+      },
+
+      settleBill: async (billId, paymentMethod, additionalData, printFinalReceipt = true) => {
+        const state = get();
+        const bill = (state.openBills || []).find(b => b.id === billId);
+        if (!bill) throw new Error('Bill not found');
+
+        const prevCart = [...state.cart];
+        set({ cart: [...bill.items] });
+
+        const origDisableReceipt = (state.businessSetup as any)?.disableReceiptPrinting;
+        if (!printFinalReceipt && state.businessSetup) {
+          (state.businessSetup as any).disableReceiptPrinting = true;
+        }
+
+        try {
+          await state.completeTransaction(paymentMethod, bill.customerName, {
+            ...additionalData,
+            tableNumber: bill.tableNumber,
+            billId: bill.id
+          });
+        } finally {
+          if (state.businessSetup && !printFinalReceipt) {
+            (state.businessSetup as any).disableReceiptPrinting = origDisableReceipt;
+          }
+        }
+
+        const remaining = (get().openBills || []).filter(b => b.id !== billId);
+        set({ openBills: remaining, cart: prevCart });
+        await saveDataToFile('open-bills.json', remaining);
+      },
+
+      cancelBill: async (billId) => {
+        const remaining = (get().openBills || []).filter(b => b.id !== billId);
+        set({ openBills: remaining });
+        await saveDataToFile('open-bills.json', remaining);
+      },
       openKeyboard: (inputElement) => set({ isKeyboardOpen: true, activeInput: inputElement }),
       closeKeyboard: () => set({ isKeyboardOpen: false, activeInput: null }),
 
@@ -741,38 +943,44 @@ export const usePosStore = create<PosState>()(
         };
 
         // --- KRA SYNC ---
-        if (state.businessSetup?.kraEnabled && state.isOnline) {
-           const backendUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
-           const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
-           if (backendUrl && apiKey) {
-               try {
-                   const apiUrl = backendUrl.replace(/\/$/, '').replace(/\/api$/, '') || '';
-                   const res = await fetch(`${apiUrl}/api/kra/invoice`, {
-                       method: 'POST',
-                       headers: {
-                           'Content-Type': 'application/json',
-                           'Authorization': `Bearer ${apiKey}`,
-                           'X-API-KEY': apiKey
-                       },
-                       body: JSON.stringify(transaction)
-                   });
-                   if (res.ok) {
-                       const data = await res.json();
-                       if (data.kraDetails) {
-                           transaction.kraDetails = data.kraDetails;
-                       }
-                   } else {
-                       throw new Error(`KRA backend responded with status: ${res.status}`);
-                   }
-               } catch (err: any) {
-                   console.error("KRA generation failed:", err);
-                   throw new Error("Failed to communicate with KRA backend. " + err.message);
-               }
-           }
+        const isKraActive = state.businessSetup?.kraEnabled === true;
+        if (isKraActive && state.isOnline) {
+          try {
+            const kraDetails = await get().submitKraInvoice(transaction);
+            if (kraDetails) {
+              transaction.kraDetails = kraDetails;
+              if (kraDetails.receiptNumber) {
+                (transaction as any).kraInvoiceNo = kraDetails.receiptNumber;
+              }
+              if (kraDetails.qrCode) {
+                (transaction as any).kraQrCode = kraDetails.qrCode;
+              }
+              if (kraDetails.controlCode) {
+                (transaction as any).kraSignature = kraDetails.controlCode;
+              }
+            }
+          } catch (err: any) {
+            console.warn("KRA generation skipped or queued for background sync:", err.message);
+          }
         }
 
-        // --- ABSOLUTELY FIRST: SHOW SUCCESS POPUP ---
-        if ((state.businessSetup as any)?.disableReceiptPrinting) {
+        // Check if this completes/settles an open hospitality bill
+        const settlingBillId = state.activeSettlingBillId || (additionalData as any)?.billId;
+        if (settlingBillId) {
+          const remaining = (state.openBills || []).filter(b => b.id !== settlingBillId);
+          set({ openBills: remaining, activeSettlingBillId: null, savedCartBeforeSettling: [] });
+          saveDataToFile('open-bills.json', remaining);
+        }
+
+        // Determine if receipt should be generated:
+        // In Hospitality bill settlement, do NOT generate receipt unless hospitalityReceiptPrinting is explicitly set ON.
+        const isHospitalitySettling = Boolean(settlingBillId || (additionalData as any)?.tableNumber);
+        const shouldPrintReceipt = isHospitalitySettling
+          ? Boolean(state.businessSetup?.hospitalityReceiptPrinting)
+          : !((state.businessSetup as any)?.disableReceiptPrinting);
+
+        // --- SHOW SUCCESS POPUP IF NO RECEIPT PRINTED ---
+        if (!shouldPrintReceipt) {
             state.openTransactionSuccessPopup(transaction);
         }
 
@@ -845,7 +1053,7 @@ export const usePosStore = create<PosState>()(
         }
 
           // Print receipt if enabled
-          if (!((state.businessSetup as any)?.disableReceiptPrinting) && window.electron && state.businessSetup) {
+          if (shouldPrintReceipt && window.electron && state.businessSetup) {
               window.electron.printReceipt(transaction, state.businessSetup, false);
           }
         },
@@ -872,8 +1080,8 @@ export const usePosStore = create<PosState>()(
              // "ability to reverse a transaction in the old receipts incase an invalid or sale was incomplete or wrong items"
              // Best practice: Update status to 'refunded'/'reversed' and restore stock.
 
-             const updatedTransactions = state.transactions.map(t =>
-                 t.id === transactionId ? { ...t, status: 'refunded' } : t
+             const updatedTransactions: Transaction[] = state.transactions.map(t =>
+                 t.id === transactionId ? { ...t, status: 'refunded' as const } : t
              );
 
              // 2. Restore Stock
@@ -934,6 +1142,102 @@ export const usePosStore = create<PosState>()(
           saveDataToFile('transactions.json', updatedTransactions);
           return { transactions: updatedTransactions };
         });
+      },
+
+      updateTransaction: (transaction) => {
+        set((state) => {
+          const updatedTransactions = state.transactions.map(t => t.id === transaction.id ? transaction : t);
+          saveDataToFile('transactions.json', updatedTransactions);
+          state.addToSyncQueue({ type: 'update-transaction', data: transaction });
+          return { transactions: updatedTransactions };
+        });
+      },
+
+      submitKraInvoice: async (transaction) => {
+        const state = get();
+
+        // 1. If running inside Electron, use the direct IPC bridge with full fallback & queue support
+        if (typeof window !== 'undefined' && window.electron && window.electron.kraSubmitInvoice) {
+          try {
+            const res = await window.electron.kraSubmitInvoice(transaction, state.products, state.businessSetup);
+            if (res) {
+              return {
+                invoiceNumber: res.scuInvcNo || transaction.id,
+                receiptNumber: res.kraInvoiceNo,
+                qrCode: res.qrCode,
+                controlCode: res.signature,
+                date: new Date().toISOString(),
+                offline: res.offline || false,
+                offlineReason: res.offlineReason || null
+              };
+            }
+          } catch (e: any) {
+            console.warn('[KRA IPC] Direct Electron invoice submission failed, trying HTTP endpoints:', e.message);
+          }
+        }
+
+        // 2. Otherwise try local-server / webportal REST endpoints
+        const candidateUrls: string[] = [];
+        if (state.businessSetup?.backOfficeUrl) candidateUrls.push(state.businessSetup.backOfficeUrl);
+        if (state.businessSetup?.apiUrl) candidateUrls.push(state.businessSetup.apiUrl);
+        candidateUrls.push('http://localhost:5173');
+        candidateUrls.push('http://localhost:5050');
+
+        const uniqueUrls = Array.from(new Set(candidateUrls.map(u => (u || '').trim().replace(/\/$/, '').replace(/\/api$/, '')))).filter(Boolean);
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
+        };
+        const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
+        if (apiKey) {
+          headers['Authorization'] = `Bearer ${apiKey}`;
+          headers['X-API-KEY'] = apiKey;
+        }
+        const bizId = state.businessSetup?.businessId || (state.businessSetup as any)?.id;
+        if (bizId) {
+          headers['x-business-id'] = bizId;
+          headers['X-Business-Id'] = bizId;
+        }
+        const outletId = state.businessSetup?.outletId;
+        if (outletId && outletId !== 'undefined' && outletId !== 'null') {
+          headers['x-outlet-id'] = outletId;
+          headers['X-Outlet-Id'] = outletId;
+        }
+
+        for (const baseUrl of uniqueUrls) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 7000);
+            const res = await fetch(`${baseUrl}/api/kra/invoice`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(transaction),
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.kraDetails) {
+                return data.kraDetails;
+              } else if (data.kraInvoiceNo) {
+                return {
+                  invoiceNumber: data.scuInvcNo || transaction.id,
+                  receiptNumber: data.kraInvoiceNo,
+                  qrCode: data.qrCode,
+                  controlCode: data.signature,
+                  date: new Date().toISOString(),
+                  offline: data.offline || false,
+                  offlineReason: data.offlineReason || null
+                };
+              }
+            } else {
+              console.warn(`[KRA] ${baseUrl}/api/kra/invoice returned status ${res.status}`);
+            }
+          } catch (err: any) {
+            console.warn(`[KRA] Failed connecting to ${baseUrl}:`, err.message);
+          }
+        }
+        return null;
       },
 
       saveCreditCustomer: (customer) => {
@@ -1028,6 +1332,10 @@ export const usePosStore = create<PosState>()(
           state.addToSyncQueue({ type: 'delete-credit-customer', data: { id } });
           return { creditCustomers: updatedCustomers };
         });
+      },
+
+      saveExpense: (expense) => {
+        get().addExpense(expense);
       },
 
       addExpense: (expense) => {
@@ -1176,6 +1484,28 @@ export const usePosStore = create<PosState>()(
         });
       },
 
+      updateServerUrl: async (newUrl: string) => {
+        const state = get();
+        if (!state.businessSetup) return;
+        const cleanUrl = newUrl.replace(/\/$/, '').replace(/\/api$/, '');
+        const currentClean = (state.businessSetup.apiUrl || '').replace(/\/$/, '').replace(/\/api$/, '');
+        if (cleanUrl === currentClean) return;
+
+        console.log(`[posStore] Seamlessly updating server URL from ${currentClean} to ${cleanUrl} (zero data loss)`);
+        const updatedSetup = {
+          ...state.businessSetup,
+          apiUrl: cleanUrl
+        };
+        await saveDataToFile('business-setup.json', updatedSetup);
+        set({ businessSetup: updatedSetup });
+        window.dispatchEvent(new CustomEvent('server_ip_changed', { detail: { newUrl: cleanUrl } }));
+        setTimeout(() => {
+          if (typeof get().syncFromServer === 'function') {
+            get().syncFromServer();
+          }
+        }, 500);
+      },
+
       // Sync operations
       addToSyncQueue: (operation) => {
         set((state) => ({
@@ -1201,13 +1531,22 @@ export const usePosStore = create<PosState>()(
         const queue = [...state.syncQueue];
         set({ syncQueue: [] }); // Optimistically clear queue
 
+        const rawOutletId = state.businessSetup?.outletId;
+        const outletId = (rawOutletId && rawOutletId !== 'undefined' && rawOutletId !== 'null') ? rawOutletId : undefined;
+        const postHeaders: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'x-api-key': apiKey
+        };
+        if (outletId) {
+          postHeaders['x-outlet-id'] = outletId;
+          postHeaders['X-Outlet-Id'] = outletId;
+        }
+
         try {
           const response = await fetch(`${apiUrl}/api/sync`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`
-            },
+            headers: postHeaders,
             body: JSON.stringify(queue)
           });
 
@@ -1229,6 +1568,9 @@ export const usePosStore = create<PosState>()(
       },
 
       syncFromServer: async () => {
+        if (isSyncPullInProgress) return;
+        isSyncPullInProgress = true;
+        try {
         // Fetch config from initial state, but DO NOT use data state here to avoid stale closures
         const configState = get();
         let apiUrl = (configState.businessSetup?.apiUrl || configState.businessSetup?.backOfficeUrl)?.replace(/\/$/, '');
@@ -1248,11 +1590,23 @@ export const usePosStore = create<PosState>()(
             if (!apiKey) { console.debug("Sync skipped: No API Key"); return; }
 
             try {
-              console.debug(`Syncing from server: ${apiUrl}/api/sync`);
-              const response = await fetch(`${apiUrl}/api/sync`, {
-                headers: {
-                  'Authorization': `Bearer ${apiKey}`
-                }
+              const currentOutletId = configState.businessSetup?.outletId || (get() as any).businessSetup?.outletId;
+              let syncUrl = `${apiUrl}/api/sync`;
+              if (currentOutletId) {
+                syncUrl += `?outletId=${encodeURIComponent(currentOutletId)}`;
+              }
+              console.debug(`Syncing from server: ${syncUrl}`);
+              const getHeaders: Record<string, string> = {
+                'Authorization': `Bearer ${apiKey}`,
+                'x-api-key': apiKey
+              };
+              if (currentOutletId) {
+                getHeaders['x-outlet-id'] = currentOutletId;
+                getHeaders['X-Outlet-Id'] = currentOutletId;
+              }
+
+              const response = await fetch(syncUrl, {
+                headers: getHeaders
               });
 
               if (!response.ok) {
@@ -1263,6 +1617,12 @@ export const usePosStore = create<PosState>()(
               serverData = await response.json();
             } catch (error) {
               console.error('Failed to sync from server:', error);
+              if (window.electron && typeof window.electron.discoverLocalServer === 'function') {
+                window.electron.discoverLocalServer().then((discovered: any) => {
+                  const foundUrl = Array.isArray(discovered) ? discovered[0]?.url : (discovered?.url || (typeof discovered === 'string' ? discovered : null));
+                  if (foundUrl) get().updateServerUrl(foundUrl);
+                }).catch(() => {});
+              }
               return;
             }
         }
@@ -1386,8 +1746,24 @@ export const usePosStore = create<PosState>()(
              return Array.from(mergedMap.values());
           };
 
-          const newProducts = sanitizeAndMerge(currentState.products, serverData.products || [], true);
-          const newUsers = sanitizeAndMerge(currentState.users, serverData.users || []);
+          const isTerminalMode = currentState.businessSetup?.deviceRole === 'TerminalMode' || !!(currentState.businessSetup?.apiUrl && currentState.businessSetup?.apiKey);
+
+          // For TerminalMode, server's assigned products and users for this outlet are authoritative
+          let newProducts: any[];
+          let newUsers: any[];
+
+          if (isTerminalMode && Array.isArray(serverData.products)) {
+             newProducts = serverData.products;
+          } else {
+             newProducts = sanitizeAndMerge(currentState.products, serverData.products || [], true);
+          }
+
+          if (isTerminalMode && Array.isArray(serverData.users)) {
+             newUsers = serverData.users;
+          } else {
+             newUsers = sanitizeAndMerge(currentState.users, serverData.users || []);
+          }
+
           const newExpenses = sanitizeAndMerge(currentState.expenses, serverData.expenses || []);
           const newSalaries = sanitizeAndMerge(currentState.salaries, serverData.salaries || []);
           const newCreditCustomers = sanitizeAndMerge(currentState.creditCustomers, serverData.creditCustomers || []);
@@ -1402,12 +1778,36 @@ export const usePosStore = create<PosState>()(
             newCategories = [...new Set([...currentState.categories, ...serverCategoryNames])];
           }
 
-          let newBusinessSetup = currentState.businessSetup;
+          let newBusinessSetup = { ...(currentState.businessSetup || {}) };
           if (serverData.businessSetup) {
-            const serverTimestamp = new Date(serverData.businessSetup.updatedAt || serverData.businessSetup.createdAt || 0);
-            const localTimestamp = currentState.businessSetup ? new Date(currentState.businessSetup.updatedAt || currentState.businessSetup.createdAt || 0) : new Date(0);
-            if (serverTimestamp > localTimestamp) {
-              newBusinessSetup = { ...currentState.businessSetup, ...serverData.businessSetup };
+            const resolvedBizId = serverData.businessSetup.businessId || serverData.businessSetup.id || currentState.businessSetup?.businessId || currentState.businessSetup?.id;
+            newBusinessSetup = {
+              ...newBusinessSetup,
+              ...serverData.businessSetup,
+              // Retain local client terminal identifiers
+              terminalName: currentState.businessSetup?.terminalName || serverData.businessSetup.terminalName,
+              apiKey: currentState.businessSetup?.apiKey || serverData.businessSetup.apiKey,
+              apiUrl: currentState.businessSetup?.apiUrl || serverData.businessSetup.apiUrl,
+              outletId: currentState.businessSetup?.outletId || serverData.businessSetup.outletId,
+              deviceRole: currentState.businessSetup?.deviceRole || 'TerminalMode',
+              kraEnabled: currentState.businessSetup?.kraEnabled !== undefined ? currentState.businessSetup.kraEnabled : (serverData.businessSetup.kraEnabled ?? false),
+              billModeEnabled: currentState.businessSetup?.billModeEnabled !== undefined ? currentState.businessSetup.billModeEnabled : (serverData.businessSetup.billModeEnabled ?? false),
+              hospitalityReceiptPrinting: currentState.businessSetup?.hospitalityReceiptPrinting !== undefined ? currentState.businessSetup.hospitalityReceiptPrinting : (serverData.businessSetup.hospitalityReceiptPrinting ?? false),
+              printDuplicateReceipts: currentState.businessSetup?.printDuplicateReceipts !== undefined ? currentState.businessSetup.printDuplicateReceipts : (serverData.businessSetup.printDuplicateReceipts ?? false),
+              businessId: resolvedBizId,
+              id: resolvedBizId,
+              isSetup: true
+            };
+            if (serverData.businessSetup.businessName) {
+              newBusinessSetup.businessName = serverData.businessSetup.businessName;
+            }
+            if (serverData.businessSetup.kraPin || serverData.businessSetup.etimsPin) {
+              const p = serverData.businessSetup.kraPin || serverData.businessSetup.etimsPin;
+              newBusinessSetup.kraPin = p;
+              (newBusinessSetup as any).etimsPin = p;
+            }
+            if (typeof window !== 'undefined' && window.localStorage) {
+              window.localStorage.setItem('whiz-pos-business-setup', JSON.stringify(newBusinessSetup));
             }
           }
 
@@ -1435,6 +1835,9 @@ export const usePosStore = create<PosState>()(
         } catch (error) {
           console.error('Failed to process sync data:', error);
         }
+        } finally {
+          isSyncPullInProgress = false;
+        }
       },
 
       setOnlineStatus: (isOnline) => {
@@ -1449,7 +1852,7 @@ export const usePosStore = create<PosState>()(
       handleMobileDataSync: (payload: any) => {
         if (!Array.isArray(payload)) payload = [payload];
 
-        payload.forEach(item => {
+        payload.forEach((item: any) => {
             const { type, data } = item;
 
             // Add to sync queue for Back Office propagation
@@ -1695,7 +2098,7 @@ export const usePosStore = create<PosState>()(
             const { path: localPath } = await window.electron.saveImage(product.image);
             product.localImage = localPath;
 
-            if (state.isOnline) {
+            if (state.isOnline && state.businessSetup?.apiUrl && state.businessSetup?.apiKey) {
               const { imageUrl } = await window.electron.uploadImage(product.image, state.businessSetup.apiUrl, state.businessSetup.apiKey);
               product.image = imageUrl;
             } else {
@@ -1723,7 +2126,7 @@ export const usePosStore = create<PosState>()(
             const { path: localPath } = await window.electron.saveImage(updates.image);
             updates.localImage = localPath;
 
-            if (state.isOnline) {
+            if (state.isOnline && state.businessSetup?.apiUrl && state.businessSetup?.apiKey) {
               const { imageUrl } = await window.electron.uploadImage(updates.image, state.businessSetup.apiUrl, state.businessSetup.apiKey);
               updates.image = imageUrl;
             } else {
@@ -1788,7 +2191,7 @@ export const usePosStore = create<PosState>()(
                  const state = get();
                  if (state.currentCashier && state.currentCashier.id === id) {
                       if (updates.isActive === false) {
-                          set({ currentCashier: null, sessionToken: null, businessSetup: { ...state.businessSetup, isLoggedIn: false } });
+                          set({ currentCashier: null, sessionToken: null, businessSetup: state.businessSetup ? { ...state.businessSetup, isLoggedIn: false } : null });
                       } else {
                           set({ currentCashier: { ...state.currentCashier, ...updates } });
                       }
@@ -1806,7 +2209,7 @@ export const usePosStore = create<PosState>()(
 
                  const state = get();
                  if (state.currentCashier && state.currentCashier.id === id) {
-                      set({ currentCashier: null, sessionToken: null, businessSetup: { ...state.businessSetup, isLoggedIn: false } });
+                      set({ currentCashier: null, sessionToken: null, businessSetup: state.businessSetup ? { ...state.businessSetup, isLoggedIn: false } : null });
                  }
              }
         }
@@ -1837,8 +2240,8 @@ export const usePosStore = create<PosState>()(
               set({ businessSetup: prefillSetup });
           }
 
-          const fileNames = ['products.json', 'users.json', 'transactions.json', 'credit-customers.json', 'expenses.json', 'salaries.json', 'credit-payments.json', 'inventory-logs.json', 'daily-summaries.json', 'loyalty-customers.json', 'suppliers.json', 'documents.json'];
-          const dataMap = {
+          const fileNames = ['products.json', 'users.json', 'transactions.json', 'credit-customers.json', 'expenses.json', 'salaries.json', 'credit-payments.json', 'inventory-logs.json', 'daily-summaries.json', 'loyalty-customers.json', 'suppliers.json', 'documents.json', 'open-bills.json'];
+          const dataMap: Record<string, string> = {
             'products.json': 'products',
             'users.json': 'users',
             'transactions.json': 'transactions',
@@ -1850,7 +2253,8 @@ export const usePosStore = create<PosState>()(
             'daily-summaries.json': 'dailySummaries',
             'loyalty-customers.json': 'loyaltyCustomers',
             'suppliers.json': 'suppliers',
-            'documents.json': 'documents'
+            'documents.json': 'documents',
+            'open-bills.json': 'openBills'
           };
 
           // Load Categories
@@ -2090,59 +2494,63 @@ export const usePosStore = create<PosState>()(
       },
 
       pushDataToServer: async () => {
-        const state = get();
-        // Use backOfficeUrl if available, fallback to apiUrl (legacy)
-        let rawUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
-        const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
-        const mongoDbUri = state.businessSetup?.mongoDbUri;
-
-        if (!state.isOnline) {
-            console.error("Cannot push data: App is offline");
-            return;
-        }
-
-        let apiUrl = rawUrl?.replace(/\/$/, '');
-        // Remove trailing /api to prevent double /api
-        apiUrl = apiUrl?.replace(/\/api$/, '') || '';
-
-        if (!apiUrl) {
-            console.error("Cannot push data: No Back Office URL configured");
-            return;
-        }
-        if (!apiKey) {
-            console.error("Cannot push data: No Back Office API Key configured");
-            return;
-        }
-
+        if (isSyncFullInProgress) return;
+        isSyncFullInProgress = true;
         try {
-            const payload = {
-                products: state.products,
-                users: state.users,
-                expenses: state.expenses,
-                salaries: state.salaries,
-                customers: state.creditCustomers,
-                transactions: state.transactions,
-                businessSetup: state.businessSetup,
-                suppliers: state.suppliers
-            };
+          const state = get();
+          // Use backOfficeUrl if available, fallback to apiUrl (legacy)
+          let rawUrl = state.businessSetup?.backOfficeUrl || state.businessSetup?.apiUrl;
+          const apiKey = state.businessSetup?.backOfficeApiKey || state.businessSetup?.apiKey;
+          const mongoDbUri = state.businessSetup?.mongoDbUri;
 
-            const response = await fetch(`${apiUrl}/api/sync/full`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`,
-                    'X-API-KEY': apiKey
-                },
-                body: JSON.stringify(payload)
-            });
+          if (!state.isOnline) {
+              return;
+          }
 
-            if (!response.ok) {
-                throw new Error('Full sync failed');
-            }
-            console.log("Full sync successful");
-            set({ lastSyncTime: new Date().toISOString() });
+          let apiUrl = rawUrl?.replace(/\/$/, '');
+          // Remove trailing /api to prevent double /api
+          apiUrl = apiUrl?.replace(/\/api$/, '') || '';
+
+          if (!apiUrl || !apiKey) {
+              return;
+          }
+
+          const payload = {
+              products: state.products,
+              users: state.users,
+              expenses: state.expenses,
+              salaries: state.salaries,
+              customers: state.creditCustomers,
+              transactions: state.transactions,
+              businessSetup: state.businessSetup,
+              suppliers: state.suppliers
+          };
+
+          const response = await fetch(`${apiUrl}/api/sync/full`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${apiKey}`,
+                  'X-API-KEY': apiKey
+              },
+              body: JSON.stringify(payload)
+          });
+
+          if (!response.ok && response.status !== 202) {
+              throw new Error(`Full sync response: ${response.status}`);
+          }
+          console.log("Full sync successfully sent");
+          set({ lastSyncTime: new Date().toISOString() });
         } catch (error) {
-            console.error('Full sync error:', error);
+          console.warn('Full sync error:', error);
+          if (window.electron && typeof window.electron.discoverLocalServer === 'function') {
+            window.electron.discoverLocalServer().then((discovered: any) => {
+              const foundUrl = Array.isArray(discovered) ? discovered[0]?.url : (discovered?.url || (typeof discovered === 'string' ? discovered : null));
+              if (foundUrl) get().updateServerUrl(foundUrl);
+            }).catch(() => {});
+          }
+        } finally {
+          isSyncFullInProgress = false;
         }
       },
 

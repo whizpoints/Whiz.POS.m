@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { usePosStore } from '../store/posStore';
-import { Store, Coffee, BarChart3, Users, Calendar, Settings, DollarSign, Database, Package, Gift, Camera, Activity, Building2, UserCheck, Printer, Smartphone, Maximize, Wrench, FileText, BookOpen, ShieldAlert, FileCheck2, History, RefreshCw } from 'lucide-react';
+import { Store, Coffee, BarChart3, Users, Calendar, Settings, DollarSign, Database, Package, Gift, Camera, Activity, Building2, UserCheck, Printer, Smartphone, Maximize, Wrench, FileText, BookOpen, ShieldAlert, FileCheck2, History, RefreshCw, UtensilsCrossed } from 'lucide-react';
 
 /**
  * Helper component to group navigation links with a title.
@@ -71,6 +71,25 @@ const Navigation = () => {
             <Coffee className="w-5 h-5" />
             <span>POS</span>
           </NavLink>
+          {businessSetup?.billModeEnabled && (
+            <NavLink to="/open-bills" className={navLinkClasses}>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center space-x-3">
+                  <UtensilsCrossed className="w-5 h-5 text-amber-500" />
+                  <span>Open Tabs / Bills</span>
+                </div>
+                {(usePosStore.getState().openBills?.length || 0) > 0 && (
+                  <span className="bg-amber-500 text-slate-950 text-xs px-2 py-0.5 rounded-full font-black ml-auto">
+                    {usePosStore.getState().openBills?.length || 0}
+                  </span>
+                )}
+              </div>
+            </NavLink>
+          )}
+          <NavLink to="/documents" className={navLinkClasses}>
+            <FileText className="w-5 h-5" />
+            <span>Documents</span>
+          </NavLink>
           <NavLink to="/mobile-receipts" className={navLinkClasses}>
             <Smartphone className="w-5 h-5" />
             <span>Mobile Receipts</span>
@@ -82,6 +101,10 @@ const Navigation = () => {
           <NavLink to="/previous-receipts" className={navLinkClasses}>
             <Printer className="w-5 h-5" />
             <span>Old Receipts</span>
+          </NavLink>
+          <NavLink to="/closing" className={navLinkClasses}>
+            <Calendar className="w-5 h-5 text-amber-500" />
+            <span className="font-semibold text-amber-800">End Day Closing</span>
           </NavLink>
 
         </NavGroup>
@@ -99,10 +122,6 @@ const Navigation = () => {
             <NavLink to="/ledger" className={navLinkClasses}>
               <BookOpen className="w-5 h-5" />
               <span>Financial Ledger</span>
-            </NavLink>
-            <NavLink to="/closing" className={navLinkClasses}>
-              <Calendar className="w-5 h-5" />
-              <span>Closing</span>
             </NavLink>
           </NavGroup>
         )}
@@ -124,18 +143,12 @@ const Navigation = () => {
           </NavLink>
         </NavGroup>
 
-        {isAdminOrManager && (
-          <NavGroup title="Inventory">
-            <NavLink to="/inventory" className={navLinkClasses}>
-              <Package className="w-5 h-5" />
-              <span>Inventory Management</span>
-            </NavLink>
-            <NavLink to="/procurement" className={navLinkClasses}>
-              <Store className="w-5 h-5" />
-              <span>Procurement & GRN</span>
-            </NavLink>
-          </NavGroup>
-        )}
+        <NavGroup title="Inventory">
+          <NavLink to="/inventory" className={navLinkClasses}>
+            <Package className="w-5 h-5" />
+            <span>View Inventory</span>
+          </NavLink>
+        </NavGroup>
 
         {isAdminOrManager && (
           <NavGroup title="Administration">
@@ -158,10 +171,6 @@ const Navigation = () => {
             <NavLink to="/manage" className={navLinkClasses}>
               <Settings className="w-5 h-5" />
               <span>Settings</span>
-            </NavLink>
-            <NavLink to="/users" className={navLinkClasses}>
-              <UserCheck className="w-5 h-5" />
-              <span>Users</span>
             </NavLink>
           </NavGroup>
         )}

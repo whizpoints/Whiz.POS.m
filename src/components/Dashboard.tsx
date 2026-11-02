@@ -178,7 +178,7 @@ export default function Dashboard() {
       else paymentStats.other += amount;
     });
 
-    const lowStockCount = products.filter(p => (p.stock !== undefined && p.stock !== null) && p.stock <= (p.minStockLevel || 5)).length;
+    const lowStockCount = products.filter(p => (p.stock !== undefined && p.stock !== null) && p.stock <= ((p as any).minStockLevel || p.minStock || 5)).length;
 
     return {
       metrics: dashboardMetrics,

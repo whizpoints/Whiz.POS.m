@@ -3,21 +3,25 @@ import { ShoppingCart, Search, Download, Filter, Printer, FileText, Mail, Refres
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
 import { useBranchContext } from '../context/BranchContext';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { getCachedData, setCachedData } from '../lib/cache';
 
 export default function Sales() {
-  const [sales, setSales] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { activeLocationId } = useBranchContext();
+  const cacheKey = `sales_receipts_${activeLocationId || 'ALL'}`;
+  const [sales, setSales] = useState<any[]>(() => getCachedData(cacheKey, []));
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [emailReceiptId, setEmailReceiptId] = useState<string | null>(null);
   const [emailTo, setEmailTo] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const { activeLocationId } = useBranchContext();
 
   useEffect(() => {
+    // Show cached sales immediately
+    setSales(getCachedData(cacheKey, []));
+
     const fetchSales = async () => {
       try {
-        setLoading(true);
+        setIsRefreshing(true);
         const token = localStorage.getItem('whiz-token');
         // For Electron, we need the absolute URL to the local backend. For web, relative URL uses Vite proxy.
         const API_BASE_URL = window.location.protocol === 'file:' ? 'http://localhost:5050' : '';
@@ -31,19 +35,17 @@ export default function Sales() {
           const data = await response.json();
           if (data.receipts) {
             setSales(data.receipts);
+            setCachedData(cacheKey, data.receipts);
           }
         }
       } catch (error) {
         console.error('Failed to fetch sales', error);
       } finally {
-        setLoading(false);
+        setIsRefreshing(false);
       }
     };
     fetchSales();
-  }, [activeLocationId]);
-
-  if (loading) return <LoadingSpinner message="Loading sales data..." />;
-
+  }, [activeLocationId, cacheKey]);
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Completed': return 'badge-success';
@@ -129,13 +131,11 @@ export default function Sales() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {sales.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-4 text-[color:var(--text-muted)]">Loading sales data...</td>
-                </tr>
-              ) : sales.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-4 text-[color:var(--text-muted)]">No sales found</td>
+                  <td colSpan={7} className="text-center py-8 text-[color:var(--text-muted)]">
+                    {isRefreshing ? 'Fetching latest sales...' : 'No sales found'}
+                  </td>
                 </tr>
               ) : (
                 sales.map((sale) => (
@@ -189,10 +189,10 @@ export default function Sales() {
         </div>
         
         <div className="md:hidden divide-y divide-[color:var(--border-glass)]">
-          {loading ? (
-            <div className="p-4 text-center text-[color:var(--text-muted)]">Loading sales data...</div>
-          ) : sales.length === 0 ? (
-            <div className="p-4 text-center text-[color:var(--text-muted)]">No sales found</div>
+          {sales.length === 0 ? (
+            <div className="p-4 text-center text-[color:var(--text-muted)]">
+              {isRefreshing ? 'Fetching latest sales...' : 'No sales found'}
+            </div>
           ) : (
             sales.map((sale) => (
               <div key={sale.id} className="p-4 flex flex-col gap-2">

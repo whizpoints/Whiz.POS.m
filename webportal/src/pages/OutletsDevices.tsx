@@ -6,7 +6,6 @@ import { useBranchContext } from '../context/BranchContext';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../context/ConfirmContext';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 export default function OutletsDevices() {
   const { confirm } = useConfirm();
@@ -19,7 +18,7 @@ export default function OutletsDevices() {
     setPairingData(null);
   }, [activeLocationId]);
 
-  const activeLocation = locations.find((l: any) => l.id === activeLocationId);
+  const activeLocation = locations.find((l: any) => l.id === activeLocationId) || locations[0];
 
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
@@ -50,7 +49,10 @@ export default function OutletsDevices() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success('All edge servers unlinked successfully! Please refresh to update.');
+        toast.success('All edge servers unlinked successfully!');
+        if (activeLocation) (activeLocation as any).apiKey = undefined;
+        setPairingData(null);
+        setTimeout(() => window.location.reload(), 1000);
         // In real app, we'd trigger a context refetch here
       } else {
         toast.error(data.error || 'Failed to unlink servers');
@@ -101,7 +103,13 @@ export default function OutletsDevices() {
 
   // VIEW: SINGLE SERVER DRILL-DOWN
   if (!activeLocation) {
-    return <LoadingSpinner message="Loading Server data..." />;
+    return (
+      <div className="p-8 text-center text-[color:var(--text-muted)] animate-in fade-in">
+        <Server className="w-12 h-12 mx-auto mb-3 opacity-40" />
+        <h3 className="text-base font-semibold text-[color:var(--text-primary)]">No Branch Configured</h3>
+        <p className="text-sm">Please add or select a store branch to manage servers and terminals.</p>
+      </div>
+    );
   }
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 p-6">

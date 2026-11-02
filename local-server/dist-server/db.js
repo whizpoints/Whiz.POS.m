@@ -7,7 +7,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 let dbPath = path.join(__dirname, '../db/local.db');
 if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('file:')) {
-    dbPath = process.env.DATABASE_URL.replace('file:', '');
+    const custom = process.env.DATABASE_URL.replace('file:', '');
+    dbPath = path.isAbsolute(custom) ? custom : path.resolve(path.join(__dirname, '..'), custom);
 }
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) {
@@ -50,4 +51,5 @@ const dialect = new SqliteDialect({
 const db = new Kysely({
     dialect,
 });
+export { sqliteDb, dbPath };
 export default db;

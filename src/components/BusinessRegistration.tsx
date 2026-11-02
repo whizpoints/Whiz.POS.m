@@ -244,7 +244,7 @@ export default function BusinessRegistration() {
                   </div>
                   <div className="text-left flex-1">
                     <h3 className="text-lg font-medium text-white mb-1">Restore Backup</h3>
-                    <p className="text-sm text-slate-400">Load a previous database backup (.wpos file)</p>
+                    <p className="text-sm text-slate-400">Load an encrypted POS backup (.whizbak file)</p>
                   </div>
                   <ArrowRight className="text-slate-500 group-hover:text-purple-400 transition-colors" />
                 </button>

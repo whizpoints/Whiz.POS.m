@@ -1,50 +1,49 @@
-let cachedSuppliers: any[] = [];
-let isSuppliersLoaded = false;
 import { useState, useEffect } from 'react';
 import { Search, Plus, Phone, Building2, Edit2, Trash2 } from 'lucide-react';
 import { useBranchContext } from '../context/BranchContext';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
 import SupplierModal from '../components/Suppliers/SupplierModal';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../context/ConfirmContext';
+import { getCachedData, setCachedData } from '../lib/cache';
 
 export default function Suppliers() {
   const { confirm } = useConfirm();
-  const [suppliers, setSuppliers] = useState<any[]>(cachedSuppliers);
-  const [loading, setLoading] = useState(!isSuppliersLoaded);
   const { activeLocationId } = useBranchContext();
+  const cacheKey = `suppliers_${activeLocationId || 'ALL'}`;
+  const [suppliers, setSuppliers] = useState<any[]>(() => getCachedData(cacheKey, []));
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
 
-  useEffect(() => {
-    const fetchSuppliers = async () => {
-      try {
-        if (!isSuppliersLoaded) setLoading(true);
-        const token = localStorage.getItem('whiz-token');
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-        const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
-        const response = await fetch(`${API_BASE_URL}/api/dashboard/suppliers${query}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.suppliers) {
-            setSuppliers(data.suppliers);
-          }
+  const fetchSuppliers = async () => {
+    try {
+      setIsRefreshing(true);
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+      const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
+      const response = await fetch(`${API_BASE_URL}/api/dashboard/suppliers${query}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      } catch (error) {
-        console.error('Failed to fetch suppliers', error);
-      } finally {
-        setLoading(false);
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.suppliers) {
+          setSuppliers(data.suppliers);
+          setCachedData(cacheKey, data.suppliers);
+        }
       }
-    };
+    } catch (error) {
+      console.error('Failed to fetch suppliers', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    setSuppliers(getCachedData(cacheKey, []));
     fetchSuppliers();
-  }, [activeLocationId]);
-
-  if (loading) return <LoadingSpinner message="Loading suppliers data..." />;
-
+  }, [activeLocationId, cacheKey]);
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
       title: 'Confirm Action',
@@ -60,21 +59,12 @@ export default function Suppliers() {
       });
       if (res.ok) {
         toast.success('Supplier deleted successfully');
-        // trigger re-fetch
-        if (!isSuppliersLoaded) setLoading(true);
-        const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
-        const response = await fetch(`${API_BASE_URL}/api/dashboard/suppliers${query}`, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (response.ok) {
-          const data = await response.json();
-          setSuppliers(data.suppliers || []);
-        }
+        fetchSuppliers();
       } else {
         toast.error('Failed to delete supplier');
       }
     } catch (err) {
       toast.error('Network error');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -121,13 +111,11 @@ export default function Suppliers() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-4 text-[color:var(--text-muted)]">Loading suppliers...</td>
-                </tr>
-              ) : suppliers.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-4 text-[color:var(--text-muted)]">No suppliers found</td>
+                  <td colSpan={7} className="text-center py-8 text-[color:var(--text-muted)]">
+                    {isRefreshing ? 'Fetching latest suppliers...' : 'No suppliers found'}
+                  </td>
                 </tr>
               ) : (
                 suppliers.map((supplier) => (
@@ -172,10 +160,10 @@ export default function Suppliers() {
         </div>
 
         <div className="md:hidden divide-y divide-[color:var(--border-glass)]">
-          {loading ? (
-            <div className="p-4 text-center text-[color:var(--text-muted)]">Loading suppliers...</div>
-          ) : suppliers.length === 0 ? (
-            <div className="p-4 text-center text-[color:var(--text-muted)]">No suppliers found</div>
+          {suppliers.length === 0 ? (
+            <div className="p-4 text-center text-[color:var(--text-muted)]">
+              {isRefreshing ? 'Fetching latest suppliers...' : 'No suppliers found'}
+            </div>
           ) : (
             suppliers.map((supplier) => (
               <div key={supplier.id} className="p-4 flex flex-col gap-2">
@@ -217,14 +205,7 @@ export default function Suppliers() {
         onClose={() => setIsModalOpen(false)}
         supplier={selectedSupplier}
         onComplete={() => {
-          if (!isSuppliersLoaded) setLoading(true);
-          const token = localStorage.getItem('whiz-token');
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-          const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
-          fetch(`${API_BASE_URL}/api/dashboard/suppliers${query}`, { headers: { 'Authorization': `Bearer ${token}` } })
-            .then(res => res.json())
-            .then(data => { setSuppliers(data.suppliers || []); setLoading(false); })
-            .catch(() => setLoading(false));
+          fetchSuppliers();
         }}
       />
     </div>

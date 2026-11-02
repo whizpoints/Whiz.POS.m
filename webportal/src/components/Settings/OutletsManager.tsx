@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Store, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Store, Plus, Trash2, Edit2, Package, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import OutletModal from './OutletModal';
 import toast from 'react-hot-toast';
@@ -22,7 +23,10 @@ export default function OutletsManager() {
       const res = await fetch(`${API_BASE_URL}/api/outlets/${activeLocationId}`, {
         headers: { 'Authorization': `Bearer ${token || ''}` }
       });
-      if (res.ok) setOutlets(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setOutlets(Array.isArray(data) ? data : (data?.outlets || (data?.id ? [data] : [])));
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -32,6 +36,9 @@ export default function OutletsManager() {
 
   useEffect(() => {
     fetchOutlets();
+    const handleOutletChanged = () => fetchOutlets();
+    window.addEventListener('whiz_outlet_changed', handleOutletChanged);
+    return () => window.removeEventListener('whiz_outlet_changed', handleOutletChanged);
   }, [activeLocationId]);
 
 
@@ -86,16 +93,30 @@ export default function OutletsManager() {
         {loading ? <p>Loading...</p> : (
           <div className="divide-y divide-gray-100">
             {outlets.map(o => (
-              <div key={o.id} className="py-4 flex justify-between items-center hover:bg-gray-50 -mx-6 px-6">
-                <div>
-                  <h4 className="font-bold text-gray-900">{o.name}</h4>
-                  <p className="text-sm text-gray-500">ID: {o.id}</p>
+              <div key={o.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/80 -mx-6 px-6 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                    <Store className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                      {o.name}
+                    </h4>
+                    <p className="text-xs text-gray-400 font-mono">ID: {o.id}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleEdit(o)} className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg">
+                  <Link 
+                    to={`/dashboard/outlets/${o.id}`}
+                    className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs inline-flex items-center gap-1.5 transition-colors border border-blue-200"
+                  >
+                    <Package className="w-3.5 h-3.5" /> Manage Inventory & Staff
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                  <button onClick={() => handleEdit(o)} title="Edit Outlet Name" className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg">
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(o.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
+                  <button onClick={() => handleDelete(o.id)} title="Delete Outlet" className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

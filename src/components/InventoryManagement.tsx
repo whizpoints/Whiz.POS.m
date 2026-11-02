@@ -89,7 +89,7 @@ export default function InventoryManagement() {
           });
       }
     } else {
-      const newId = Math.random().toString(36).substr(2, 9);
+      const newId = Date.now() + Math.floor(Math.random() * 1000);
       addProduct({ ...productData, id: newId });
       
       if (productData.stock > 0) {
@@ -443,7 +443,7 @@ export default function InventoryManagement() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`text-sm font-medium ${
                         !isReconcileMode && product.stock === 0 ? 'text-red-600' :
-                        !isReconcileMode && product.stock <= (product.minStock || 10) ? 'text-orange-600' :
+                        !isReconcileMode && (product.stock ?? 0) <= (product.minStock || 10) ? 'text-orange-600' :
                         'text-gray-900'
                       }`}>
                         {product.stock || 0}
@@ -675,9 +675,9 @@ export default function InventoryManagement() {
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
                             if (window.electron) {
-                              const result = await window.electron.saveImage(file.path);
+                              const result = await window.electron.saveImage((file as any).path || '');
                               if (result.success && result.fileName) {
-                                setFormData(prev => ({ ...prev, image: result.fileName }));
+                                setFormData(prev => ({ ...prev, image: result.fileName || '' }));
                               }
                             } else {
                               const imageURL = URL.createObjectURL(file);

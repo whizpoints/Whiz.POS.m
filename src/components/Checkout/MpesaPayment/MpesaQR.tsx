@@ -23,7 +23,8 @@ export default function MpesaQR({ totalAmount }: Props) {
       setError(null);
       
       try {
-        const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+        const businessSetup = usePosStore.getState().businessSetup;
+        const cloudUrl = (businessSetup?.apiUrl || businessSetup?.backOfficeUrl || import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app').replace(/\/$/, '');
         const res = await fetch(`${cloudUrl}/api/mpesa/qrcode`, {
           method: 'POST',
           headers: {

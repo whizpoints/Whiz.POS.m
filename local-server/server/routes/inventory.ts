@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
+import { authenticate } from '../middleware/auth.js';
 
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -12,26 +13,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 // const prisma = new PrismaClient();
 
-
-const authenticate = (req: any, res: any, next: any) => {
-  let token = null;
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    token = authHeader.split(' ')[1];
-  } else if (req.query.token) {
-    token = req.query.token;
-  }
-  
-  if (!token) return res.status(401).json({ error: 'Missing authorization header or token' });
-
-  try {
-    const payload = jwt.verify(token, (process.env.JWT_SECRET || 'fallback_secret'));
-    req.user = payload;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-};
 
 router.use(authenticate);
 
@@ -42,7 +23,17 @@ router.get('/', async (req: any, res: any) => {
     const { locationId } = req.query;
     
     const products = await (async () => {
-      const prods = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
+      let prods = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
+    if (prods.length === 0) {
+      const anyProds = await db.selectFrom('Product').selectAll().orderBy('name', 'asc').execute();
+      if (anyProds.length > 0) {
+        console.log('[AutoHeal] Re-aligning ' + anyProds.length + ' products to business ' + businessId);
+        await db.updateTable('Product').set({ businessId }).execute();
+        await db.updateTable('Category').set({ businessId }).execute();
+        await db.updateTable('StoreLocation').set({ businessId }).execute();
+        prods = await db.selectFrom('Product').selectAll().where('businessId', '=', businessId).orderBy('name', 'asc').execute();
+      }
+    }
       const invs = await db.selectFrom('ProductInventory').selectAll().where('productId', 'in', prods.length > 0 ? prods.map(p => p.id) : ['']).execute();
       const locs = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).execute();
       for (const i of invs) {
@@ -55,14 +46,30 @@ router.get('/', async (req: any, res: any) => {
     })().catch(async () => []);
 
     const formatted = products.map(p => {
-       let stock = 0;
-       if (locationId) {
-          const inv = p.inventory?.find((i: any) => i.locationId === locationId);
-          stock = inv ? inv.stock : 0;
-       } else if (p.inventory && Array.isArray(p.inventory)) {
-          stock = p.inventory.reduce((sum: number, inv: any) => sum + (inv.stock || 0), 0);
+       const invList = (p.inventory && Array.isArray(p.inventory)) ? p.inventory : [];
+       const totalStock = invList.reduce((sum: number, inv: any) => sum + (Number(inv.stock) || 0), 0);
+
+       // Central Store stock is strictly where outletId is null
+       let centralInvs = invList.filter((i: any) => !i.outletId);
+       if (locationId && locationId !== 'ALL') {
+         centralInvs = centralInvs.filter((i: any) => i.locationId === locationId);
        }
-       return { ...p, stock };
+       const inStoreStock = centralInvs.reduce((sum: number, i: any) => sum + (Number(i.stock) || 0), 0);
+
+       const outletId = req.query.outletId;
+       let effectiveStock = inStoreStock;
+       if (outletId && outletId !== 'ALL' && outletId !== 'CENTRAL' && outletId !== 'STORE') {
+         const outInv = invList.find((i: any) => i.outletId === outletId);
+         effectiveStock = outInv ? Number(outInv.stock) || 0 : 0;
+       }
+
+       return {
+         ...p,
+         stock: effectiveStock,
+         inStoreStock,
+         totalStock,
+         outletStock: Math.max(0, totalStock - inStoreStock)
+       };
     });
 
     res.json(formatted);
@@ -131,6 +138,7 @@ router.post('/', async (req: any, res: any) => {
          await db.insertInto('ProductInventory').values({ id: randomUUID(), 
              productId: product.id,
              locationId: targetLocationId,
+             outletId: null,
              stock: stock || 0,
              reorderLevel: reorderLevel || 5
             }).returningAll().executeTakeFirstOrThrow();
@@ -173,6 +181,7 @@ router.put('/:id', async (req: any, res: any) => {
     if (barcode !== undefined) updateData.barcode = barcode || null;
     if (resolvedCategory !== undefined) updateData.category = resolvedCategory;
 
+    updateData.updatedAt = new Date().toISOString();
     await db.updateTable('Product').set(updateData).where('id', '=', id).where('businessId', '=', businessId).execute();
 
     // Update inventory if locationId is provided
@@ -186,33 +195,49 @@ router.put('/:id', async (req: any, res: any) => {
 
     if (targetLocationId && stock !== undefined) {
       try {
-        const existingInventory = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', id).where('locationId', '=', targetLocationId).executeTakeFirst();
+        // Strict boundary: Inventory updates from the main catalog strictly update Central Store stock (outletId is null)
+        const existingInventory = await db.selectFrom('ProductInventory')
+          .selectAll()
+          .where('productId', '=', id)
+          .where('outletId', 'is', null)
+          .executeTakeFirst();
         
-        const oldStock = existingInventory ? existingInventory.stock : 0;
-        const newStock = stock || 0;
+        const oldStock = existingInventory ? Number(existingInventory.stock || 0) : 0;
+        const newStock = Number(stock) || 0;
         const variance = newStock - oldStock;
+        const now = new Date().toISOString();
         
         if (existingInventory) {
-          await db.updateTable('ProductInventory').set({ stock: newStock, reorderLevel: reorderLevel || 5 }).where('id', '=', existingInventory.id).execute();
+          await db.updateTable('ProductInventory')
+            .set({ stock: newStock, reorderLevel: reorderLevel || 5, updatedAt: now })
+            .where('id', '=', existingInventory.id)
+            .execute();
         } else {
-          await db.insertInto('ProductInventory').values({ id: randomUUID(),  productId: id, locationId: targetLocationId, stock: newStock, reorderLevel: reorderLevel || 5  }).returningAll().executeTakeFirstOrThrow();
+          await db.insertInto('ProductInventory').values({
+            id: randomUUID(),
+            productId: id,
+            locationId: targetLocationId,
+            outletId: null,
+            stock: newStock,
+            reorderLevel: reorderLevel || 5,
+            updatedAt: now
+          }).execute();
         }
         
         if (variance !== 0 || !existingInventory) {
-           const outletId = req.query.outletId || req.body.outletId || existingInventory?.outletId || null;
            await db.insertInto('StockMovement').values({ 
                id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
                businessId,
                productId: id,
                locationId: targetLocationId,
-               outletId: String(outletId) !== 'undefined' && outletId !== null ? String(outletId) : null,
-               type: variance > 0 ? 'ADJUSTMENT_UP' : (variance < 0 ? 'ADJUSTMENT_DOWN' : 'ASSIGNMENT'),
+               outletId: null,
+               type: variance > 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
                quantity: Math.abs(variance),
-               reference: 'Server Manual Update',
+               reference: 'Central Store Stock Adjustment',
                sourceTerminal: 'SERVER',
-               timestamp: new Date().toISOString(),
-               updatedAt: new Date().toISOString()
-              }).execute();
+               timestamp: now,
+               updatedAt: now
+           }).execute();
         }
       } catch (invErr: any) {
         console.warn('Inventory update skipped:', invErr?.message || invErr);
@@ -487,33 +512,132 @@ router.post('/quick-add', async (req: any, res: any) => {
 
     if (!targetLocationId) return res.status(400).json({ error: 'No location found' });
 
-    const inv = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', productId).where('locationId', '=', targetLocationId).executeTakeFirst();
+    const now = new Date().toISOString();
+    // Strictly update Central Store (outletId is null)
+    const inv = await db.selectFrom('ProductInventory')
+      .selectAll()
+      .where('productId', '=', productId)
+      .where('outletId', 'is', null)
+      .executeTakeFirst();
 
     if (inv) {
-      await db.updateTable('ProductInventory').set((eb) => ({ stock: eb('stock', '+', quantity) })).where('id', '=', inv.id).execute();
+      await db.updateTable('ProductInventory')
+        .set((eb) => ({ stock: eb('stock', '+', quantity), updatedAt: now }))
+        .where('id', '=', inv.id)
+        .execute();
     } else {
-      await db.insertInto('ProductInventory').values({ id: randomUUID(),  productId, locationId: targetLocationId, stock: quantity, reorderLevel: 5  }).returningAll().executeTakeFirstOrThrow();
+      await db.insertInto('ProductInventory').values({
+        id: randomUUID(),
+        productId,
+        locationId: targetLocationId,
+        outletId: null,
+        stock: quantity,
+        reorderLevel: 5,
+        updatedAt: now
+      }).execute();
     }
 
-    const outletId = req.query.outletId || req.body.outletId || inv?.outletId || null;
-    await db.insertInto('StockMovement').values({ id: randomUUID(), 
-        id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    await db.insertInto('StockMovement').values({
+        id: `grn_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
         businessId,
         productId,
         locationId: targetLocationId,
-        outletId: String(outletId) !== 'undefined' && outletId !== null ? String(outletId) : null,
-        type: 'ADJUSTMENT_UP',
+        outletId: null,
+        type: 'PURCHASE',
         quantity: quantity,
-        reference: 'Quick Add from Server',
+        reference: 'Stock Received into Central Store',
         sourceTerminal: 'SERVER',
-               timestamp: new Date().toISOString(),
-               updatedAt: new Date().toISOString()
-       }).execute();
+        timestamp: now,
+        updatedAt: now
+    }).execute();
 
     res.json({ success: true, message: 'Stock added successfully' });
   } catch (error) {
     console.error('Quick Add error:', error);
     res.status(500).json({ error: 'Failed to add stock' });
+  }
+});
+
+
+// Receive stock into Central Store (GRN)
+router.post('/receive-stock', async (req: any, res: any) => {
+  try {
+    const { businessId } = req.user;
+    const { productId, quantity: rawQty, costPrice, referenceNote, locationId } = req.body;
+
+    const quantity = parseInt(rawQty, 10);
+    if (isNaN(quantity) || quantity <= 0) {
+      return res.status(400).json({ error: 'Quantity must be a positive integer' });
+    }
+
+    const product = await db.selectFrom('Product').selectAll().where('id', '=', productId).executeTakeFirst();
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    let targetLocationId = locationId;
+    if (!targetLocationId) {
+      const loc = await db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).executeTakeFirst();
+      if (loc) targetLocationId = loc.id;
+    }
+    if (!targetLocationId) return res.status(400).json({ error: 'No location found' });
+
+    const now = new Date().toISOString();
+    const centralInv = await db.selectFrom('ProductInventory')
+      .selectAll()
+      .where('productId', '=', productId)
+      .where('outletId', 'is', null)
+      .executeTakeFirst();
+
+    let newStock = quantity;
+    if (centralInv) {
+      newStock = Number(centralInv.stock || 0) + quantity;
+      await db.updateTable('ProductInventory')
+        .set({ stock: newStock, updatedAt: now })
+        .where('id', '=', centralInv.id)
+        .execute();
+    } else {
+      await db.insertInto('ProductInventory').values({
+        id: randomUUID(),
+        productId,
+        locationId: targetLocationId,
+        outletId: null,
+        stock: quantity,
+        reorderLevel: 5,
+        updatedAt: now
+      }).execute();
+    }
+
+    // Update cost price on product if specified
+    if (costPrice !== undefined && !isNaN(Number(costPrice)) && Number(costPrice) > 0) {
+      await db.updateTable('Product')
+        .set({ costPrice: Number(costPrice), updatedAt: now })
+        .where('id', '=', productId)
+        .execute();
+    }
+
+    // Log StockMovement
+    await db.insertInto('StockMovement').values({
+      id: `grn_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      businessId,
+      productId,
+      locationId: targetLocationId,
+      outletId: null,
+      type: 'PURCHASE',
+      quantity,
+      reference: referenceNote || 'Goods Received Note (GRN) into Central Store',
+      sourceTerminal: 'SERVER',
+      timestamp: now,
+      updatedAt: now
+    }).execute();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('stock_updated', { productId, inStoreStock: newStock });
+    }
+
+    res.json({ success: true, inStoreStock: newStock, message: 'Stock received into Central Store successfully' });
+  } catch (error: any) {
+    console.error('Receive stock error:', error);
+    res.status(500).json({ error: error.message || 'Failed to receive stock' });
   }
 });
 

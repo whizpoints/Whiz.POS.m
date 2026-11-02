@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Package, Plus, Edit2, Trash2, ArrowRightLeft, FileUp, Download } from 'lucide-react';
+import { Search, Package, Plus, Edit2, Trash2, ArrowRightLeft, FileUp, Download, Warehouse, PackageCheck, AlertCircle, Barcode, Check, X, RotateCcw } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useBranchContext } from '../context/BranchContext';
 import { getApiBaseUrl } from '../lib/utils';
 import StockTransferModal from '../components/Inventory/StockTransferModal';
@@ -11,30 +12,75 @@ import { useConfirm } from '../context/ConfirmContext';
 export default function Inventory() {
   const { confirm } = useConfirm();
   const [products, setProducts] = useState<any[]>([]);
+  const [outlets, setOutlets] = useState<any[]>([]);
+  const [selectedOutletScope, setSelectedOutletScope] = useState<string>('CENTRAL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
+  
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  
+  // Quick Add (Receive) Modal
   const [quickAddProduct, setQuickAddProduct] = useState<string | null>(null);
   const [quickAddQty, setQuickAddQty] = useState('');
+
+  // Formal GRN Receive Modal
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [receiveForm, setReceiveForm] = useState({
+    productId: '',
+    quantity: '',
+    costPrice: '',
+    referenceNote: ''
+  });
+  const [isReceiving, setIsReceiving] = useState(false);
+  const [receiveSearch, setReceiveSearch] = useState('');
+  const [selectedReceiveProduct, setSelectedReceiveProduct] = useState<any | null>(null);
+  const receiveSearchInputRef = useRef<HTMLInputElement>(null);
+  const receiveQtyInputRef = useRef<HTMLInputElement>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { activeLocationId } = useBranchContext();
 
   useEffect(() => {
+    fetchOutlets();
+  }, []);
+
+  useEffect(() => {
     fetchProducts();
-  }, [activeLocationId]);
+  }, [activeLocationId, selectedOutletScope]);
+
+  const fetchOutlets = async () => {
+    const token = localStorage.getItem('whiz-token');
+    try {
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/outlets`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOutlets(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch outlets:', e);
+    }
+  };
 
   const fetchProducts = async () => {
     const token = localStorage.getItem('whiz-token');
     try {
       setLoading(true);
       const API_BASE_URL = getApiBaseUrl();
-      const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
-      const res = await fetch(`${API_BASE_URL}/api/inventory${query}`, {
+      const params = new URLSearchParams();
+      if (activeLocationId !== 'ALL') params.append('locationId', activeLocationId);
+      if (selectedOutletScope && selectedOutletScope !== 'ALL') params.append('outletId', selectedOutletScope);
+
+      const res = await fetch(`${API_BASE_URL}/api/inventory?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      setProducts(data);
+      setProducts(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -102,7 +148,7 @@ export default function Inventory() {
       });
 
       if (res.ok) {
-        toast.success(`Added ${quickAddQty} items to stock!`);
+        toast.success(`Received ${quickAddQty} units into Central Store!`);
         fetchProducts();
         setQuickAddProduct(null);
       } else {
@@ -111,6 +157,94 @@ export default function Inventory() {
       }
     } catch (err) {
       toast.error('Network error');
+    }
+  };
+
+  const openReceiveModal = () => {
+    setReceiveSearch('');
+    setSelectedReceiveProduct(null);
+    setReceiveForm({ productId: '', quantity: '', costPrice: '', referenceNote: '' });
+    setIsReceiveModalOpen(true);
+    setTimeout(() => receiveSearchInputRef.current?.focus(), 150);
+  };
+
+  const handleSelectReceiveProduct = (prod: any) => {
+    setSelectedReceiveProduct(prod);
+    setReceiveForm(prev => ({
+      ...prev,
+      productId: prod.id,
+      costPrice: prod.costPrice ? String(prod.costPrice) : prev.costPrice
+    }));
+    setTimeout(() => receiveQtyInputRef.current?.focus(), 150);
+  };
+
+  const handleReceiveSearchChange = (val: string) => {
+    setReceiveSearch(val);
+    const trimmed = val.trim();
+    if (!trimmed) return;
+    // Check for exact barcode or exact SKU match (typical of barcode scanners)
+    const exactMatch = products.find(p => 
+      (p.barcode && p.barcode.toLowerCase() === trimmed.toLowerCase()) || 
+      (p.sku && p.sku.toLowerCase() === trimmed.toLowerCase())
+    );
+    if (exactMatch) {
+      handleSelectReceiveProduct(exactMatch);
+      setReceiveSearch('');
+    }
+  };
+
+  const handleReceiveSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (receiveMatchingProducts.length > 0) {
+        handleSelectReceiveProduct(receiveMatchingProducts[0]);
+        setReceiveSearch('');
+      }
+    }
+  };
+
+  const handleReceiveStockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const qty = parseInt(receiveForm.quantity, 10);
+    if (!receiveForm.productId || isNaN(qty) || qty <= 0) {
+      toast.error('Please select a product and enter a positive quantity');
+      return;
+    }
+
+    try {
+      setIsReceiving(true);
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/inventory/receive-stock`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          productId: receiveForm.productId,
+          quantity: qty,
+          costPrice: receiveForm.costPrice ? parseFloat(receiveForm.costPrice) : undefined,
+          referenceNote: receiveForm.referenceNote || undefined,
+          locationId: activeLocationId === 'ALL' ? null : activeLocationId
+        })
+      });
+
+      if (res.ok) {
+        toast.success(`Received ${qty} units into Central Store!`);
+        setIsReceiveModalOpen(false);
+        setReceiveForm({ productId: '', quantity: '', costPrice: '', referenceNote: '' });
+        setSelectedReceiveProduct(null);
+        setReceiveSearch('');
+        fetchProducts();
+      } else {
+        const d = await res.json();
+        toast.error(d.error || 'Failed to receive stock');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setIsReceiving(false);
     }
   };
 
@@ -149,31 +283,84 @@ export default function Inventory() {
     }
   };
 
-    const triggerDownload = (url: string, filename: string) => {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    };
+  const triggerDownload = (url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
-    const handleExport = () => {
-      const token = localStorage.getItem('whiz-token');
-      const API_BASE_URL = getApiBaseUrl();
-      const query = activeLocationId === 'ALL' ? '' : `&locationId=${activeLocationId}`;
-      triggerDownload(`${API_BASE_URL}/api/inventory/template/products?token=${token}${query}`, 'Products_Template.xlsx');
-    };
+  const handleExport = () => {
+    const token = localStorage.getItem('whiz-token');
+    const API_BASE_URL = getApiBaseUrl();
+    const query = activeLocationId === 'ALL' ? '' : `&locationId=${activeLocationId}`;
+    triggerDownload(`${API_BASE_URL}/api/inventory/template/products?token=${token}${query}`, 'Products_Template.xlsx');
+  };
+
+  const categories = ['All', ...Array.from(new Set(products.map(p => p.category || 'Uncategorized')))];
+  
+  const receiveMatchingProducts = products.filter(p => {
+    if (!receiveSearch.trim()) return true;
+    const q = receiveSearch.toLowerCase().trim();
+    return (
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.sku && p.sku.toLowerCase().includes(q)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+      (p.category && p.category.toLowerCase().includes(q))
+    );
+  });
+
+  const filteredProducts = products.filter(p => {
+    const matchesCategory = selectedCategory === 'All' || (p.category || 'Uncategorized') === selectedCategory;
+    const matchesQuery = !searchQuery || 
+      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      p.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.barcode?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesQuery;
+  });
 
   return (
     <div className="space-y-4 animate-in p-6">
+      {/* Central Store Context Banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm text-blue-900 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-600 text-white rounded-lg shrink-0">
+            <Warehouse className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="font-semibold text-blue-950 flex items-center gap-2">
+              Central Store & Warehouse Receiving
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                Offline-First Primary Pool
+              </span>
+            </div>
+            <p className="text-xs text-blue-700 mt-0.5">
+              Goods received from suppliers arrive directly into the Central Store. To assign stock to local POS registers, transfer via{' '}
+              <Link to="/dashboard/outlets" className="underline font-semibold hover:text-blue-950">
+                Outlets & Terminals
+              </Link>.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button 
+            onClick={openReceiveModal}
+            className="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-1.5 shadow-sm"
+          >
+            <PackageCheck className="w-4 h-4" /> Receive Delivery (GRN)
+          </button>
+        </div>
+      </div>
+
       <section className="section">
         <div className="section-header">
           <div>
             <h2 className="section-title">Inventory & Products</h2>
-            <p className="section-desc">Manage your product catalog, stock levels, and categories.</p>
+            <p className="section-desc">Manage your product catalog, receive warehouse stock, and oversee store distribution.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleImport} />
             <button 
               onClick={handleExport}
@@ -200,17 +387,45 @@ export default function Inventory() {
         </div>
 
         <div className="glass-panel overflow-hidden">
-          <div className="flex items-center justify-between gap-3 p-3 border-b border-[color:var(--border-glass)]">
-            <div className="search-box flex-1 max-w-md" style={{ minWidth: 0 }}>
-              <Search />
-              <input placeholder="Search SKU, barcode or name..." />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 border-b border-[color:var(--border-glass)]">
+            <div className="flex items-center gap-2 flex-1 max-w-xl">
+              <div className="search-box flex-1" style={{ minWidth: 0 }}>
+                <Search />
+                <input 
+                  placeholder="Search SKU, barcode or name..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <select
+                  value={selectedOutletScope}
+                  onChange={(e) => setSelectedOutletScope(e.target.value)}
+                  className="input py-1.5 px-3 text-xs font-semibold rounded-xl bg-white border border-gray-300 shadow-sm"
+                  title="Filter inventory view"
+                >
+                  <option value="CENTRAL">Central Store (Warehouse Supply)</option>
+                  <option value="ALL">All Stock (Consolidated)</option>
+                  {outlets.map(o => (
+                    <option key={o.id} value={o.id}>Outlet: {o.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+
             <div className="flex items-center gap-1 flex-wrap">
-              {['All', 'Low Stock', 'Out of Stock'].map((c, i) => (
-                <button key={c} className={`chip ${i === 0 ? 'active' : ''}`}>{c}</button>
+              {categories.map((c) => (
+                <button 
+                  key={c} 
+                  onClick={() => setSelectedCategory(c)}
+                  className={`chip ${selectedCategory === c ? 'active bg-blue-600 text-white' : 'bg-gray-100'}`}
+                >
+                  {c}
+                </button>
               ))}
             </div>
           </div>
+
           <div className="table-scroll">
             <table className="data-table">
               <thead>
@@ -219,57 +434,94 @@ export default function Inventory() {
                   <th>Name</th>
                   <th>Category</th>
                   <th className="font-tabular text-right">Price (KES)</th>
-                  <th className="font-tabular text-right">Stock</th>
+                  <th className="font-tabular text-right">In-Store Stock</th>
+                  <th className="font-tabular text-right">Outlet Stock</th>
+                  <th className="font-tabular text-right">Total System Stock</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="text-center py-4">Loading...</td></tr>
-                ) : products.length > 0 ? (
-                  products.map(p => (
-                    <tr key={p.id}>
-                      <td className="font-mono text-xs text-[color:var(--text-muted)]">{p.sku}</td>
-                      <td>
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[color:var(--accent-primary-soft)] text-[color:var(--accent-primary)]">
-                            <Package className="w-4 h-4" />
+                  <tr><td colSpan={8} className="text-center py-6 text-gray-500">Loading inventory catalog...</td></tr>
+                ) : filteredProducts.length > 0 ? (
+                  filteredProducts.map(p => {
+                    const inStore = p.inStoreStock ?? p.stock ?? 0;
+                    const total = p.totalStock ?? p.stock ?? 0;
+                    const outletAllocated = p.outletStock ?? Math.max(0, total - inStore);
+
+                    return (
+                      <tr key={p.id}>
+                        <td className="font-mono text-xs text-[color:var(--text-muted)]">{p.sku}</td>
+                        <td>
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[color:var(--accent-primary-soft)] text-[color:var(--accent-primary)]">
+                              <Package className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900">{p.name}</div>
+                              {p.barcode && <div className="text-[10px] text-gray-400 font-mono">Barcode: {p.barcode}</div>}
+                            </div>
                           </div>
-                          <span className="font-semibold">{p.name}</span>
-                        </div>
-                      </td>
-                      <td className="text-[color:var(--text-secondary)]">{p.category || 'Uncategorized'}</td>
-                      <td className="font-tabular font-semibold text-right">{p.price.toLocaleString()}</td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <span className={`font-semibold ${p.stock <= 5 ? 'text-red-600' : 'text-gray-900'}`}>
-                            {p.stock}
+                        </td>
+                        <td className="text-[color:var(--text-secondary)]">{p.category || 'Uncategorized'}</td>
+                        <td className="font-tabular font-semibold text-right">{Number(p.price || 0).toLocaleString()}</td>
+                        
+                        {/* Central Store Stock */}
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span className={`font-semibold px-2 py-0.5 rounded ${inStore <= (p.reorderLevel || 5) ? 'bg-amber-100 text-amber-800' : 'bg-blue-50 text-blue-800'}`}>
+                              {inStore}
+                            </span>
+                            <button 
+                              onClick={() => handleQuickAdd(p.id)}
+                              className="p-1 rounded-md hover:bg-blue-100 text-blue-600 transition-colors"
+                              title="Quick Receive into Store (+)"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* Outlet Stock */}
+                        <td className="py-3 px-4 text-right">
+                          <span className={`font-medium px-2 py-0.5 rounded text-xs ${outletAllocated > 0 ? 'bg-purple-50 text-purple-700' : 'text-gray-400'}`}>
+                            {outletAllocated}
                           </span>
-                          <button 
-                            onClick={() => handleQuickAdd(p.id)}
-                            className="p-1 rounded-md hover:bg-blue-50 text-blue-600 transition-colors"
-                            title="Quick Add Stock"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => handleEdit(p)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]">
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDelete(p.id)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-500">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+
+                        {/* Total Consolidated Stock */}
+                        <td className="py-3 px-4 text-right">
+                          <span className="font-bold text-gray-900">
+                            {total}
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button 
+                              onClick={() => handleEdit(p)} 
+                              className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-blue-600"
+                              title="Edit product and in-store stock"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(p.id)} 
+                              className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-500"
+                              title="Delete product"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-[color:var(--text-muted)]">
-                      No products found. Add your first product!
+                    <td colSpan={8} className="text-center py-8 text-[color:var(--text-muted)]">
+                      No products found. Use <strong>New Product</strong> or <strong>Receive Delivery (GRN)</strong> to add inventory!
                     </td>
                   </tr>
                 )}
@@ -279,6 +531,7 @@ export default function Inventory() {
         </div>
       </section>
 
+      {/* Stock Transfer Modal */}
       <StockTransferModal 
         isOpen={isTransferModalOpen}
         onClose={() => setIsTransferModalOpen(false)}
@@ -286,6 +539,7 @@ export default function Inventory() {
         onTransferComplete={fetchProducts}
       />
       
+      {/* Product Edit / Create Modal */}
       <ProductModal
         isOpen={isProductModalOpen}
         onClose={() => setIsProductModalOpen(false)}
@@ -293,13 +547,18 @@ export default function Inventory() {
         onComplete={fetchProducts}
       />
       
-      <Modal isOpen={!!quickAddProduct} onClose={() => setQuickAddProduct(null)} title="Quick Add Stock">
+      {/* Quick Add Stock Modal */}
+      <Modal isOpen={!!quickAddProduct} onClose={() => setQuickAddProduct(null)} title="Quick Receive into Store">
         <form onSubmit={submitQuickAdd} className="space-y-4 mt-2">
+          <p className="text-xs text-gray-500">
+            Stock added here goes directly into the <strong>Central Store</strong> warehouse.
+          </p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to add</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity Received</label>
             <input 
               type="number" 
               required
+              min="1"
               className="w-full p-2 border rounded-lg" 
               value={quickAddQty} 
               onChange={e => setQuickAddQty(e.target.value)} 
@@ -309,7 +568,210 @@ export default function Inventory() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setQuickAddProduct(null)} className="btn btn-ghost">Cancel</button>
-            <button type="submit" className="btn btn-primary">Add Stock</button>
+            <button type="submit" className="btn btn-primary">Receive into Store</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Formal Goods Received Note (GRN) Modal */}
+      <Modal 
+        isOpen={isReceiveModalOpen} 
+        onClose={() => setIsReceiveModalOpen(false)} 
+        title="Receive Delivery into Central Store (GRN)"
+        className="max-w-2xl sm:max-w-3xl"
+      >
+        <form onSubmit={handleReceiveStockSubmit} className="space-y-4 mt-2">
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-blue-600 mt-0.5" />
+            <span>
+              Document supplier deliveries into Central Store. Stock increases your in-store warehouse pool and is logged under Stock Movements.
+            </span>
+          </div>
+
+          {/* Product Selection Section */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-800 mb-1.5">
+              Select Product to Receive *
+            </label>
+
+            {selectedReceiveProduct ? (
+              /* Selected Product Card */
+              <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <Check className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-gray-900 text-base truncate">
+                      {selectedReceiveProduct.name}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap text-xs text-gray-600 mt-0.5">
+                      <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                        SKU: {selectedReceiveProduct.sku}
+                      </span>
+                      {selectedReceiveProduct.barcode && (
+                        <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200 flex items-center gap-1">
+                          <Barcode className="w-3 h-3 text-gray-500" />
+                          {selectedReceiveProduct.barcode}
+                        </span>
+                      )}
+                      <span className="font-semibold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
+                        Current In-Store: {selectedReceiveProduct.inStoreStock ?? selectedReceiveProduct.stock ?? 0} units
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedReceiveProduct(null);
+                    setReceiveForm(prev => ({ ...prev, productId: '' }));
+                    setTimeout(() => receiveSearchInputRef.current?.focus(), 100);
+                  }}
+                  className="btn btn-sm btn-secondary bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 shrink-0 inline-flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Change
+                </button>
+              </div>
+            ) : (
+              /* Product Search Combobox */
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400 pointer-events-none" />
+                  <input
+                    ref={receiveSearchInputRef}
+                    type="text"
+                    value={receiveSearch}
+                    onChange={e => handleReceiveSearchChange(e.target.value)}
+                    onKeyDown={handleReceiveSearchKeyDown}
+                    placeholder="Search by product name, SKU, or scan barcode with scanner..."
+                    className="w-full pl-9 pr-8 py-2.5 border-2 border-blue-300 rounded-xl bg-white text-sm focus:outline-none focus:border-blue-600 transition-colors shadow-sm"
+                  />
+                  {receiveSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReceiveSearch('');
+                        receiveSearchInputRef.current?.focus();
+                      }}
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filtered Search Results Dropdown List */}
+                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-inner max-h-56 overflow-y-auto divide-y divide-gray-100">
+                  {receiveMatchingProducts.length > 0 ? (
+                    receiveMatchingProducts.slice(0, 50).map(p => (
+                      <div
+                        key={p.id}
+                        onClick={() => handleSelectReceiveProduct(p)}
+                        className="p-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between gap-3 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm text-gray-900 truncate">
+                            {p.name}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 font-mono mt-0.5">
+                            <span>SKU: {p.sku}</span>
+                            {p.barcode && <span>• Barcode: {p.barcode}</span>}
+                            {p.category && <span className="text-gray-400">({p.category})</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className="text-xs text-gray-500">In-Store</div>
+                            <div className="font-bold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              {p.inStoreStock ?? p.stock ?? 0} units
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-xs bg-blue-600 hover:bg-blue-700 text-white font-medium px-2.5 py-1 rounded-lg"
+                          >
+                            Select
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center text-sm text-gray-500">
+                      No products found matching "{receiveSearch}". Try another name or SKU.
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Tip: Barcode scanners will auto-select the product when scanned. Press Enter to select the top match.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Quantity Received (Units) *
+              </label>
+              <input
+                ref={receiveQtyInputRef}
+                type="number"
+                required
+                min="1"
+                placeholder="e.g. 100"
+                value={receiveForm.quantity}
+                onChange={e => setReceiveForm({ ...receiveForm, quantity: e.target.value })}
+                className="w-full p-2.5 border rounded-lg text-base font-semibold"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                New Cost Price (Optional, KES)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g. 450.00"
+                value={receiveForm.costPrice}
+                onChange={e => setReceiveForm({ ...receiveForm, costPrice: e.target.value })}
+                className="w-full p-2.5 border rounded-lg"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Supplier Delivery Note / Invoice Ref
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Invoice #9823 / Brookside Dairy"
+              value={receiveForm.referenceNote}
+              onChange={e => setReceiveForm({ ...receiveForm, referenceNote: e.target.value })}
+              className="w-full p-2.5 border rounded-lg"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t">
+            <button 
+              type="button" 
+              onClick={() => setIsReceiveModalOpen(false)} 
+              className="btn btn-ghost"
+              disabled={isReceiving}
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              className="btn btn-primary inline-flex items-center gap-1.5"
+              disabled={isReceiving || !receiveForm.productId || !receiveForm.quantity}
+            >
+              <PackageCheck className="w-4 h-4" />
+              {isReceiving ? 'Processing...' : 'Confirm Goods Received'}
+            </button>
           </div>
         </form>
       </Modal>

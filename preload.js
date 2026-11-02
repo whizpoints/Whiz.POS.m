@@ -58,6 +58,26 @@ contextBridge.exposeInMainWorld('electron', {
   printClosingReport: (reportData, businessSetup, detailed) => ipcRenderer.send('print-closing-report', reportData, businessSetup, detailed),
 
   /**
+   * Hospitality Bill Mode: Prints proforma bill for customer.
+   */
+  printCustomerBill: (bill, businessSetup) => ipcRenderer.send('print-customer-bill', bill, businessSetup),
+
+  /**
+   * Hospitality Bill Mode: Prints compact duplicate slip for cashier.
+   */
+  printCashierSlip: (bill, businessSetup) => ipcRenderer.send('print-cashier-slip', bill, businessSetup),
+
+  /**
+   * Hospitality / Daily Closing: Prints consolidated shift audit strip.
+   */
+  printShiftAuditStrip: (reportData, sales, openBills, businessSetup) => ipcRenderer.send('print-shift-audit-strip', reportData, sales, openBills, businessSetup),
+
+  /**
+   * Cashier End-of-Day / Shift Closing Slip.
+   */
+  printCashierSummary: (cashierName, cashierStats, unpaidBills, businessSetup, selectedDate) => ipcRenderer.send('print-cashier-summary', cashierName, cashierStats, unpaidBills, businessSetup, selectedDate),
+
+  /**
    * Retrieves a list of available system printers.
    * @returns {Promise<any[]>}
    */
@@ -74,6 +94,11 @@ contextBridge.exposeInMainWorld('electron', {
    * @returns {Promise<string | null>}
    */
   discoverLocalServer: () => ipcRenderer.invoke('discover-local-server'),
+  onServerDiscovered: (callback) => {
+    const subscription = (event, data) => callback(event, data);
+    ipcRenderer.on('server-discovered', subscription);
+    return () => ipcRenderer.removeListener('server-discovered', subscription);
+  },
 
   /**
    * Prints the initial business setup invoice.
@@ -176,6 +201,8 @@ contextBridge.exposeInMainWorld('electron', {
   backupData: () => ipcRenderer.invoke('backup-data'),
 
   restoreData: () => ipcRenderer.invoke('restore-data'),
+  getBackupSettings: () => ipcRenderer.invoke('get-backup-settings'),
+  saveBackupSettings: (settings) => ipcRenderer.invoke('save-backup-settings', settings),
 
   getConnectedDevices: () => ipcRenderer.invoke('get-connected-devices'),
 
@@ -201,5 +228,12 @@ contextBridge.exposeInMainWorld('electron', {
       addUser: (userData) => ipcRenderer.invoke('user-add', userData),
       updateUser: (userId, updates) => ipcRenderer.invoke('user-update', userId, updates),
       deleteUser: (userId) => ipcRenderer.invoke('user-delete', userId)
-  }
+  },
+
+  // --- KRA eTIMS Bridge ---
+  kraPing: (businessSetup) => ipcRenderer.invoke('kra-ping', businessSetup),
+  kraInitDevice: (businessSetup) => ipcRenderer.invoke('kra-init-device', businessSetup),
+  kraSyncQueue: (businessSetup) => ipcRenderer.invoke('kra-sync-queue', businessSetup),
+  kraSubmitInvoice: (transaction, products, businessSetup) => ipcRenderer.invoke('kra-submit-invoice', transaction, products, businessSetup),
+  kraGetStats: () => ipcRenderer.invoke('kra-get-stats')
 });

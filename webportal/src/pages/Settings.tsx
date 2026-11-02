@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
+import { getCachedData, setCachedData } from '../lib/cache';
 
 
 type Tab = 'security' | 'payments' | 'etims' | 'profile' | 'notifications' | 'email';
@@ -22,11 +23,12 @@ const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
 
 export default function Settings() {
   const [tab, setTab] = useState<Tab>('security');
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(() => getCachedData('business_profile', null));
+  const [, setIsRefreshing] = useState(false);
 
   const fetchProfile = async () => {
     try {
+      setIsRefreshing(true);
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
       const res = await fetch(`${API_BASE_URL}/api/business/profile`, {
@@ -39,11 +41,12 @@ export default function Settings() {
           if (typeof data.settings === 'string') data.settings = JSON.parse(data.settings);
         } catch(e) {}
         setProfile(data);
+        setCachedData('business_profile', data);
       }
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -62,11 +65,15 @@ export default function Settings() {
       } catch (e) {}
 
       const mergedSettings = { ...parsedSettings, ...updates };
+      const effectivePin = updates.etimsPin || updates.kraPin || mergedSettings.etimsPin || mergedSettings.kraPin || profile?.kraPin;
 
       const res = await fetch(`${API_BASE_URL}/api/business/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ settings: JSON.stringify(mergedSettings) })
+        body: JSON.stringify({ 
+          settings: JSON.stringify(mergedSettings),
+          kraPin: effectivePin
+        })
       });
       if (res.ok) {
         fetchProfile();
@@ -79,10 +86,6 @@ export default function Settings() {
       toast.error('Error saving settings.');
     }
   };
-
-  if (loading) {
-    return <LoadingSpinner message="Loading settings..." />;
-  }
 
   return (
     <div className="space-y-6 md:space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -801,19 +804,105 @@ function PaymentsPanel() {
 
 function ETimsPanel({ profile, onSave }: any) {
   const [showToken, setShowToken] = useState(false);
+  const [pinging, setPinging] = useState(false);
+  const [pingStatus, setPingStatus] = useState<{ success: boolean; msg: string; latency?: number } | null>(null);
+
+  const getSettings = (p: any) => {
+    try {
+      return typeof p?.settings === 'string' ? JSON.parse(p.settings) : (p?.settings || {});
+    } catch (e) {
+      return {};
+    }
+  };
+
+  const initialSettings = getSettings(profile);
   const [formData, setFormData] = useState({
-    etimsPin: profile?.settings?.etimsPin || '',
-    etimsBranch: profile?.settings?.etimsBranchId || profile?.settings?.etimsBranch || '',
-    etimsSerial: profile?.settings?.etimsDeviceSerial || profile?.settings?.etimsSerial || '',
-    etimsUrl: profile?.settings?.etimsUrl || '',
-    etimsToken: profile?.settings?.etimsToken || '',
-    etimsAutoRetry: profile?.settings?.etimsAutoRetry ?? true
+    etimsPin: profile?.kraPin || initialSettings?.etimsPin || initialSettings?.kraPin || '',
+    etimsBranch: initialSettings?.etimsBranchId || initialSettings?.etimsBranch || '00',
+    etimsSerial: initialSettings?.etimsDeviceSerial || initialSettings?.etimsSerial || 'WHIZPOS-V7.1.0',
+    etimsUrl: initialSettings?.etimsUrl || 'https://etims-api-sbx.kra.go.ke/etims-api',
+    etimsToken: initialSettings?.etimsToken || '',
+    etimsAutoRetry: initialSettings?.etimsAutoRetry ?? true,
+    etimsEnabled: initialSettings?.etimsEnabled ?? (initialSettings?.kraEnabled ?? Boolean(profile?.kraPin))
   });
+
+  // Re-sync form state when profile updates
+  useEffect(() => {
+    if (profile) {
+      const s = getSettings(profile);
+      setFormData({
+        etimsPin: profile.kraPin || s.etimsPin || s.kraPin || '',
+        etimsBranch: s.etimsBranchId || s.etimsBranch || '00',
+        etimsSerial: s.etimsDeviceSerial || s.etimsSerial || 'WHIZPOS-V7.1.0',
+        etimsUrl: s.etimsUrl || 'https://etims-api-sbx.kra.go.ke/etims-api',
+        etimsToken: s.etimsToken || '',
+        etimsAutoRetry: s.etimsAutoRetry ?? true,
+        etimsEnabled: s.etimsEnabled !== undefined ? Boolean(s.etimsEnabled) : (s.kraEnabled !== undefined ? Boolean(s.kraEnabled) : Boolean(profile.kraPin))
+      });
+    }
+  }, [profile]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
+
+  const handlePing = async () => {
+    if (!formData.etimsPin) {
+      toast.error('Please enter a Business KRA PIN first.');
+      return;
+    }
+    setPinging(true);
+    setPingStatus(null);
+    const start = Date.now();
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+      const res = await fetch(`${API_BASE_URL}/api/kra/init-device`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          tin: formData.etimsPin,
+          bhfId: formData.etimsBranch,
+          dvcSrlNo: formData.etimsSerial,
+          etimsUrl: formData.etimsUrl
+        })
+      });
+      const latency = Date.now() - start;
+      const data = await res.json();
+      if (res.ok && (data.success || data.resultCd === '000')) {
+        setPingStatus({ success: true, msg: data.resultMsg || 'Handshake Successful', latency });
+        toast.success(`KRA Control Unit connected (${latency}ms)!`);
+      } else {
+        setPingStatus({ success: false, msg: data.resultMsg || data.error || 'Connection Failed', latency });
+        toast.error(`KRA Response: ${data.resultMsg || data.error || 'Failed'}`);
+      }
+    } catch (err: any) {
+      const latency = Date.now() - start;
+      setPingStatus({ success: false, msg: err.message, latency });
+      toast.error(`CU Ping Error: ${err.message}`);
+    } finally {
+      setPinging(false);
+    }
+  };
+
+  const handleSave = (enableState?: boolean) => {
+    const isEnabling = enableState !== undefined ? enableState : formData.etimsEnabled;
+    const payload = {
+      ...formData,
+      etimsEnabled: isEnabling,
+      kraEnabled: isEnabling,
+      kraPin: formData.etimsPin,
+      etimsPin: formData.etimsPin,
+      etimsBranchId: formData.etimsBranch,
+      etimsDeviceSerial: formData.etimsSerial
+    };
+    setFormData(prev => ({ ...prev, etimsEnabled: isEnabling }));
+    onSave(payload);
+  };
+
+  const isConfigured = Boolean(formData.etimsPin);
+  const isActive = Boolean(formData.etimsEnabled && isConfigured);
 
   return (
     <>
@@ -829,23 +918,23 @@ function ETimsPanel({ profile, onSave }: any) {
         <div className="glass-panel rounded-2xl p-4 md:p-6 space-y-5 md:space-y-6 lg:col-span-2">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="label">Business KRA PIN</label>
-              <input type="text" name="etimsPin" value={formData.etimsPin} onChange={handleChange} className="input font-mono uppercase" placeholder="A000000000X" />
+              <label className="label">Business KRA PIN <span className="text-red-500">*</span></label>
+              <input type="text" name="etimsPin" value={formData.etimsPin} onChange={handleChange} className="input font-mono uppercase" placeholder="P000000000X" />
             </div>
             <div>
               <label className="label">Branch / Outlet ID</label>
-              <input type="text" name="etimsBranch" value={formData.etimsBranch} onChange={handleChange} className="input" placeholder="e.g. BR-001" />
+              <input type="text" name="etimsBranch" value={formData.etimsBranch} onChange={handleChange} className="input" placeholder="e.g. 00 or BR-001" />
             </div>
             <div>
               <label className="label">VSDC Device Serial</label>
-              <input type="text" name="etimsSerial" value={formData.etimsSerial} onChange={handleChange} className="input font-mono" placeholder="VSDC-XXXXXX" />
+              <input type="text" name="etimsSerial" value={formData.etimsSerial} onChange={handleChange} className="input font-mono" placeholder="WHIZPOS-V7.1.0" />
             </div>
             <div>
               <label className="label">Control Unit URL</label>
               <input type="url" name="etimsUrl" value={formData.etimsUrl} onChange={handleChange} className="input text-[13px]" placeholder="https://etims-api-sbx.kra.go.ke/etims-api" />
             </div>
             <div className="md:col-span-2">
-              <label className="label">VSDC Auth Token</label>
+              <label className="label">VSDC Auth Token / CMC Key</label>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]" />
                 <input 
@@ -854,7 +943,7 @@ function ETimsPanel({ profile, onSave }: any) {
                   value={formData.etimsToken} 
                   onChange={handleChange} 
                   className="input !pl-10 !pr-10 font-mono text-[13px]" 
-                  placeholder="����������������" 
+                  placeholder="Enter KRA CMC Key / Auth Token" 
                 />
                 <button
                   type="button"
@@ -872,15 +961,44 @@ function ETimsPanel({ profile, onSave }: any) {
               <input type="checkbox" name="etimsAutoRetry" checked={formData.etimsAutoRetry} onChange={handleChange} className="mt-0.5 md:mt-0 w-4.5 h-4.5 rounded border-[color:var(--border-default)] text-[color:var(--accent)] focus:ring-[color:var(--accent)]" />
               Auto-retry failed signings (max 3 attempts)
             </label>
-            <div className="flex flex-col md:flex-row gap-2">
-              <button className="btn btn-secondary w-full md:w-auto text-sm inline-flex justify-center items-center gap-1.5">
-                <RefreshCw className="w-4 h-4" />
-                Ping Control Unit
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button 
+                type="button"
+                onClick={handlePing} 
+                disabled={pinging}
+                className="btn btn-secondary w-full sm:w-auto text-sm inline-flex justify-center items-center gap-1.5"
+              >
+                <RefreshCw className={`w-4 h-4 ${pinging ? 'animate-spin' : ''}`} />
+                {pinging ? 'Pinging CU...' : 'Ping Control Unit'}
               </button>
-              <button onClick={() => onSave(formData)} className="btn btn-primary w-full md:w-auto text-sm inline-flex justify-center items-center gap-1.5">
-                <Save className="w-4 h-4" />
-                Activate eTIMS
-              </button>
+              {isActive ? (
+                <>
+                  <button 
+                    type="button"
+                    onClick={() => handleSave(true)} 
+                    className="btn btn-primary w-full sm:w-auto text-sm inline-flex justify-center items-center gap-1.5 bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => handleSave(false)} 
+                    className="btn btn-secondary text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 w-full sm:w-auto text-sm inline-flex justify-center items-center gap-1.5"
+                  >
+                    Deactivate
+                  </button>
+                </>
+              ) : (
+                <button 
+                  type="button"
+                  onClick={() => handleSave(true)} 
+                  className="btn btn-primary w-full sm:w-auto text-sm inline-flex justify-center items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Activate eTIMS
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -888,20 +1006,31 @@ function ETimsPanel({ profile, onSave }: any) {
         <div className="space-y-4">
           <div className="glass-card rounded-2xl p-4 md:p-5">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                   style={{ background: 'rgba(16,185,129,0.16)' }}>
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <div 
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: isActive ? 'rgba(16,185,129,0.16)' : 'rgba(239,68,68,0.16)' }}
+              >
+                {isActive ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                )}
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400">Active</div>
-                <div className="text-[15px] font-semibold text-[color:var(--text-primary)]">Signing online</div>
+                <div className={`text-[11px] uppercase tracking-wider font-bold ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  {isActive ? 'Active' : 'Disabled'}
+                </div>
+                <div className="text-[15px] font-semibold text-[color:var(--text-primary)]">
+                  {isActive ? 'Signing online' : 'Local mode (offline)'}
+                </div>
               </div>
             </div>
             <div className="space-y-3 text-[13px]">
-              <StatRow label="Signed today" value="184" accent />
-              <StatRow label="Failed (retrying)" value="2" />
-              <StatRow label="Last CU ping" value="68 ms" />
-              <StatRow label="eTIMS version" value="v3.2.1" />
+              <StatRow label="Configured PIN" value={formData.etimsPin || 'None'} accent={Boolean(formData.etimsPin)} />
+              <StatRow label="Branch ID" value={formData.etimsBranch || '00'} />
+              <StatRow label="Device Serial" value={formData.etimsSerial || 'Default'} />
+              <StatRow label="Last CU Ping" value={pingStatus ? `${pingStatus.latency}ms (${pingStatus.success ? 'OK' : 'Err'})` : 'Idle'} />
+              <StatRow label="eTIMS Environment" value={formData.etimsUrl?.includes('-sbx') ? 'Sandbox / Test' : 'Production'} />
             </div>
           </div>
 

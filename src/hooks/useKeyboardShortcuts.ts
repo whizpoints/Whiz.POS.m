@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { usePosStore } from '../store/posStore';
 
 export const useKeyboardShortcuts = () => {
-  const { clearCart, openCheckout, cart } = usePosStore();
+  const { clearCart, openCheckout, openBillPrompt, cart, businessSetup } = usePosStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -22,16 +22,20 @@ export const useKeyboardShortcuts = () => {
         }
       }
 
-      // Quick Checkout: F12 or Space
+      // Quick Checkout or Issue Bill: F12 or Space
       if (e.key === 'F12' || e.key === ' ') {
         e.preventDefault();
         if (cart.length > 0) {
-          openCheckout();
+          if (businessSetup?.billModeEnabled) {
+            openBillPrompt();
+          } else {
+            openCheckout();
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clearCart, openCheckout, cart.length]);
+  }, [clearCart, openCheckout, openBillPrompt, cart.length, businessSetup?.billModeEnabled]);
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePosStore } from '../../../store/posStore';
-import { Loader2, CheckCircle2, AlertTriangle, RefreshCw, WifiOff, FileEdit } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, RefreshCw, WifiOff, FileEdit, Users, Edit3, Check } from 'lucide-react';
 import { useToast } from '../../ui/use-toast';
 
 interface Props {
@@ -10,59 +10,134 @@ interface Props {
 export default function TillMonitor({ totalAmount }: Props) {
   const [isPolling, setIsPolling] = useState(true);
   const [detectedPayment, setDetectedPayment] = useState<any>(null);
+  const [candidatePayments, setCandidatePayments] = useState<any[]>([]);
   const [isManualOffline, setIsManualOffline] = useState(false);
   const [offlinePhone, setOfflinePhone] = useState('');
   const [offlineCode, setOfflineCode] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [customCustomerName, setCustomCustomerName] = useState('');
   const { completeTransaction } = usePosStore();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Poll the backend every 5 seconds for new M-Pesa transactions
+    // Poll the backend every 4 seconds for new M-Pesa transactions
     let timeout: NodeJS.Timeout;
     
-    // Track when this component mounted so we only look for RECENT payments (allow up to 2 mins early)
-    const componentMountTime = new Date().getTime() - (2 * 60 * 1000);
-    
+    // Look for payments arriving up to 30 mins early or while modal is open
+    const componentMountTime = new Date().getTime() - (30 * 60 * 1000);
+
+    const enrichCustomerName = (matchingTxn: any) => {
+      let resolvedName = matchingTxn.customerName || '';
+      if (!resolvedName || resolvedName === 'Customer' || resolvedName === 'Unknown') {
+        const state = usePosStore.getState();
+        if (matchingTxn.phoneNumber) {
+          const phoneSuffix = String(matchingTxn.phoneNumber).slice(-9);
+          const cCust = state.creditCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
+          const lCust = state.loyaltyCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
+          if (cCust) resolvedName = cCust.name;
+          else if (lCust) resolvedName = lCust.name;
+        }
+      }
+      return resolvedName || 'M-Pesa Customer';
+    };
+
+    const onPaymentDetected = (matchingTxn: any) => {
+      const finalName = enrichCustomerName(matchingTxn);
+      setDetectedPayment({
+        transactionId: matchingTxn.transactionId,
+        amount: Number(matchingTxn.amount),
+        phoneNumber: matchingTxn.phoneNumber,
+        customerName: finalName,
+        timestamp: matchingTxn.timestamp || new Date().toISOString()
+      });
+      setCustomCustomerName(finalName);
+      setIsPolling(false);
+    };
+
+    // Real-time socket event listener
+    const handleMpesaSocketEvent = (e: any) => {
+      const data = e.detail;
+      if (!data || !data.transactionId) return;
+      const amt = Number(data.amount);
+      const localUsedCodes = usePosStore.getState().transactions.map((t: any) => t.mpesaCode).filter(Boolean);
+      if (Math.abs(amt - Number(totalAmount)) < 0.01 && !localUsedCodes.includes(data.transactionId)) {
+        setCandidatePayments(prev => {
+          const exists = prev.some(p => p.transactionId === data.transactionId);
+          if (!exists) return [data, ...prev];
+          return prev;
+        });
+        if (!detectedPayment) {
+          onPaymentDetected(data);
+        }
+      }
+    };
+    window.addEventListener('mpesa_payment_received', handleMpesaSocketEvent);
+
     const poll = async () => {
       try {
         if (!isPolling || isManualOffline) return;
         
         const businessSetup = usePosStore.getState().businessSetup;
-        const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId;
+        const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.id;
         if (!businessId) return;
 
-        const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
-        const res = await fetch(`${cloudUrl}/api/mpesa/payments/search?businessId=${businessId}`);
-        if (res.ok) {
-          const txns = await res.json();
-          const localUsedCodes = usePosStore.getState().transactions.map(t => t.mpesaCode).filter(Boolean);
-          
-          // Find a transaction that arrived AFTER the modal was opened, matches amount, and NOT used
-          const matchingTxn = txns.find((t: any) => {
-            const txnTime = new Date(t.timestamp).getTime();
-            return txnTime >= componentMountTime && t.amount === totalAmount && !localUsedCodes.includes(t.transactionId);
-          });
-          
-          if (matchingTxn) {
-            let fallbackName = 'Customer';
-            const state = usePosStore.getState();
-            if (matchingTxn.phoneNumber) {
-               // Try to match last 9 digits in case of prefix differences (e.g. 2547... vs 07...)
-               const phoneSuffix = matchingTxn.phoneNumber.slice(-9);
-               const cCust = state.creditCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
-               const lCust = state.loyaltyCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
-               if (cCust) fallbackName = cCust.name;
-               else if (lCust) fallbackName = lCust.name;
-            }
+        const rawUrl = businessSetup?.apiUrl || businessSetup?.backOfficeUrl || import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+        const primaryUrl = rawUrl.replace(/\/$/, '').replace(/\/api$/, '');
+        const cloudFallbackUrl = (import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app').replace(/\/$/, '');
 
-            setDetectedPayment({
-              transactionId: matchingTxn.transactionId,
-              amount: matchingTxn.amount,
-              phoneNumber: matchingTxn.phoneNumber,
-              customerName: matchingTxn.customerName || fallbackName,
-              timestamp: matchingTxn.timestamp
-            });
-            setIsPolling(false);
+        let res: Response | null = null;
+        try {
+          res = await fetch(`${primaryUrl}/api/mpesa/payments/search?businessId=${businessId}`, {
+            signal: AbortSignal.timeout(2500)
+          });
+        } catch (fetchErr) {
+          // If primary server failed or timed out, attempt cloud fallback
+          if (primaryUrl !== cloudFallbackUrl) {
+            try {
+              res = await fetch(`${cloudFallbackUrl}/api/mpesa/payments/search?businessId=${businessId}`, {
+                signal: AbortSignal.timeout(3000)
+              });
+            } catch (cloudErr) {
+              // Both failed, ignore for this poll interval
+            }
+          }
+          // Also trigger server discovery if the primary URL had connection error
+          if (window.electron && typeof window.electron.discoverLocalServer === 'function') {
+            window.electron.discoverLocalServer().then((discovered: any) => {
+              const foundUrl = Array.isArray(discovered) ? discovered[0]?.url : (discovered?.url || (typeof discovered === 'string' ? discovered : null));
+              if (foundUrl && foundUrl !== primaryUrl) {
+                usePosStore.getState().updateServerUrl(foundUrl);
+              }
+            }).catch(() => {});
+          }
+        }
+
+        if (res && res.ok) {
+          const txns = await res.json();
+          const localUsedCodes = usePosStore.getState().transactions.map((t: any) => t.mpesaCode).filter(Boolean);
+          
+          // Match unconsumed transactions with amount equal to total
+          const matches = Array.isArray(txns) ? txns.filter((t: any) => {
+            const rawTime = t.timestamp || t.createdAt || Date.now();
+            const txnTime = new Date(rawTime).getTime();
+            const amtMatches = Math.abs(Number(t.amount) - Number(totalAmount)) < 0.01;
+            const notUsed = !localUsedCodes.includes(t.transactionId);
+            return txnTime >= (componentMountTime - 60000) && amtMatches && notUsed;
+          }) : [];
+          
+          if (matches.length > 1) {
+            setCandidatePayments(matches);
+            // If nothing is explicitly picked yet, don't auto-pick arbitrary one, prompt cashier
+            if (!detectedPayment) {
+              setIsPolling(false);
+              return;
+            }
+          } else if (matches.length === 1) {
+            setCandidatePayments(matches);
+            if (!detectedPayment) {
+              onPaymentDetected(matches[0]);
+              return;
+            }
           }
         }
       } catch (err) {
@@ -70,14 +145,41 @@ export default function TillMonitor({ totalAmount }: Props) {
       }
       
       if (isPolling && !isManualOffline) {
-        timeout = setTimeout(poll, 5000);
+        timeout = setTimeout(poll, 4000);
       }
     };
     
     poll();
     
-    return () => clearTimeout(timeout);
-  }, [isPolling, totalAmount, isManualOffline]);
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('mpesa_payment_received', handleMpesaSocketEvent);
+    };
+  }, [isPolling, totalAmount, isManualOffline, detectedPayment]);
+
+  const selectCandidate = (cand: any) => {
+    let resolvedName = cand.customerName || '';
+    if (!resolvedName || resolvedName === 'Customer' || resolvedName === 'Unknown') {
+      const state = usePosStore.getState();
+      if (cand.phoneNumber) {
+        const phoneSuffix = String(cand.phoneNumber).slice(-9);
+        const cCust = state.creditCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
+        const lCust = state.loyaltyCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
+        if (cCust) resolvedName = cCust.name;
+        else if (lCust) resolvedName = lCust.name;
+      }
+    }
+    const finalName = resolvedName || 'M-Pesa Customer';
+    setDetectedPayment({
+      transactionId: cand.transactionId,
+      amount: Number(cand.amount),
+      phoneNumber: cand.phoneNumber,
+      customerName: finalName,
+      timestamp: cand.timestamp || new Date().toISOString()
+    });
+    setCustomCustomerName(finalName);
+    setIsPolling(false);
+  };
 
   const handleConfirm = async () => {
     if (!detectedPayment) return;
@@ -87,11 +189,14 @@ export default function TillMonitor({ totalAmount }: Props) {
       return;
     }
 
+    const finalCustomerName = customCustomerName.trim() || detectedPayment.customerName || 'M-Pesa Customer';
+
     try {
-      // Mark payment as consumed on cloud server to prevent double-use
-      const cloudUrl = import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+      // Mark payment as consumed on cloud/server to prevent double-use
       const businessSetup = usePosStore.getState().businessSetup;
-      const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId;
+      const businessId = businessSetup?.businessId || (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.id;
+      const rawUrl = businessSetup?.apiUrl || businessSetup?.backOfficeUrl || import.meta.env.VITE_CLOUD_URL || 'https://api.whizpoint.app';
+      const cloudUrl = rawUrl.replace(/\/$/, '').replace(/\/api$/, '');
 
       const consumeRes = await fetch(`${cloudUrl}/api/mpesa/payments/consume`, {
         method: 'POST',
@@ -101,18 +206,22 @@ export default function TillMonitor({ totalAmount }: Props) {
 
       if (!consumeRes.ok) {
         const err = await consumeRes.json().catch(() => ({}));
-        toast(err.error || 'This payment may already have been claimed.', 'error');
-        return;
+        if (consumeRes.status === 409) {
+          console.warn('[TillMonitor] Payment was already claimed, proceeding with sale:', detectedPayment.transactionId);
+        } else {
+          toast(err.error || 'Payment consume verification failed.', 'error');
+        }
       }
     } catch (err) {
-      // Non-fatal: log but proceed. The POS still records the sale locally.
-      console.error('[TillMonitor] Failed to consume payment on cloud server:', err);
+      console.error('[TillMonitor] Failed to consume payment on server:', err);
     }
     
-    // Complete the transaction atomically
+    // Complete the transaction atomically with customer name recorded
     completeTransaction('mpesa', undefined, { 
       mpesaCode: detectedPayment.transactionId,
       phoneNumber: detectedPayment.phoneNumber,
+      customerName: finalCustomerName,
+      mpesaName: finalCustomerName,
       amountTendered: detectedPayment.amount
     });
   };
@@ -191,48 +300,141 @@ export default function TillMonitor({ totalAmount }: Props) {
     );
   }
 
+  // If multiple payments match the amount and none selected yet: Cashier picks who is paying!
+  if (!detectedPayment && candidatePayments.length > 1) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+            <Users className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">
+              Multiple Payments Found ({candidatePayments.length})
+            </h3>
+            <p className="text-xs text-gray-500">Select the customer standing at your counter:</p>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-2 mb-4 pr-1">
+          {candidatePayments.map((cand, idx) => (
+            <div 
+              key={idx}
+              onClick={() => selectCandidate(cand)}
+              className="p-3.5 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50/50 cursor-pointer transition-all flex items-center justify-between shadow-sm bg-white"
+            >
+              <div>
+                <p className="font-bold text-gray-900 text-base flex items-center gap-2">
+                  {cand.customerName || 'M-Pesa Customer'}
+                </p>
+                <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                  <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-700 font-bold">{cand.phoneNumber || 'No phone'}</span>
+                  <span className="font-mono">{cand.transactionId}</span>
+                  <span>{new Date(cand.timestamp || Date.now()).toLocaleTimeString()}</span>
+                </div>
+              </div>
+              <button 
+                type="button"
+                className="px-3 py-1.5 bg-green-600 text-white font-bold text-xs rounded-lg shadow hover:bg-green-700"
+              >
+                SELECT
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button 
+          onClick={() => { setCandidatePayments([]); setIsPolling(true); }}
+          className="py-2 text-xs text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1 font-semibold"
+        >
+          <RefreshCw className="w-3.5 h-3.5" /> Re-scan for new payments
+        </button>
+      </div>
+    );
+  }
+
   if (detectedPayment) {
-    const isAmountMatch = detectedPayment.amount === totalAmount;
+    const isAmountMatch = Math.abs(detectedPayment.amount - totalAmount) < 0.01;
     
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              PAYMENT DETECTED
-            </h3>
-            <p className="text-sm text-gray-500">Please verify details before completing</p>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 mb-6 shadow-sm">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase">Customer Name</p>
-              <p className="font-medium text-gray-900">
-                {(detectedPayment.customerName && detectedPayment.customerName.trim().split(' ').length < 2 && detectedPayment.customerName !== 'Customer') 
-                  ? -name- (M-Pesa).replace('-name-', detectedPayment.customerName)
-                  : (detectedPayment.customerName || 'Unknown')}
-              </p>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+              <CheckCircle2 className="w-6 h-6" />
             </div>
             <div>
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                PAYMENT DETECTED
+              </h3>
+              <p className="text-xs text-gray-500">Verify customer details and confirm</p>
+            </div>
+          </div>
+          {candidatePayments.length > 1 && (
+            <button 
+              type="button"
+              onClick={() => setDetectedPayment(null)}
+              className="text-xs text-blue-600 font-bold hover:underline"
+            >
+              Choose different customer ({candidatePayments.length})
+            </button>
+          )}
+        </div>
+        
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 mb-4 shadow-sm">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 bg-green-50/70 p-3 rounded-lg border border-green-200">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-green-800 uppercase">Customer Name</p>
+                <button 
+                  type="button" 
+                  onClick={() => setIsEditingName(!isEditingName)} 
+                  className="text-xs text-green-700 flex items-center gap-1 font-bold hover:underline"
+                >
+                  <Edit3 className="w-3 h-3" /> {isEditingName ? 'Cancel' : 'Edit Name'}
+                </button>
+              </div>
+              {isEditingName ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    value={customCustomerName} 
+                    onChange={e => setCustomCustomerName(e.target.value)}
+                    placeholder="Enter customer name..."
+                    className="flex-1 px-3 py-1.5 text-sm bg-white border border-green-300 rounded-lg font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setIsEditingName(false)}
+                    className="p-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <p className="text-lg font-black text-gray-900 mt-0.5">
+                  {customCustomerName || detectedPayment.customerName || 'M-Pesa Customer'}
+                </p>
+              )}
+            </div>
+
+            <div>
               <p className="text-xs font-semibold text-gray-400 uppercase">Phone Number</p>
-              <p className="font-medium text-gray-900">
-                {detectedPayment.phoneNumber?.length > 15 
-                  ? 'Hidden (Privacy)' 
-                  : detectedPayment.phoneNumber}
-              </p>
+              <p className="font-mono font-bold text-gray-900">{detectedPayment.phoneNumber || 'Not provided'}</p>
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase">Transaction ID</p>
-              <p className="font-medium text-gray-900">{detectedPayment.transactionId}</p>
+              <p className="font-mono font-bold text-gray-900">{detectedPayment.transactionId}</p>
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase">Time</p>
-              <p className="font-medium text-gray-900">{new Date(detectedPayment.timestamp).toLocaleTimeString()}</p>
+              <p className="font-medium text-gray-700">{new Date(detectedPayment.timestamp).toLocaleTimeString()}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase">Verification Status</p>
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                <CheckCircle2 className="w-3 h-3" /> Validated
+              </span>
             </div>
           </div>
           

@@ -89,6 +89,11 @@ export default function SettingsPage() {
     autoLogoffMinutes: 5,
     printerPaperWidth: 80,
     disableReceiptPrinting: false,
+    billModeEnabled: false,
+    hospitalityReceiptPrinting: false,
+    printDuplicateReceipts: false,
+    kraEnabled: false,
+    kraEndpoint: '',
   });
 
   const [userData, setUserData] = useState({
@@ -123,6 +128,11 @@ export default function SettingsPage() {
         autoLogoffMinutes: businessSetup.autoLogoffMinutes || 5,
         printerPaperWidth: businessSetup.printerPaperWidth || 80,
         disableReceiptPrinting: (businessSetup as any).disableReceiptPrinting || false,
+        billModeEnabled: (businessSetup as any).billModeEnabled || false,
+        hospitalityReceiptPrinting: (businessSetup as any).hospitalityReceiptPrinting || false,
+        printDuplicateReceipts: (businessSetup as any).printDuplicateReceipts || false,
+        kraEnabled: businessSetup.kraEnabled || false,
+        kraEndpoint: businessSetup.kraEndpoint || '',
       });
     }
   }, [businessSetup]);
@@ -489,6 +499,59 @@ export default function SettingsPage() {
                     </div>
                 </div>
               </div>
+              <div className="md:col-span-2">
+                <div className="flex items-center justify-between p-4 bg-amber-50/50 rounded-lg border border-amber-200">
+                    <div className='flex items-center'>
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center mr-3 text-amber-700">
+                            ☕
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-800">Hospitality / Bar "Bill Mode" (Pay After Use / Open Tabs)</label>
+                            <p className="text-xs text-gray-500">Instead of immediate checkout, print customer proforma bills & cashier slips, keeping tabs open until settled</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        <span className="text-sm font-semibold text-gray-600">{(businessData as any).billModeEnabled ? 'Enabled' : 'Disabled'}</span>
+                        <button
+                            onClick={() => {
+                                const newVal = !(businessData as any).billModeEnabled;
+                                setBusinessData(prev => ({ ...prev, billModeEnabled: newVal } as any));
+                                saveBusinessSetup({ ...businessSetup, ...businessData, billModeEnabled: newVal, isSetup: true } as any);
+                            }}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${(businessData as any).billModeEnabled ? 'bg-amber-600' : 'bg-gray-200'}`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${(businessData as any).billModeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                    </div>
+                </div>
+
+                {(businessData as any).billModeEnabled && (
+                  <div className="flex items-center justify-between p-4 bg-amber-50/40 rounded-lg border border-amber-200 mt-3 animate-in fade-in">
+                      <div className='flex items-center'>
+                          <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center mr-3 text-amber-700">
+                              <Printer className="w-4 h-4" />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-bold text-gray-800">Hospitality Receipt Printing</label>
+                              <p className="text-xs text-gray-500">Automatically print customer proforma bills when opening tabs and tax receipts when settling. When disabled, tabs & payments are recorded digitally without printing physical paper unless manually requested.</p>
+                          </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                          <span className="text-sm font-semibold text-gray-600">{(businessData as any).hospitalityReceiptPrinting ? 'Enabled' : 'Disabled'}</span>
+                          <button
+                              onClick={() => {
+                                  const newVal = !(businessData as any).hospitalityReceiptPrinting;
+                                  setBusinessData(prev => ({ ...prev, hospitalityReceiptPrinting: newVal } as any));
+                                  saveBusinessSetup({ ...businessSetup, ...businessData, hospitalityReceiptPrinting: newVal, isSetup: true } as any);
+                              }}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${(businessData as any).hospitalityReceiptPrinting ? 'bg-amber-600' : 'bg-gray-200'}`}
+                          >
+                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${(businessData as any).hospitalityReceiptPrinting ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                      </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -744,6 +807,29 @@ export default function SettingsPage() {
 
                     {!businessData.disableReceiptPrinting && (
                         <>
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className='flex items-center'>
+                                    <Printer className="w-5 h-5 mr-2 text-gray-600" />
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Duplicate Receipt Printing (Customer + Cashier Copy)</label>
+                                        <p className="text-xs text-gray-500">Prints an identical compact Cashier Copy after the customer receipt for physical audit records</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                    <span className="text-sm text-gray-600">{businessData.printDuplicateReceipts ? 'Enabled' : 'Disabled'}</span>
+                                    <button
+                                        onClick={() => {
+                                            const newVal = !businessData.printDuplicateReceipts;
+                                            setBusinessData(prev => ({ ...prev, printDuplicateReceipts: newVal }));
+                                            saveBusinessSetup({ ...businessSetup, ...businessData, printDuplicateReceipts: newVal, isSetup: true } as any);
+                                        }}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${businessData.printDuplicateReceipts ? 'bg-blue-600' : 'bg-gray-200'}`}
+                                    >
+                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${businessData.printDuplicateReceipts ? 'translate-x-6' : 'translate-x-1'}`} />
+                                    </button>
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Paper Width (mm)</label>
                                 <input

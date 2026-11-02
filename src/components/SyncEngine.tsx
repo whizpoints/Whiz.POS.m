@@ -121,7 +121,7 @@ export default function SyncEngine() {
       const failedOperation: SyncOperation = {
         id: `SYNC${Date.now()}`,
         type: 'transaction',
-        data: { error: error.message },
+        data: { error: (error as any)?.message || String(error) },
         timestamp: new Date().toISOString(),
         status: 'failed',
         retryCount: 1

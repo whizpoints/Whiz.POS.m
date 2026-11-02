@@ -1,11 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model Business {
@@ -16,7 +16,7 @@ model Business {
   logoUrl           String?
   documentLogoUrl   String?
   watermarkUrl      String?
-  settings          Json?    @default("{}")
+  settings          String?  @default("{}")
   emailVerified     Boolean  @default(false)
   setupComplete     Boolean  @default(false)
   verificationToken String?
@@ -35,6 +35,7 @@ model Business {
   suppliers       Supplier[]
   outlets         Outlet[]
   stockMovements  StockMovement[]
+  categories      Category[]
   Client          Client[]
   SavedDocument   SavedDocument[]
   servers         Server[]
@@ -43,6 +44,19 @@ model Business {
 
   @@index([email])
   @@index([updatedAt])
+}
+
+model Category {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([name])
 }
 
 model MpesaConfig {
@@ -65,8 +79,6 @@ model MpesaConfig {
   stkEnabled Boolean @default(true)
   c2bEnabled Boolean @default(true)
 
-  // Per-business Safaricom public certificate (base64-encoded PEM or DER).
-  // If null, the shared server/utils/ProductionCertificate.cer is used as fallback.
   certificateBase64 String?
 
   createdAt DateTime @default(now())
@@ -89,14 +101,15 @@ model User {
   locationId String?
   email      String   @unique
   password   String
+  pin        String?
   name       String
-  role       Role     @default(CASHIER)
+  role       String   @default("CASHIER")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
+  outletId   String?
 
   business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location StoreLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  outletId String?
   outlet   Outlet?        @relation(fields: [outletId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
@@ -104,12 +117,6 @@ model User {
   @@index([outletId])
   @@index([email])
   @@index([updatedAt])
-}
-
-enum Role {
-  ADMIN
-  CASHIER
-  MANAGER
 }
 
 model StoreLocation {
@@ -167,18 +174,19 @@ model Outlet {
 }
 
 model StockMovement {
-  id         String   @id @default(cuid())
-  businessId String
-  productId  String
-  locationId String
-  outletId   String?
-  serverId   String?
-  terminalId String?
-  type       String // SALE, TRANSFER, PO, ADJUSTMENT
-  quantity   Int
-  reference  String?
-  timestamp  DateTime @default(now())
-  updatedAt  DateTime @default(now()) @updatedAt
+  id             String   @id @default(cuid())
+  businessId     String
+  productId      String
+  locationId     String
+  outletId       String?
+  serverId       String?
+  terminalId     String?
+  type           String // SALE, TRANSFER, PO, ADJUSTMENT
+  quantity       Int
+  reference      String?
+  sourceTerminal String?
+  timestamp      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 
   business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
   product  Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -253,15 +261,15 @@ model Customer {
   address    String?
   taxId      String?
 
-  isCredit    Boolean @default(false)
-  isLoyalty   Boolean @default(false)
-  isWholesale Boolean @default(false)
+  isCredit    Boolean? @default(false)
+  isLoyalty   Boolean? @default(false)
+  isWholesale Boolean? @default(false)
 
-  balance       Float @default(0)
-  totalCredit   Float @default(0)
-  paidAmount    Float @default(0)
-  loyaltyPoints Int   @default(0)
-  totalSpent    Float @default(0)
+  balance       Float? @default(0)
+  totalCredit   Float? @default(0)
+  paidAmount    Float? @default(0)
+  loyaltyPoints Int    @default(0)
+  totalSpent    Float  @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -286,10 +294,10 @@ model MpesaTransaction {
   isEnriched    Boolean  @default(false)
   timestamp     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
+  outletId      String?
 
   business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location StoreLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  outletId String?
   outlet   Outlet?        @relation(fields: [outletId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
@@ -312,7 +320,7 @@ model Receipt {
   paymentMethod String
   customerPhone String?
   mpesaCode     String?
-  status        ReceiptStatus @default(PENDING)
+  status        String        @default("PENDING")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
 
@@ -345,12 +353,6 @@ model ReceiptItem {
   totalPrice  Float
 
   @@index([receiptId])
-}
-
-enum ReceiptStatus {
-  COMPLETED
-  PENDING
-  REFUNDED
 }
 
 model Supplier {
@@ -410,9 +412,8 @@ model PairingRequest {
   id         String @id @default(cuid())
   type       String @default("SERVER") // SERVER or TERMINAL
   status     String @default("PENDING") // PENDING, APPROVED, EXPIRED
-  deviceInfo Json?
+  deviceInfo String?
 
-  // These will be filled upon approval
   businessId String?
   outletId   String?
   serverId   String? // The actual server created upon approval
@@ -485,4 +486,20 @@ model SavedDocument {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
+}
+
+model SyncLog {
+  id         String   @id @default(cuid())
+  businessId String
+  outletId   String?
+  terminal   String
+  type       String
+  status     String
+  details    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([outletId])
+  @@index([createdAt])
 }

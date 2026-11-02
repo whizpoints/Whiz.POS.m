@@ -2,6 +2,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { usePosStore } from './store/posStore';
 import { CheckoutModal } from './components/Checkout';
+import OpenBillsModal from './components/Hospitality/OpenBillsModal';
 import MainNavigator from './pages/MainNavigator';
 import BusinessRegistrationPage from './pages/BusinessRegistrationPage';
 import LoginScreen from './components/LoginScreen';
@@ -38,7 +39,7 @@ function App() {
 
   // Use custom hook to track idle state.
   // Only enable tracking if explicitly enabled in settings AND logged in.
-  const isAutoLogoffEnabled = businessSetup?.isLoggedIn && (businessSetup?.autoLogoffEnabled === true);
+  const isAutoLogoffEnabled = Boolean(businessSetup?.isLoggedIn && (businessSetup?.autoLogoffEnabled === true));
   const isIdle = useAutoLogout(idleMs, isAutoLogoffEnabled);
 
   // Debug log for auto-logoff
@@ -69,43 +70,118 @@ function App() {
     }
   }, []);
 
-  // Setup Socket.io Real-Time Sync
+  // Listen for discovered servers from Electron background discovery
   useEffect(() => {
-    const state = usePosStore.getState();
-    const rawUrl = state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
-    let apiUrl = rawUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
+    if (window.electron && typeof (window.electron as any).onServerDiscovered === 'function') {
+      const unsubscribe = (window.electron as any).onServerDiscovered((_event: any, server: any) => {
+        if (server && server.url) {
+          usePosStore.getState().updateServerUrl(server.url);
+        }
+      });
+      return () => {
+        if (typeof unsubscribe === 'function') unsubscribe();
+      };
+    }
+  }, []);
+
+  // Initial check: if current apiUrl is unreachable, perform proactive discovery
+  useEffect(() => {
+    const checkServerConnectivity = async () => {
+      const state = usePosStore.getState();
+      const currentUrl = state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl;
+      let reachable = false;
+      if (currentUrl) {
+        try {
+          const res = await fetch(`${currentUrl.replace(/\/$/, '')}/api/health`, {
+            signal: AbortSignal.timeout(1500)
+          });
+          if (res.ok) reachable = true;
+        } catch (e) {
+          reachable = false;
+        }
+      }
+      if (!reachable && window.electron && typeof window.electron.discoverLocalServer === 'function') {
+        console.log('[App] Current server URL unreachable. Running proactive auto-discovery...');
+        try {
+          const discovered = await window.electron.discoverLocalServer();
+          const foundUrl = Array.isArray(discovered) ? discovered[0]?.url : ((discovered as any)?.url || (typeof discovered === 'string' ? discovered : null));
+          if (foundUrl) {
+            console.log('[App] Auto-discovered active server:', foundUrl);
+            await usePosStore.getState().updateServerUrl(foundUrl);
+          }
+        } catch (err) {
+          console.warn('[App] Proactive discovery failed:', err);
+        }
+      }
+    };
+    checkServerConnectivity();
+  }, []);
+
+  // Setup Socket.io Real-Time Sync with dynamic reconnect on IP change
+  const currentApiUrl = usePosStore(state => state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl);
+  const activeBusinessId = usePosStore(state => state.businessSetup?.businessId || (state.businessSetup as any)?.cloudBusinessId);
+
+  useEffect(() => {
+    let apiUrl = currentApiUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
     
     if (apiUrl) {
+      console.log('[Socket] Connecting socket to:', apiUrl);
       const socket = io(apiUrl, {
-        transports: ['websocket'],
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
+        reconnectionAttempts: 10,
       });
 
       socket.on('connect', () => {
-        console.log('[Socket] Connected to POS Server for real-time sync');
-        const activeBusinessId = usePosStore.getState().businessSetup?.businessId || (usePosStore.getState().businessSetup as any)?.cloudBusinessId;
-        if (activeBusinessId) {
-          socket.emit('join_business', activeBusinessId);
+        console.log('[Socket] Connected to POS Server for real-time sync at', apiUrl);
+        const bId = usePosStore.getState().businessSetup?.businessId || (usePosStore.getState().businessSetup as any)?.cloudBusinessId;
+        if (bId) {
+          socket.emit('join_business', bId);
+        }
+      });
+
+      socket.on('connect_error', (err) => {
+        console.warn(`[Socket] Connection error to ${apiUrl}:`, err.message);
+        // If connection fails, trigger background server discovery
+        if (window.electron && typeof window.electron.discoverLocalServer === 'function') {
+          window.electron.discoverLocalServer().then((discovered: any) => {
+            const foundUrl = Array.isArray(discovered) ? discovered[0]?.url : (discovered?.url || (typeof discovered === 'string' ? discovered : null));
+            if (foundUrl && foundUrl !== apiUrl) {
+              usePosStore.getState().updateServerUrl(foundUrl);
+            }
+          }).catch(() => {});
         }
       });
 
       // Receive downward sync from Cloud or other POS terminals
       socket.on('cloud_sync_received', (data) => {
         console.log('[Socket] Received real-time sync data:', data);
-        usePosStore.getState().pullDeltaFromServer(); // Trigger a pull to fetch new data
+        if (typeof usePosStore.getState().syncFromServer === 'function') usePosStore.getState().syncFromServer(); // Trigger a pull to fetch new data
       });
 
       socket.on('stock_updated', (data) => {
         console.log('[Socket] Stock updated remotely:', data);
-        usePosStore.getState().pullDeltaFromServer();
+        if (typeof usePosStore.getState().syncFromServer === 'function') usePosStore.getState().syncFromServer();
+      });
+
+      socket.on('mpesa_payment_received', (data) => {
+        console.log('[Socket] Real-time M-Pesa payment received:', data);
+        window.dispatchEvent(new CustomEvent('mpesa_payment_received', { detail: data }));
       });
 
       return () => {
-        socket.disconnect();
+        try {
+          if (socket.connected) {
+            socket.disconnect();
+          } else {
+            socket.once('connect', () => socket.disconnect());
+            socket.close();
+          }
+        } catch (e) {}
       };
     }
-  }, []);
+  }, [currentApiUrl, activeBusinessId]);
 
   // Periodic Sync (Every 10 seconds)
   useEffect(() => {
@@ -177,6 +253,7 @@ function App() {
 
           {/* Global Modals */}
           <CheckoutModal />
+          <OpenBillsModal />
           <OnScreenKeyboard />
 
 

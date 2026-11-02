@@ -25,6 +25,9 @@ release-builds/
 *.sqlite
 *.sqlite-journal
 *.db
+*.db-*
+*.db-wal
+*.db-shm
 local-server/prisma/*.db
 local-server/business-setup.json
 local-server/data/

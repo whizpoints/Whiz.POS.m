@@ -51,6 +51,7 @@ function initDB(userDataPath) {
         CREATE TABLE IF NOT EXISTS suppliers (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS heldOrders (id TEXT PRIMARY KEY, data TEXT);
+        CREATE TABLE IF NOT EXISTS openBills (id TEXT PRIMARY KEY, data TEXT);
         CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, saleId TEXT, paymentMethod TEXT, amount REAL, reference TEXT, status TEXT, source TEXT, rawCallback TEXT, timestamp TEXT);
         
         -- Multi-Outlet Additions
@@ -379,6 +380,7 @@ function getFileTableMapping(filename) {
         'suppliers.json': { table: 'suppliers', isArray: true },
         'audit-logs.json': { table: 'audit_logs', isArray: true },
         'held-orders.json': { table: 'heldOrders', isArray: true },
+        'open-bills.json': { table: 'openBills', isArray: true },
         'stock-movements.json': { table: 'stockMovements', isArray: true },
         'inventory-logs.json': { table: 'stockMovements', isArray: true },
         'categories.json': { table: 'categories', isArray: true },

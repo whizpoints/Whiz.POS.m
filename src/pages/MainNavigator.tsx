@@ -24,6 +24,8 @@ import MobileReceiptsPage from './MobileReceiptsPage';
 import SalariesPage from './SalariesPage';
 import DeveloperPage from './DeveloperPage';
 import UsersPage from './UsersPage';
+import OpenBillsPage from './OpenBillsPage';
+import InvoiceGenerator from './InvoiceGenerator';
 
 import ProcurementPage from '../components/ProcurementPage';
 import FinancialLedgerPage from '../components/FinancialLedgerPage';
@@ -107,6 +109,10 @@ const MainNavigator = () => {
         <Route path="/status" element={<OfflineSyncStatus />} />
         <Route path="/previous-receipts" element={<PreviousReceiptsPage />} />
         <Route path="/mobile-receipts" element={<MobileReceiptsPage />} />
+        <Route path="/open-bills" element={<OpenBillsPage />} />
+        <Route path="/open-tabs" element={<OpenBillsPage />} />
+        <Route path="/documents" element={<InvoiceGenerator />} />
+        <Route path="/invoices" element={<InvoiceGenerator />} />
 
         <Route path="/manage" element={<SettingsPage />} />
         <Route path="/developer" element={<DeveloperPage />} />

@@ -206,7 +206,7 @@ export default function ProcurementPage() {
                        <td className="px-6 py-4 font-medium">{po.supplierName}</td>
                        <td className="px-6 py-4 text-sm text-gray-500">{new Date(po.dateCreated).toLocaleDateString()}</td>
                        <td className="px-6 py-4 text-sm text-gray-600">
-                         {po.items.map(i => `${i.quantity}x ${i.productName}`).join(', ')}
+                         {po.items.map((i: any) => `${i.quantity}x ${i.productName}`).join(', ')}
                        </td>
                        <td className="px-6 py-4 font-bold text-gray-800">KES {po.totalAmount.toLocaleString()}</td>
                      </tr>

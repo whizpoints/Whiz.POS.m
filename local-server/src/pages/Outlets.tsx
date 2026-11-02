@@ -69,7 +69,8 @@ export default function Outlets() {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('whiz-token')}` }
       });
       if (res.ok) {
-        setOutlets(await res.json());
+        const data = await res.json();
+        setOutlets(Array.isArray(data) ? data : (data?.outlets || (data?.id ? [data] : [])));
       }
     } catch (e) {
       console.error(e);
@@ -86,7 +87,8 @@ export default function Outlets() {
       });
       if (!res.ok) throw new Error('Failed to approve');
       toast.success('Terminal Approved and Outlet Created!');
-      fetchData();
+      await fetchData();
+      setActiveTab('outlets');
     } catch (e: any) {
       toast.error(e.message);
     }

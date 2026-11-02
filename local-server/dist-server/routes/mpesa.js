@@ -45,8 +45,8 @@ async function triggerTransactionStatus(config, receipt, businessId) {
             TransactionID: receipt,
             PartyA: config.shortcode,
             IdentifierType: "4",
-            ResultURL: `${baseDomain}/api/mpesa/callback/transaction-status/${businessId}`,
-            QueueTimeOutURL: `${baseDomain}/api/mpesa/callback/transaction-status/${businessId}`,
+            ResultURL: `${baseDomain}/api/callbacks/payments/callback/transaction-status/${businessId}`,
+            QueueTimeOutURL: `${baseDomain}/api/callbacks/payments/callback/transaction-status/${businessId}`,
             Remarks: "Status Check",
             Occasion: "Status"
         };
@@ -58,7 +58,12 @@ async function triggerTransactionStatus(config, receipt, businessId) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
-        }).catch(err => console.error(`[M-Pesa Webhook] Failed to query transaction status for ${receipt}:`, err));
+        })
+            .then(async (res) => {
+            const text = await res.text();
+            console.log(`[M-Pesa Webhook] Transaction status response for ${receipt}:`, res.status, text);
+        })
+            .catch(err => console.error(`[M-Pesa Webhook] Failed to query transaction status for ${receipt}:`, err));
     }
     catch (err) {
         console.error(`[M-Pesa Webhook] Setup failed for transaction status query ${receipt}:`, err);
@@ -187,8 +192,23 @@ router.post('/callback/stk/:businessId', async (req, res) => {
                         amount: parseFloat(typeof amount !== 'undefined' ? amount : (typeof TransAmount !== 'undefined' ? TransAmount : '0')),
                         phoneNumber: typeof phone !== 'undefined' ? phone.toString() : (typeof MSISDN !== 'undefined' ? MSISDN.toString() : ''),
                         status: 'UNLINKED',
+                        isEnriched: config.initiatorName && config.initiatorPassword ? 0 : 1,
                         customerName: typeof customerName !== 'undefined' ? customerName : null
                     }).execute();
+                }
+                // Broadcast real-time payment to local POS terminals
+                const io = req.app.get('io');
+                if (io) {
+                    const payload = {
+                        transactionId: typeof receipt !== 'undefined' ? receipt : (typeof TransID !== 'undefined' ? TransID : 'unknown'),
+                        amount: parseFloat(typeof amount !== 'undefined' ? amount : (typeof TransAmount !== 'undefined' ? TransAmount : '0')),
+                        phoneNumber: typeof phone !== 'undefined' ? phone.toString() : (typeof MSISDN !== 'undefined' ? MSISDN.toString() : ''),
+                        customerName: typeof customerName !== 'undefined' ? customerName : 'M-Pesa Customer',
+                        isEnriched: true,
+                        businessId
+                    };
+                    io.to(`business_${businessId}`).emit('mpesa_payment_received', payload);
+                    io.emit('mpesa_payment_received', payload);
                 }
                 // Fetch Customer Name using Transaction Status API
                 if (config.initiatorName && config.initiatorPassword) {
@@ -209,10 +229,39 @@ router.post('/callback/c2b/validation/:businessId', async (req, res) => {
     console.log(`[M-Pesa Webhook] C2B Validation received for business ${req.params.businessId}:`, JSON.stringify(req.body, null, 2));
     try {
         const { businessId } = req.params;
-        const { BusinessShortCode } = req.body;
+        const { TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode } = req.body;
         const config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
         if (!config || config.shortcode !== BusinessShortCode) {
             return res.json({ "ResultCode": 1, "ResultDesc": "Rejected: Invalid ShortCode mapping" });
+        }
+        const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || 'M-Pesa Customer';
+        if (TransID && TransAmount) {
+            const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', TransID).executeTakeFirst();
+            if (!existingTx) {
+                await db.insertInto('MpesaTransaction').values({
+                    id: randomUUID(),
+                    businessId,
+                    transactionId: TransID,
+                    amount: parseFloat(TransAmount),
+                    phoneNumber: MSISDN ? MSISDN.toString() : '',
+                    status: 'UNLINKED',
+                    isEnriched: 1,
+                    customerName
+                }).execute();
+            }
+            const io = req.app.get('io');
+            if (io) {
+                const payload = {
+                    transactionId: TransID,
+                    amount: parseFloat(TransAmount),
+                    phoneNumber: MSISDN ? MSISDN.toString() : '',
+                    customerName,
+                    isEnriched: true,
+                    businessId
+                };
+                io.to(`business_${businessId}`).emit('mpesa_payment_received', payload);
+                io.emit('mpesa_payment_received', payload);
+            }
         }
         res.json({ "ResultCode": 0, "ResultDesc": "Accepted" });
     }
@@ -230,18 +279,38 @@ router.post('/callback/c2b/confirmation/:businessId', async (req, res) => {
             // Reject spoofed callbacks
             return res.json({ "ResultCode": 1, "ResultDesc": "Rejected" });
         }
-        const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ');
-        const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', receipt || TransID || 'unknown').executeTakeFirst();
+        const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || 'M-Pesa Customer';
+        const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', TransID).executeTakeFirst();
         if (!existingTx) {
             await db.insertInto('MpesaTransaction').values({
                 id: randomUUID(),
                 businessId,
-                transactionId: typeof receipt !== 'undefined' ? receipt : (typeof TransID !== 'undefined' ? TransID : 'unknown'),
-                amount: parseFloat(typeof amount !== 'undefined' ? amount : (typeof TransAmount !== 'undefined' ? TransAmount : '0')),
-                phoneNumber: typeof phone !== 'undefined' ? phone.toString() : (typeof MSISDN !== 'undefined' ? MSISDN.toString() : ''),
+                transactionId: TransID,
+                amount: parseFloat(TransAmount || '0'),
+                phoneNumber: MSISDN ? MSISDN.toString() : '',
                 status: 'UNLINKED',
-                customerName: typeof customerName !== 'undefined' ? customerName : null
+                isEnriched: 1,
+                customerName
             }).execute();
+        }
+        else {
+            await db.updateTable('MpesaTransaction')
+                .set({ customerName, phoneNumber: MSISDN ? MSISDN.toString() : '' })
+                .where('transactionId', '=', TransID)
+                .execute();
+        }
+        const io = req.app.get('io');
+        if (io) {
+            const payload = {
+                transactionId: TransID,
+                amount: parseFloat(TransAmount || '0'),
+                phoneNumber: MSISDN ? MSISDN.toString() : '',
+                customerName,
+                isEnriched: true,
+                businessId
+            };
+            io.to(`business_${businessId}`).emit('mpesa_payment_received', payload);
+            io.emit('mpesa_payment_received', payload);
         }
         // Trigger Transaction Status Background Job
         if (config.initiatorName && config.initiatorPassword) {
@@ -294,11 +363,44 @@ router.get('/payments/search', async (req, res) => {
         const q = req.query.q;
         if (!businessId)
             return res.status(400).json({ error: 'Missing businessId' });
+        // Also sync from cloud if reachable
+        try {
+            const cloudUrl = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+            const cloudRes = await fetch(`${cloudUrl}/api/mpesa/payments/search?businessId=${businessId}`, {
+                signal: AbortSignal.timeout(3000)
+            });
+            if (cloudRes.ok) {
+                const cloudTxns = await cloudRes.json();
+                if (Array.isArray(cloudTxns)) {
+                    for (const ctx of cloudTxns) {
+                        const existing = await db.selectFrom('MpesaTransaction')
+                            .selectAll()
+                            .where('transactionId', '=', ctx.transactionId)
+                            .executeTakeFirst();
+                        if (!existing) {
+                            await db.insertInto('MpesaTransaction').values({
+                                id: ctx.id || randomUUID(),
+                                businessId,
+                                locationId: ctx.locationId || null,
+                                transactionId: ctx.transactionId,
+                                amount: Number(ctx.amount) || 0,
+                                phoneNumber: String(ctx.phoneNumber || ''),
+                                customerName: ctx.customerName || null,
+                                status: ctx.status || 'UNLINKED',
+                                isEnriched: ctx.isEnriched ? 1 : 0,
+                                timestamp: ctx.timestamp ? new Date(ctx.timestamp).toISOString() : new Date().toISOString(),
+                                updatedAt: new Date().toISOString()
+                            }).execute();
+                        }
+                    }
+                }
+            }
+        }
+        catch (cloudErr) { }
         let query = db.selectFrom('MpesaTransaction')
             .selectAll()
             .where('businessId', '=', businessId)
             .where('status', '=', 'UNLINKED')
-            .where('isEnriched', '=', true)
             .orderBy('timestamp', 'desc')
             .limit(20);
         if (q) {
@@ -312,6 +414,7 @@ router.get('/payments/search', async (req, res) => {
         res.json(txns);
     }
     catch (err) {
+        console.error('M-Pesa payment search error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -367,13 +470,24 @@ router.post('/qrcode', async (req, res) => {
 router.post('/payments/consume', async (req, res) => {
     try {
         const { transactionId, businessId } = req.body;
-        if (!transactionId || !businessId)
+        if (!transactionId)
             return res.status(400).json({ error: 'Missing parameters' });
-        const result = await db.updateTable('MpesaTransaction').set({ status: 'LINKED' }).where('transactionId', '=', transactionId).where('businessId', '=', businessId).where('status', '=', 'UNLINKED').execute();
-        if (result.length === 0 || Number(result[0].numUpdatedRows) === 0) {
-            return res.status(409).json({ error: 'Transaction already claimed or not found.' });
+        const cleanTxnId = String(transactionId).trim();
+        const existing = await db.selectFrom('MpesaTransaction')
+            .selectAll()
+            .where('transactionId', '=', cleanTxnId)
+            .executeTakeFirst();
+        if (!existing) {
+            return res.status(404).json({ error: 'Transaction not found.' });
         }
-        res.json({ success: true });
+        if (existing.status === 'LINKED') {
+            return res.json({ success: true, alreadyConsumed: true, message: 'Transaction already claimed.' });
+        }
+        await db.updateTable('MpesaTransaction')
+            .set({ status: 'LINKED' })
+            .where('id', '=', existing.id)
+            .execute();
+        res.json({ success: true, message: 'Payment claimed successfully.' });
     }
     catch (err) {
         console.error('Consume error:', err);

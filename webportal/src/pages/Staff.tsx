@@ -1,25 +1,24 @@
-let cachedStaff: any[] = [];
-let isStaffLoaded = false;
 import { useState, useEffect } from 'react';
 import { Plus, Mail, Phone, ShieldCheck } from 'lucide-react';
 import { useBranchContext } from '../context/BranchContext';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
 import StaffModal from '../components/Staff/StaffModal';
 import toast from 'react-hot-toast';
 import { Trash2, Edit2 } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { getCachedData, setCachedData } from '../lib/cache';
 
 export default function Staff() {
   const { confirm } = useConfirm();
-  const [staff, setStaff] = useState<any[]>(cachedStaff);
-  const [loading, setLoading] = useState(!isStaffLoaded);
   const { activeLocationId } = useBranchContext();
+  const cacheKey = `staff_${activeLocationId || 'ALL'}`;
+  const [staff, setStaff] = useState<any[]>(() => getCachedData(cacheKey, []));
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
 
   const fetchStaff = async () => {
     try {
-      if (!isStaffLoaded) setLoading(true);
+      setIsRefreshing(true);
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
       const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
@@ -31,22 +30,21 @@ export default function Staff() {
       if (response.ok) {
         const data = await response.json();
         if (data.staff) {
-          cachedStaff = data.staff; isStaffLoaded = true; setStaff(data.staff);
+          setStaff(data.staff);
+          setCachedData(cacheKey, data.staff);
         }
       }
     } catch (error) {
       console.error('Failed to fetch staff', error);
     } finally {
-      setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
+    setStaff(getCachedData(cacheKey, []));
     fetchStaff();
-  }, [activeLocationId]);
-
-  if (loading) return <LoadingSpinner message="Loading staff data..." />;
-
+  }, [activeLocationId, cacheKey]);
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
       title: 'Confirm Action',
@@ -94,10 +92,10 @@ export default function Staff() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {loading ? (
-          <div className="col-span-full text-center py-8 text-[color:var(--text-muted)]">Loading staff data...</div>
-        ) : staff.length === 0 ? (
-          <div className="col-span-full text-center py-8 text-[color:var(--text-muted)]">No staff members found</div>
+        {staff.length === 0 ? (
+          <div className="col-span-full text-center py-8 text-[color:var(--text-muted)]">
+            {isRefreshing ? 'Fetching latest staff...' : 'No staff members found'}
+          </div>
         ) : (
           staff.map((employee) => (
           <div key={employee.id} className="glass-card p-5 space-y-4">

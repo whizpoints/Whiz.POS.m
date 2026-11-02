@@ -60,7 +60,7 @@ const MobileReceiptsPage = () => {
           </div>
         ) : (
           <div className="space-y-8">
-            {Object.entries(receiptsByCashier).map(([cashier, receipts]) => (
+            {Object.entries(receiptsByCashier).map(([cashier, receipts]: [string, any]) => (
                 <div key={cashier} className="bg-gray-100/50 p-4 rounded-xl border border-gray-200">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="bg-blue-500 p-2 rounded-lg text-white">
@@ -73,7 +73,7 @@ const MobileReceiptsPage = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {receipts.map((receipt) => (
+                        {receipts.map((receipt: any) => (
                         <div key={receipt._printId || Math.random()} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
                             <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-start">
                             <div>

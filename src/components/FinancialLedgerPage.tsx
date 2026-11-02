@@ -18,9 +18,9 @@ export default function FinancialLedgerPage() {
 
   // Compute COGS (Cost of Goods Sold) based on purchased items (simplified)
   const cogs = useMemo(() => {
-    return purchaseOrders
-      .filter(po => po.status === 'received')
-      .reduce((sum, po) => sum + po.totalAmount, 0);
+    return (purchaseOrders || [])
+      .filter((po: any) => po.status === 'received')
+      .reduce((sum: number, po: any) => sum + (po.totalAmount || 0), 0);
   }, [purchaseOrders]);
 
   // Compute Opex (Operating Expenses)
@@ -77,7 +77,7 @@ export default function FinancialLedgerPage() {
     });
 
     // PO (Inventory / AP)
-    purchaseOrders.filter(po => po.status === 'received').forEach(po => {
+    (purchaseOrders || []).filter((po: any) => po.status === 'received').forEach((po: any) => {
       entries.push({
         id: `J-INV-${po.id}`,
         date: po.dateCreated,

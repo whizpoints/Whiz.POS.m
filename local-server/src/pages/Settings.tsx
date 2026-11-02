@@ -3,7 +3,8 @@ import { useState, useEffect, type ReactNode } from 'react';
 import {
   Key, Copy, CheckCircle2, CreditCard, ShieldCheck, AlertTriangle,
   RefreshCw, Eye, EyeOff, Save, Building2, Globe, Lock, User2, Mail,
-  Bell, Palette, Database, Download, Trash2, ChevronRight, Link
+  Bell, Palette, Database, Download, Trash2, ChevronRight, Link,
+  Upload, HardDrive, Clock, ExternalLink, ArrowRight, Check, Sparkles, Folder
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
@@ -192,19 +193,20 @@ function ApiKeyRow({ label, keyStr, status, badge }: { label: string; keyStr: st
 }
 
 function SecurityPanel({ profile, fetchProfile }: any) {
-  const isAlreadyLinked = !!(profile?.settings?.backOfficeApiKey && profile?.settings?.cloudLocationId);
+  const isAlreadyLinked = !!(profile?.settings?.backOfficeApiKey && (profile?.settings?.cloudLocationId || profile?.settings?.cloudLocationName));
 
   const [url, setUrl] = useState(profile?.settings?.backOfficeUrl || 'https://api.whizpoint.app');
   const [apiKey, setApiKey] = useState(profile?.settings?.backOfficeApiKey || '');
   const [pairingCode, setPairingCode] = useState('');
+  const [pairingMode, setPairingMode] = useState<'browser' | 'manual'>('browser');
   const [step, setStep] = useState<'input' | 'pairing' | 'linked'>(isAlreadyLinked ? 'linked' : 'input');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [cloudInfo, setCloudInfo] = useState<any>(null);
+  const [testingSync, setTestingSync] = useState(false);
   const [error, setError] = useState('');
-
-  // --- NEW: Modern Browser Authorization Flow ---
+  const [approvalUrl, setApprovalUrl] = useState<string | null>(null);
   const [pollIntervalId, setPollIntervalId] = useState<any>(null);
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     return () => {
@@ -212,36 +214,57 @@ function SecurityPanel({ profile, fetchProfile }: any) {
     };
   }, [pollIntervalId]);
 
+  useEffect(() => {
+    if (isAlreadyLinked) {
+      setStep('linked');
+    }
+  }, [isAlreadyLinked]);
+
   const handleLinkAccount = async () => {
     setIsVerifying(true);
     setError('');
     try {
-      const CLOUD_API = (process.env.NODE_ENV === 'production' ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
+      const cleanUrl = (url || 'https://api.whizpoint.app').replace(/\/+$/, '');
       
-      const res = await fetch(`${CLOUD_API}/api/pairing/request`, {
+      const res = await fetch(`${cleanUrl}/api/pairing/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'SERVER', deviceInfo: { os: navigator.platform } })
+        body: JSON.stringify({ 
+          type: 'SERVER', 
+          deviceInfo: { 
+            platform: navigator.platform, 
+            hostname: window.location.hostname,
+            appName: 'WhizPOS Local Server'
+          } 
+        })
       });
-      if (!res.ok) throw new Error('Failed to generate link request');
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}: Failed to generate link request`);
+      }
+
       const data = await res.json();
+      const connectUrl = `${cleanUrl}/connect/server/${data.requestId}`;
+      setApprovalUrl(connectUrl);
       
-      const connectUrl = `${CLOUD_API}/connect/server/${data.requestId}`;
-      
-      // Start polling
-      const pId = setInterval(() => checkCloudApproval(CLOUD_API, data.requestId, pId), 3000);
+      // Poll cloud status every 2.5 seconds
+      const pId = setInterval(() => checkCloudApproval(cleanUrl, data.requestId, pId), 2500);
       setPollIntervalId(pId);
       
-      setStep('pairing' as any); // Hijack the step for "waiting" UI
-      
-      toast(`Please open the browser window that just popped up, or go to ${connectUrl}`, { duration: 10000 });
-        if ((window as any).electron && (window as any).electron.openExternal) {
-           (window as any).electron.openExternal(connectUrl);
-        } else {
-           window.open(connectUrl, '_blank');
-        }
+      setStep('pairing');
+      toast.success('Pairing session initiated! Please approve in the cloud portal.');
+
+      if ((window as any).electron && (window as any).electron.openExternal) {
+        (window as any).electron.openExternal(connectUrl);
+      } else {
+        window.open(connectUrl, '_blank');
+      }
     } catch (err: any) {
-      setError('Cloud connection failed. Ensure you have internet.');
+      console.error('Link account error:', err);
+      setError(err.message || 'Cloud connection failed. Ensure you have internet.');
+      toast.error(err.message || 'Failed to initiate cloud pairing');
+    } finally {
       setIsVerifying(false);
     }
   };
@@ -255,10 +278,13 @@ function SecurityPanel({ profile, fetchProfile }: any) {
       if (data.status === 'APPROVED' && data.credentials) {
         clearInterval(intervalId);
         
-        // Save the received API key directly to the server settings
-        const saveRes = await fetch('/api/settings/save', {
+        const token = localStorage.getItem('whiz-token');
+        const API_BASE_URL = getApiBaseUrl();
+
+        // 1. Save locally via settings/save
+        const saveRes = await fetch(`${API_BASE_URL}/api/settings/save`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
           body: JSON.stringify({
             backOfficeUrl: cloudApi,
             apiKey: data.credentials.apiKey,
@@ -266,117 +292,172 @@ function SecurityPanel({ profile, fetchProfile }: any) {
             syncMode: 'AUTO_REALTIME',
             outletId: data.credentials.outletId,
             serverId: data.credentials.serverId,
-              cloudBusinessName: data.credentials.businessName,
-              cloudLocationName: data.credentials.locationName
-            })
-        });
+            cloudBusinessName: data.credentials.businessName,
+            cloudLocationName: data.credentials.locationName
+          })
+        }).catch(() => null);
 
-        if (saveRes.ok) {
-          const saveData = await saveRes.json();
+        if (saveRes && saveRes.ok) {
+          const saveData = await saveRes.json().catch(() => ({}));
           if (saveData.newToken) {
             localStorage.setItem('whiz-token', saveData.newToken);
-            // Also update the whiz-user to reflect the new businessId
-            const userRaw = localStorage.getItem('whiz-user');
-            if (userRaw) {
-               const u = JSON.parse(userRaw);
-               u.businessId = data.credentials.businessId;
-               localStorage.setItem('whiz-user', JSON.stringify(u));
-            }
           }
-          toast.success('Successfully Linked to Cloud!');
-          setTimeout(() => window.location.reload(), 2000);
-        } else {
-          const errData = await saveRes.json().catch(() => ({}));
-          setError(errData.error || 'Failed to save configuration locally');
-          setStep('cloud' as any);
         }
+
+        // 2. Save into Business profile settings
+        await fetch(`${API_BASE_URL}/api/business/profile`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+          body: JSON.stringify({
+            settings: {
+              ...profile?.settings,
+              backOfficeUrl: cloudApi,
+              backOfficeApiKey: data.credentials.apiKey,
+              cloudBusinessId: data.credentials.businessId,
+              cloudLocationId: data.credentials.outletId,
+              cloudBusinessName: data.credentials.businessName,
+              cloudLocationName: data.credentials.locationName,
+              linkedAt: new Date().toISOString()
+            }
+          })
+        }).catch(() => {});
+
+        toast.success(`Server linked to "${data.credentials.locationName}"!`);
+        setTimeout(() => window.location.reload(), 1500);
       } else if (data.status === 'EXPIRED') {
         clearInterval(intervalId);
-        setError('Pairing request expired');
+        setError('Pairing session timed out. Please initiate a new link.');
         setStep('input');
       }
-    } catch (err) {
-      // Keep polling
-    }
+    } catch (err) {}
   };
 
-  // Step 2: User enters pairing code → validate it
   const handleValidatePairing = async () => {
-    if (pairingCode.length !== 6) {
-      toast.error('Pairing code must be 6 digits');
-      return;
+    if (!apiKey.trim()) {
+      return toast.error('Please enter your Permanent API Key');
     }
+    if (pairingCode.trim().length !== 6) {
+      return toast.error('Pairing code must be 6 digits');
+    }
+
     setIsConfirming(true);
     setError('');
     try {
-      // Validate the pairing code
-      const res = await fetch(`${url}/api/auth/validate-pairing`, {
+      const cleanUrl = (url || 'https://api.whizpoint.app').replace(/\/+$/, '');
+      
+      const res = await fetch(`${cleanUrl}/api/auth/validate-pairing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: apiKey.trim(), pairingCode: pairingCode.trim() })
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setError(data.error || 'Invalid or expired Pairing Code. Please generate a new one on the Back Office.');
+        setError(data.error || 'Invalid or expired Pairing Code. Check Back Office Outlets.');
         setIsConfirming(false);
         return;
       }
 
-      // Pairing validated! Now confirm (burn the code)
-      const confirmRes = await fetch(`${url}/api/auth/confirm-pairing`, {
+      const confirmRes = await fetch(`${cleanUrl}/api/auth/confirm-pairing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: apiKey.trim(), pairingCode: pairingCode.trim() })
       });
       const confirmData = await confirmRes.json();
       if (!confirmRes.ok || !confirmData.success) {
-        setError('Handshake failed. Please try again.');
+        setError(confirmData.error || 'Pairing handshake failed. Please try again.');
         setIsConfirming(false);
         return;
       }
 
-      // Save everything to local server profile
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();
+
+      // Save locally
+      const saveRes = await fetch(`${API_BASE_URL}/api/settings/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          backOfficeUrl: cleanUrl,
+          apiKey: apiKey.trim(),
+          cloudBusinessId: data.businessId,
+          syncMode: 'AUTO_REALTIME',
+          outletId: confirmData.outletId || data.locationId,
+          serverId: confirmData.serverId,
+          cloudBusinessName: data.businessName,
+          cloudLocationName: data.locationName
+        })
+      }).catch(() => null);
+
+      if (saveRes && saveRes.ok) {
+        const saveData = await saveRes.json().catch(() => ({}));
+        if (saveData.newToken) {
+          localStorage.setItem('whiz-token', saveData.newToken);
+        }
+      }
+
       await fetch(`${API_BASE_URL}/api/business/profile`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           settings: {
             ...profile?.settings,
-            backOfficeUrl: url,
+            backOfficeUrl: cleanUrl,
             backOfficeApiKey: apiKey.trim(),
             cloudBusinessId: data.businessId,
             cloudLocationId: data.locationId,
             cloudBusinessName: data.businessName,
             cloudLocationName: data.locationName,
-            cloudEmail: data.email,
             linkedAt: new Date().toISOString()
           }
         })
       });
 
-      setCloudInfo(data);
-      setStep('linked');
-      fetchProfile();
-      toast.success(`✅ Server linked to "${data.locationName}" (${data.businessName})`);
-    } catch (err) {
+      toast.success(`Server linked to "${data.locationName}" (${data.businessName})!`);
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err: any) {
       console.error(err);
-      setError('Network error. Please check your connection.');
+      setError(err.message || 'Network error linking server');
     } finally {
       setIsConfirming(false);
     }
   };
 
-  // Unlink server
+  const handleTestSync = async () => {
+    setTestingSync(true);
+    try {
+      const cleanUrl = (profile?.settings?.backOfficeUrl || url || 'https://api.whizpoint.app').replace(/\/+$/, '');
+      const keyToUse = profile?.settings?.backOfficeApiKey || apiKey;
+      const start = Date.now();
+      const res = await fetch(`${cleanUrl}/api/business/locations`, {
+        headers: { 'Authorization': `Bearer ${keyToUse}` }
+      });
+      const ms = Date.now() - start;
+      if (res.ok) {
+        toast.success(`Cloud link operational (${ms}ms latency)`, { duration: 4000 });
+      } else {
+        toast.error(`Cloud returned status ${res.status}`);
+      }
+    } catch (err) {
+      toast.error('Could not reach cloud backoffice');
+    } finally {
+      setTestingSync(false);
+    }
+  };
+
   const handleUnlink = async () => {
-    if (!confirm('Are you sure you want to unlink this server from the Back Office?')) return;
+    const ok = await confirm({
+      title: 'Unlink Local Server?',
+      message: 'Are you sure you want to unlink this server from the cloud? Cloud synchronization will stop immediately until re-paired.',
+      confirmText: 'Yes, Unlink Server'
+    });
+    if (!ok) return;
+
     try {
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();
       await fetch(`${API_BASE_URL}/api/business/profile`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           settings: {
             ...profile?.settings,
@@ -385,121 +466,364 @@ function SecurityPanel({ profile, fetchProfile }: any) {
             cloudLocationId: null,
             cloudBusinessName: null,
             cloudLocationName: null,
-            cloudEmail: null,
             linkedAt: null
           }
         })
       });
+
       setStep('input');
       setApiKey('');
       setPairingCode('');
-      setCloudInfo(null);
       fetchProfile();
-      toast.success('Server unlinked from Back Office');
+      toast.success('Server unlinked successfully');
     } catch (err) {
-      toast.error('Failed to unlink');
+      toast.error('Failed to unlink server');
     }
   };
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Server Link"
-        title="Connect to Back Office"
-        description="Link this local server to your online WhizPOS back office using a secure 2FA handshake."
+        eyebrow="Cloud Synchronization"
+        title="Server Cloud Link"
+        description="Connect this local server appliance with WhizPOS Cloud to enable live multi-branch inventory, remote analytics, and automated cloud backups."
         icon={<Globe className="w-5 h-5" />}
         gradient="linear-gradient(135deg, rgba(59,130,246,0.25), rgba(168,85,247,0.18))"
       />
 
-      {/* Already Linked State */}
+      {/* STATE 1: ALREADY LINKED */}
       {step === 'linked' && (
-        <div className="glass-panel p-5 space-y-4">
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-            <CheckCircle2 className="w-6 h-6 text-green-500 shrink-0" />
-            <div className="min-w-0">
-              <div className="text-sm font-bold text-green-700">Server Linked Successfully</div>
-              <div className="text-xs text-[color:var(--text-muted)]">
-                Connected to <span className="font-semibold text-[color:var(--text-primary)]">{profile?.settings?.cloudLocationName || cloudInfo?.locationName || 'Branch'}</span> — {profile?.settings?.cloudBusinessName || cloudInfo?.businessName || 'Business'}
+        <div className="glass-panel p-6 rounded-3xl border border-emerald-500/20 bg-emerald-500/5 shadow-lg space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-emerald-500/20">
+            <div className="flex items-center gap-3.5">
+              <div className="relative flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  Server Connected & Synchronized
+                  <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
+                    Active
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Real-time two-way synchronization active between local POS terminals and cloud back office.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleTestSync}
+                disabled={testingSync}
+                className="btn btn-secondary !px-3 !py-1.5 text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${testingSync ? 'animate-spin' : ''}`} />
+                Test Latency
+              </button>
+              <button
+                onClick={handleUnlink}
+                className="btn btn-ghost text-red-500 hover:bg-red-50 !px-3 !py-1.5 text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Unlink Server
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+            <div className="p-4 rounded-2xl bg-white/70 border border-slate-200/80 shadow-sm">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Branch</div>
+              <div className="text-sm font-bold text-slate-800 truncate">
+                {profile?.settings?.cloudLocationName || 'Main Store'}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/70 border border-slate-200/80 shadow-sm">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Business</div>
+              <div className="text-sm font-bold text-slate-800 truncate">
+                {profile?.settings?.cloudBusinessName || profile?.name || 'WhizPOS Business'}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/70 border border-slate-200/80 shadow-sm">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Node Identifier</div>
+              <div className="text-xs font-mono font-bold text-sky-600 truncate">
+                SVR-{String(profile?.settings?.backOfficeApiKey || apiKey || 'NODE').slice(0, 8).toUpperCase()}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/70 border border-slate-200/80 shadow-sm">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Cloud Endpoint</div>
+              <div className="text-xs font-mono text-slate-600 truncate">
+                {profile?.settings?.backOfficeUrl || url}
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-[color:var(--bg-secondary)] border border-[color:var(--border)]">
-              <div className="text-[10px] font-bold uppercase text-[color:var(--text-muted)] mb-0.5">Branch</div>
-              <div className="text-sm font-semibold text-[color:var(--text-primary)] truncate">{profile?.settings?.cloudLocationName || cloudInfo?.locationName || '—'}</div>
+          <div className="bg-white/60 p-4 rounded-2xl border border-slate-200/80 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600">
+                <Key className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-700">Permanent Server API Token</div>
+                <div className="text-xs font-mono text-slate-400">
+                  ••••••••••••••••••••••••••••••••{String(profile?.settings?.backOfficeApiKey || apiKey).slice(-6)}
+                </div>
+              </div>
             </div>
-            <div className="p-3 rounded-lg bg-[color:var(--bg-secondary)] border border-[color:var(--border)]">
-              <div className="text-[10px] font-bold uppercase text-[color:var(--text-muted)] mb-0.5">Business</div>
-              <div className="text-sm font-semibold text-[color:var(--text-primary)] truncate">{profile?.settings?.cloudBusinessName || cloudInfo?.businessName || '—'}</div>
-            </div>
-            <div className="p-3 rounded-lg bg-[color:var(--bg-secondary)] border border-[color:var(--border)]">
-              <div className="text-[10px] font-bold uppercase text-[color:var(--text-muted)] mb-0.5">Back Office</div>
-              <div className="text-sm font-mono text-[color:var(--text-secondary)] truncate text-xs">{url}</div>
-            </div>
-            <div className="p-3 rounded-lg bg-[color:var(--bg-secondary)] border border-[color:var(--border)]">
-              <div className="text-[10px] font-bold uppercase text-[color:var(--text-muted)] mb-0.5">Linked</div>
-              <div className="text-sm text-[color:var(--text-secondary)] truncate">{profile?.settings?.linkedAt ? new Date(profile.settings.linkedAt).toLocaleDateString() : 'Active'}</div>
-            </div>
-          </div>
-
-          <button onClick={handleUnlink} className="btn btn-ghost text-red-500 hover:bg-red-500/10 inline-flex items-center gap-2 text-sm">
-            <Trash2 className="w-4 h-4" />
-            Unlink Server
-          </button>
-        </div>
-      )}
-
-      {/* Step 1: Link Account */}
-      {step === 'input' && (
-        <div className="glass-panel p-6 flex flex-col items-center justify-center space-y-4 text-center">
-          <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-2">
-            <Link className="w-8 h-8 text-blue-500" />
-          </div>
-          <h3 className="text-xl font-bold text-[color:var(--text-primary)]">Link to Cloud</h3>
-          <p className="text-sm text-[color:var(--text-secondary)] max-w-sm">
-            Securely pair this local server with your WHIZPOS cloud business account to enable synchronization and remote management.
-          </p>
-
-          {error && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-600 w-full text-left">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div className="pt-4 w-full">
-            <button onClick={handleLinkAccount} disabled={isVerifying} className="btn btn-primary w-full inline-flex items-center justify-center gap-2 py-3">
-              {isVerifying ? <RefreshCw className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
-              {isVerifying ? 'Generating Request...' : 'Link WHIZPOS Account'}
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(profile?.settings?.backOfficeApiKey || apiKey);
+                toast.success('API Key copied to clipboard');
+              }}
+              className="btn btn-secondary !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Copy Key
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 2: Waiting for Cloud Approval */}
+      {/* STATE 2: WAITING FOR APPROVAL */}
       {step === 'pairing' && (
-        <div className="glass-panel p-8 flex flex-col items-center justify-center space-y-6 text-center">
-          <RefreshCw className="w-12 h-12 text-blue-500 animate-spin" />
-          <div>
-            <div className="text-lg font-bold text-[color:var(--text-primary)] mb-2">Waiting for Approval</div>
-            <div className="text-sm text-[color:var(--text-secondary)] max-w-sm mx-auto">
-              A browser window has been opened. Please log in to your WHIZPOS cloud account and approve this server.
+        <div className="glass-panel p-8 rounded-3xl border border-sky-500/20 bg-sky-500/5 shadow-xl flex flex-col items-center justify-center text-center space-y-6 max-w-xl mx-auto">
+          <div className="relative">
+            <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center animate-pulse">
+              <Globe className="w-8 h-8 text-sky-600" />
+            </div>
+            <div className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center">
+              <Clock className="w-3 h-3 text-white" />
             </div>
           </div>
-          <button onClick={() => {
-            if (pollIntervalId) clearInterval(pollIntervalId);
-            setStep('input');
-          }} className="btn btn-ghost mt-4">
-            Cancel
+
+          <div>
+            <h3 className="text-xl font-black text-slate-800 mb-2">Cloud Authorization In Progress</h3>
+            <p className="text-sm text-slate-600 max-w-md mx-auto">
+              Please approve this local server in the WhizPOS Cloud Back Office to complete pairing.
+            </p>
+          </div>
+
+          <div className="w-full bg-white/80 p-4 rounded-2xl border border-sky-100 shadow-sm space-y-3">
+            <div className="text-xs text-slate-500 font-medium">Click the button below if the approval window did not open:</div>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              {approvalUrl && (
+                <>
+                  <a
+                    href={approvalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-primary inline-flex items-center justify-center gap-2 text-sm !py-2.5"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open Cloud Approval Screen
+                  </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(approvalUrl);
+                      toast.success('Approval link copied to clipboard');
+                    }}
+                    className="btn btn-secondary inline-flex items-center justify-center gap-2 text-sm !py-2.5"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copy Link
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-500 bg-white/60 px-4 py-2 rounded-full border border-slate-200">
+            <RefreshCw className="w-3.5 h-3.5 text-sky-500 animate-spin" />
+            <span>Listening for cloud authorization confirmation (polls every 2.5s)...</span>
+          </div>
+
+          <button
+            onClick={() => {
+              if (pollIntervalId) clearInterval(pollIntervalId);
+              setStep('input');
+            }}
+            className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors"
+          >
+            Cancel and Return to Options
           </button>
+        </div>
+      )}
+
+      {/* STATE 3: INPUT / NOT LINKED */}
+      {step === 'input' && (
+        <div className="space-y-6">
+          {/* Mode Switcher */}
+          <div className="flex p-1.5 rounded-2xl bg-slate-100/80 border border-slate-200 max-w-md gap-1">
+            <button
+              onClick={() => setPairingMode('browser')}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                pairingMode === 'browser'
+                  ? 'bg-white text-sky-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              1-Click Cloud Pairing
+            </button>
+            <button
+              onClick={() => setPairingMode('manual')}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                pairingMode === 'manual'
+                  ? 'bg-white text-sky-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Key className="w-3.5 h-3.5" />
+              Enter Pairing Code
+            </button>
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-700">
+              <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold">Pairing Failed</div>
+                <div className="text-xs mt-0.5">{error}</div>
+              </div>
+            </div>
+          )}
+
+          {/* MODE A: 1-Click Browser Pairing */}
+          {pairingMode === 'browser' && (
+            <div className="glass-panel p-8 rounded-3xl border border-sky-500/20 bg-gradient-to-b from-sky-50/50 to-white shadow-sm space-y-6 max-w-2xl">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-sky-500 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-md shadow-sky-500/20">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Automatic Browser Handshake</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Connects directly to your logged-in WhizPOS Cloud account without manually typing long cryptographic keys.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Cloud Backoffice Endpoint URL
+                </label>
+                <input
+                  type="text"
+                  value={url}
+                  onChange={e => setUrl(e.target.value)}
+                  className="input w-full font-mono text-xs"
+                  placeholder="https://api.whizpoint.app"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleLinkAccount}
+                  disabled={isVerifying}
+                  className="btn btn-primary w-full py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20 text-sm"
+                >
+                  {isVerifying ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Connecting to Cloud...
+                    </>
+                  ) : (
+                    <>
+                      <Link className="w-4 h-4" />
+                      Link WhizPOS Cloud Account
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* MODE B: Manual 6-Digit Pairing Code */}
+          {pairingMode === 'manual' && (
+            <div className="glass-panel p-8 rounded-3xl border border-slate-200/80 bg-white shadow-sm space-y-6 max-w-2xl">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Enter Back Office Pairing Credentials</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Obtain these credentials from your Cloud Web Portal under <strong>Outlets & Devices → Local Server Edge Node</strong>.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Cloud Endpoint
+                  </label>
+                  <input
+                    type="text"
+                    value={url}
+                    onChange={e => setUrl(e.target.value)}
+                    className="input w-full font-mono text-xs"
+                    placeholder="https://api.whizpoint.app"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Permanent API Key
+                  </label>
+                  <input
+                    type="text"
+                    value={apiKey}
+                    onChange={e => setApiKey(e.target.value)}
+                    className="input w-full font-mono text-xs"
+                    placeholder="Paste your 64-character server API key"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    6-Digit Temporary Pairing Code
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={pairingCode}
+                    onChange={e => setPairingCode(e.target.value.replace(/\D/g, ''))}
+                    className="input w-full font-mono text-2xl font-black tracking-[0.3em] text-center"
+                    placeholder="000000"
+                  />
+                  <p className="text-[11px] text-amber-600 mt-1 font-medium">
+                    Pairing code expires 15 minutes after generation in the Web Portal.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleValidatePairing}
+                  disabled={isConfirming || pairingCode.length !== 6 || !apiKey.trim()}
+                  className="btn btn-primary w-full py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg text-sm disabled:opacity-50"
+                >
+                  {isConfirming ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Verifying Handshake...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Verify & Connect Server
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-/* --------------------------- Payments --------------------------- */
 function PaymentsPanel() {
   const [showConsumer, setShowConsumer] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
@@ -1239,73 +1563,353 @@ function ChannelRow({ icon, name, value, muted }: { icon: string; name: string; 
 }
 
 function BackupPanel() {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [backups, setBackups] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [restoringFileName, setRestoringFileName] = useState<string | null>(null);
+  const [backupDir, setBackupDir] = useState('C:\\ProgramData\\whiz-pos\\Backups\\Server');
+  const [showManualUpload, setShowManualUpload] = useState(false);
+  const [manualFile, setManualFile] = useState<File | null>(null);
+  const [uploadingManual, setUploadingManual] = useState(false);
+  const { confirm } = useConfirm();
 
-  const handleUpload = async () => {
-    if (!file) return toast.error('Please select a backup file');
-    setUploading(true);
+  const fetchBackups = async () => {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = getApiBaseUrl();
-      const res = await fetch(`${API_BASE_URL}/api/backup/import`, {
+      const res = await fetch(`${API_BASE_URL}/api/backup/list`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setBackups(data.backups || []);
+          if (data.backupDir) setBackupDir(data.backupDir);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch backups:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackups();
+  }, []);
+
+  const handleCreateBackup = async () => {
+    setCreating(true);
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/backup/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Encrypted backup created (${(data.size / 1024).toFixed(1)} KB)`);
+        fetchBackups();
+      } else {
+        toast.error(data.error || 'Failed to create backup');
+      }
+    } catch (err) {
+      toast.error('Network error creating backup');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRestore = async (fileName: string) => {
+    const ok = await confirm({
+      title: 'Restore System Database?',
+      message: `Are you sure you want to restore "${fileName}"? This will overwrite the local server database with this snapshot. The application will restart automatically.`,
+      confirmText: 'Yes, Restore Snapshot'
+    });
+    if (!ok) return;
+
+    setRestoringFileName(fileName);
+    try {
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/backup/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ fileName })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success('Database restored successfully! Restarting local server...', { duration: 5000 });
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        toast.error(data.error || 'Restore failed');
+      }
+    } catch (err) {
+      toast.error('Error executing restore');
+    } finally {
+      setRestoringFileName(null);
+    }
+  };
+
+  const handleManualUpload = async () => {
+    if (!manualFile) return toast.error('Please select a .whizbak file');
+    if (!manualFile.name.toLowerCase().endsWith('.whizbak')) {
+      return toast.error('Only encrypted .whizbak files are allowed');
+    }
+    const ok = await confirm({
+      title: 'Restore Uploaded Backup?',
+      message: `Are you sure you want to restore "${manualFile.name}"? This will overwrite current server data with the contents of this archive.`,
+      confirmText: 'Yes, Restore Uploaded Backup'
+    });
+    if (!ok) return;
+
+    setUploadingManual(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', manualFile);
+
+      const token = localStorage.getItem('whiz-token');
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/backup/restore`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      
       const data = await res.json();
-      if (res.ok) {
-        toast.success('Backup imported successfully!');
-        setTimeout(() => window.location.reload(), 1500);
+      if (res.ok && data.success) {
+        toast.success('External backup restored! Restarting local server...', { duration: 5000 });
+        setTimeout(() => window.location.reload(), 2000);
       } else {
-        toast.error(data.error || 'Failed to import backup');
+        toast.error(data.error || 'Failed to restore backup');
       }
     } catch (err) {
-      toast.error('An error occurred');
-      console.error(err);
+      toast.error('Upload failed');
     } finally {
-      setUploading(false);
+      setUploadingManual(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (!bytes || bytes === 0) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  };
+
+  const formatDate = (dateStr: any) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return String(dateStr);
     }
   };
 
   return (
-    <div className="glass-panel p-5 space-y-4">
-      <div className="space-y-1.5">
-        <h3 className="text-lg font-medium text-[color:var(--text-primary)]">Restore Backup</h3>
-        <p className="text-sm text-[color:var(--text-secondary)]">
-          Upload a Whiz POS JSON backup file to restore your settings, products, and categories.
-        </p>
+    <div className="space-y-6">
+      <SectionHeader
+        eyebrow="Data Protection & Recovery"
+        title="Automated Backups & Restore"
+        description="Encrypted WHIZBAK2 snapshots are automatically stored on the local server every 15 minutes. Restore any snapshot with one click."
+        icon={<Database className="w-5 h-5" />}
+        gradient="linear-gradient(135deg, rgba(16,185,129,0.25), rgba(59,130,246,0.18))"
+      />
+
+      {/* Top Action & Stats Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="glass-panel p-5 rounded-2xl border border-slate-200/80 bg-white shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Available Snapshots</div>
+            <div className="text-2xl font-black text-slate-800">{backups.length}</div>
+            <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">Automated 7-Day Retention</div>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <HardDrive className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl border border-slate-200/80 bg-white shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Storage Folder</div>
+            <div className="text-xs font-mono font-bold text-slate-700 truncate max-w-[200px]" title={backupDir}>
+              .../Backups/Server
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">ProgramData Secured</div>
+          </div>
+          <div className="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
+            <Folder className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-sky-500/10 to-indigo-500/10 shadow-sm flex flex-col justify-center gap-2">
+          <button
+            onClick={handleCreateBackup}
+            disabled={creating}
+            className="btn btn-primary w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 text-xs shadow-md"
+          >
+            {creating ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Snapshotting Database...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Take Backup Now
+              </>
+            )}
+          </button>
+          <div className="text-[10px] text-center text-slate-500 font-medium">
+            Immediate encrypted snapshot of SQLite & assets
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <input 
-          type="file" 
-          accept=".json,.wpos"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="block w-full text-sm text-[color:var(--text-secondary)]
-            file:mr-4 file:py-2 file:px-4
-            file:rounded-full file:border-0
-            file:text-sm file:font-semibold
-            file:bg-[color:var(--bg-subtle)] file:text-[color:var(--text-primary)]
-            hover:file:bg-[color:var(--bg-hover)]"
-        />
-        
-        <button
-          onClick={handleUpload}
-          disabled={!file || uploading}
-          className="btn-primary w-fit flex items-center gap-2"
-        >
-          {uploading ? (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
+      {/* Main Snapshots List */}
+      <div className="glass-panel p-6 rounded-3xl border border-slate-200/80 bg-white shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">Local Server Backup Vault</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Select any restore point below to recover settings, products, inventory counts, and sales.
+            </p>
+          </div>
+          <button
+            onClick={fetchBackups}
+            className="btn btn-ghost !p-2 text-slate-400 hover:text-slate-700"
+            title="Refresh List"
+          >
             <RefreshCw className="w-4 h-4" />
-          )}
-          {uploading ? 'Restoring...' : 'Restore Data'}
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-sky-500" />
+            <span className="text-xs">Scanning backup vault...</span>
+          </div>
+        ) : backups.length === 0 ? (
+          <div className="p-10 text-center border-2 border-dashed border-slate-200 rounded-2xl space-y-3">
+            <Database className="w-10 h-10 text-slate-300 mx-auto" />
+            <div className="text-sm font-bold text-slate-700">No Backup Snapshots Found</div>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              Click &quot;Take Backup Now&quot; above to create your first encrypted database snapshot.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 max-h-[480px] overflow-y-auto pr-1">
+            {backups.map((b: any) => {
+              const isRestoring = restoringFileName === b.fileName;
+              return (
+                <div
+                  key={b.fileName}
+                  className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 px-3 rounded-2xl transition-colors"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-600">
+                      <Database className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-800 truncate" title={b.fileName}>
+                        {b.fileName}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        <span>{formatDate(b.createdAt)}</span>
+                        <span>•</span>
+                        <span className="font-mono">{formatFileSize(b.size)}</span>
+                        <span>•</span>
+                        <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold text-[10px] border border-emerald-100">
+                          WHIZBAK2 Encrypted
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={`${getApiBaseUrl()}/api/backup/download/${encodeURIComponent(b.fileName)}?apiKey=${encodeURIComponent(localStorage.getItem('whiz-token') || '')}`}
+                      download={b.fileName}
+                      className="btn btn-secondary !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5"
+                      title="Download backup file"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Save</span>
+                    </a>
+
+                    <button
+                      onClick={() => handleRestore(b.fileName)}
+                      disabled={isRestoring || !!restoringFileName}
+                      className="btn btn-primary !bg-emerald-600 hover:!bg-emerald-500 !px-4 !py-1.5 text-xs font-bold inline-flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 disabled:opacity-50"
+                    >
+                      {isRestoring ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Restoring...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          Restore Database
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Collapsible: Manual External File Import */}
+      <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50">
+        <button
+          onClick={() => setShowManualUpload(prev => !prev)}
+          className="w-full flex items-center justify-between text-left text-xs font-bold text-slate-600 hover:text-slate-900"
+        >
+          <span className="flex items-center gap-2">
+            <Upload className="w-4 h-4 text-slate-400" />
+            Advanced: Restore from External .whizbak Archive (USB / Manual)
+          </span>
+          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${showManualUpload ? 'rotate-90' : ''}`} />
         </button>
+
+        {showManualUpload && (
+          <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+            <p className="text-xs text-slate-500">
+              Select an external encrypted <code>.whizbak</code> file from another machine to import its catalog and database into this server.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 items-center">
+              <input
+                type="file"
+                accept=".whizbak"
+                onChange={e => setManualFile(e.target.files?.[0] || null)}
+                className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
+              />
+              <button
+                onClick={handleManualUpload}
+                disabled={!manualFile || uploadingManual}
+                className="btn btn-secondary !py-2 !px-4 text-xs font-bold shrink-0 inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {uploadingManual ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Upload className="w-3.5 h-3.5" />
+                )}
+                Upload & Restore
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -95,7 +95,7 @@ export default function OfflineSyncStatus() {
     }
     if (syncStatus?.progress === 100 && syncStatus?.currentTask) {
       setSyncHistory(prev => [
-        { id: `h-${Date.now()}`, action: syncStatus.currentTask, status: 'success', timestamp: new Date().toISOString() },
+        { id: `h-${Date.now()}`, action: syncStatus.currentTask || 'Sync Complete', status: 'success', timestamp: new Date().toISOString() },
         ...prev.slice(0, 29)
       ]);
     }

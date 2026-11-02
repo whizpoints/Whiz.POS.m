@@ -36,18 +36,30 @@ router.use(authenticate);
 router.get('/', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { locationId } = req.query;
+    const { locationId, outletId } = req.query;
     
     const products = await prisma.product.findMany({
       where: { businessId },
-      include: { inventory: { include: { location: true } } },
+      include: { inventory: { include: { location: true, outlet: true } } },
       orderBy: { name: 'asc' }
     });
 
     const formatted = products.map(p => {
-       const totalStock = p.inventory.reduce((sum: number, inv: any) => sum + inv.stock, 0);
-       const inStoreInv = p.inventory.find(i => i.outletId === null);
-       const inStoreStock = inStoreInv ? inStoreInv.stock : 0;
+       const totalStock = p.inventory.reduce((sum: number, inv: any) => sum + (inv.stock || 0), 0);
+       let inStoreStock = 0;
+       if (outletId === 'CENTRAL') {
+          const centralInv = p.inventory.find((i: any) => i.outletId === null);
+          inStoreStock = centralInv ? centralInv.stock : 0;
+       } else if (outletId && outletId !== 'ALL') {
+          const outInv = p.inventory.find((i: any) => i.outletId === outletId);
+          inStoreStock = outInv ? outInv.stock : 0;
+       } else if (locationId && locationId !== 'ALL') {
+          const locInvs = p.inventory.filter((i: any) => i.locationId === locationId);
+          inStoreStock = locInvs.reduce((sum: number, i: any) => sum + (i.stock || 0), 0);
+       } else {
+          const inStoreInv = p.inventory.find((i: any) => i.outletId === null) || p.inventory[0];
+          inStoreStock = inStoreInv ? inStoreInv.stock : totalStock;
+       }
        
        return { ...p, stock: totalStock, totalStock, inStoreStock };
     });
@@ -218,9 +230,18 @@ router.post('/import', upload.single('file'), async (req: any, res: any) => {
 router.post('/quick-add', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { productId, quantity, locationId } = req.body;
+    const { productId, quantity, locationId, outletId } = req.body;
     
     let targetLocationId = locationId;
+    let targetOutletId = outletId || null;
+
+    if (targetOutletId) {
+      const outlet = await prisma.outlet.findFirst({ where: { id: targetOutletId, businessId } });
+      if (outlet && outlet.locationId) {
+        targetLocationId = outlet.locationId;
+      }
+    }
+
     if (!targetLocationId) {
       const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
       if (loc) targetLocationId = loc.id;
@@ -228,31 +249,56 @@ router.post('/quick-add', async (req: any, res: any) => {
 
     if (!targetLocationId) return res.status(400).json({ error: 'No location found' });
 
-    const inv = await prisma.productInventory.findFirst({
-      where: { productId, locationId: targetLocationId }
-    });
+    const numQty = Number(quantity);
+    if (isNaN(numQty)) return res.status(400).json({ error: 'Invalid quantity' });
+
+    const invWhere: any = { productId, locationId: targetLocationId, outletId: targetOutletId || null };
+
+    let inv = await prisma.productInventory.findFirst({ where: invWhere });
 
     if (inv) {
-      await prisma.productInventory.update({
+      inv = await prisma.productInventory.update({
         where: { id: inv.id },
-        data: { stock: { increment: quantity } }
+        data: { stock: { increment: numQty }, updatedAt: new Date() }
       });
     } else {
-      await prisma.productInventory.create({
+      inv = await prisma.productInventory.create({
         data: {
           productId,
           locationId: targetLocationId,
-          stock: quantity,
+          outletId: targetOutletId || null,
+          stock: numQty,
           reorderLevel: 5
         }
       });
     }
 
-    // Note: Cloud Sync background engine picks this up naturally if we had an audit table, 
-    // but for immediate sync we can simulate the push here: 
-    console.log(`[Quick Add] Triggering immediate sync to cloud for Product ${productId} + ${quantity}`);
+    const { randomUUID } = await import('crypto');
+    await prisma.stockMovement.create({
+      data: {
+        id: `adj_${Date.now()}_${randomUUID().substring(0, 8)}`,
+        businessId,
+        productId,
+        locationId: targetLocationId,
+        outletId: targetOutletId,
+        type: numQty >= 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+        quantity: Math.abs(numQty),
+        reference: 'Quick Add from Web Portal',
+        timestamp: new Date()
+      }
+    });
 
-    res.json({ success: true, message: 'Stock added successfully' });
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`business_${businessId}`).emit('downward_sync_event', {
+        type: 'STOCK_ADJUSTMENT',
+        outletId: targetOutletId,
+        productId,
+        delta: numQty
+      });
+    }
+
+    res.json({ success: true, message: 'Stock added successfully', stock: inv.stock });
   } catch (error) {
     console.error('Quick Add error:', error);
     res.status(500).json({ error: 'Failed to add stock' });
@@ -551,6 +597,88 @@ router.get('/template/products', async (req: any, res: any) => {
     } catch (error) {
       console.error('Import reconciliation error:', error);
       res.status(500).json({ error: 'Failed to process audit sheet' });
+    }
+  });
+
+  // Receive stock into Central Store (GRN)
+  router.post('/receive-stock', async (req: any, res: any) => {
+    try {
+      const { businessId } = req.user;
+      const { productId, quantity: rawQty, costPrice, referenceNote, locationId } = req.body;
+
+      const quantity = parseInt(rawQty, 10);
+      if (isNaN(quantity) || quantity <= 0) {
+        return res.status(400).json({ error: 'Quantity must be a positive integer' });
+      }
+
+      const product = await prisma.product.findFirst({ where: { id: productId, businessId } });
+      if (!product) return res.status(404).json({ error: 'Product not found' });
+
+      let targetLocationId = locationId;
+      if (!targetLocationId) {
+        const loc = await prisma.storeLocation.findFirst({ where: { businessId } });
+        if (loc) targetLocationId = loc.id;
+      }
+      if (!targetLocationId) return res.status(400).json({ error: 'No location found' });
+
+      const now = new Date();
+      const centralInv = await prisma.productInventory.findFirst({
+        where: { productId, outletId: null }
+      });
+
+      let updatedInv;
+      if (centralInv) {
+        updatedInv = await prisma.productInventory.update({
+          where: { id: centralInv.id },
+          data: { stock: { increment: quantity }, updatedAt: now }
+        });
+      } else {
+        updatedInv = await prisma.productInventory.create({
+          data: {
+            productId,
+            locationId: targetLocationId,
+            outletId: null,
+            stock: quantity,
+            reorderLevel: 5
+          }
+        });
+      }
+
+      if (costPrice !== undefined && !isNaN(Number(costPrice)) && Number(costPrice) > 0) {
+        await prisma.product.update({
+          where: { id: productId },
+          data: { costPrice: Number(costPrice), updatedAt: now }
+        });
+      }
+
+      const { randomUUID } = await import('crypto');
+      await prisma.stockMovement.create({
+        data: {
+          id: `grn_${Date.now()}_${randomUUID().substring(0, 8)}`,
+          businessId,
+          productId,
+          locationId: targetLocationId,
+          outletId: null,
+          type: 'PURCHASE',
+          quantity,
+          reference: referenceNote || 'Goods Received Note (GRN) into Central Store',
+          timestamp: now
+        }
+      });
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`business_${businessId}`).emit('downward_sync_event', {
+          type: 'STOCK_RECEIVED',
+          productId,
+          inStoreStock: updatedInv.stock
+        });
+      }
+
+      res.json({ success: true, inStoreStock: updatedInv.stock, message: 'Stock received into Central Store successfully' });
+    } catch (error: any) {
+      console.error('Receive stock error:', error);
+      res.status(500).json({ error: error.message || 'Failed to receive stock' });
     }
   });
   

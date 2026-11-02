@@ -53,6 +53,8 @@ export default function CheckoutModal() {
     completeTransaction('mpesa', undefined, {
       mpesaCode: txn.transactionId,
       phoneNumber: txn.phoneNumber,
+      customerName: txn.customerName || 'M-Pesa Customer',
+      mpesaName: txn.customerName || 'M-Pesa Customer',
       amountTendered: txn.amount
     });
   };

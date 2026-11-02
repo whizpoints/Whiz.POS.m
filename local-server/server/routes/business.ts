@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { uploadAsset } from '../services/s3Service.js';
+import { authenticate } from '../middleware/auth.js';
 
 import { encrypt, decrypt } from '../utils/crypto.js';
 const router = Router();
@@ -35,31 +36,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-const authenticate = async (req: any, res: any, next: any) => {
-  const authHeader = req.headers.authorization;
-  const apiKey = req.headers['x-api-key'] || (authHeader ? authHeader.split(' ')[1] : null);
-
-  if (!apiKey) return res.status(401).json({ error: 'Missing authorization header or API key' });
-
-  try {
-    // Try to verify as JWT (Web Portal)
-    const payload = jwt.verify(apiKey, JWT_SECRET);
-    req.user = payload;
-    return next();
-  } catch (err) {
-    // Fallback: Verify as API Key (Desktop POS)
-    try {
-      const business = await db.selectFrom('Business').selectAll().where('apiKey', '=', apiKey).executeTakeFirst();
-      if (business) {
-        req.user = { businessId: business.id };
-        return next();
-      }
-    } catch (dbErr) {}
-    
-    return res.status(401).json({ error: 'Invalid token or API key' });
-  }
-};
-
 // Check if setup is complete
 router.get('/setup-status', async (req: any, res: any) => {
   try {
@@ -76,7 +52,10 @@ router.use(authenticate);
 router.get('/profile', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const business = await db.selectFrom('Business').select(['id', 'name', 'email', 'logoUrl', 'createdAt', 'settings', 'apiKey']).where('id', '=', businessId).executeTakeFirst();
+    let business = await db.selectFrom('Business').select(['id', 'name', 'email', 'logoUrl', 'createdAt', 'settings', 'apiKey']).where('id', '=', businessId).executeTakeFirst();
+    if (!business) {
+      business = await db.selectFrom('Business').select(['id', 'name', 'email', 'logoUrl', 'createdAt', 'settings', 'apiKey']).executeTakeFirst();
+    }
     if (!business) return res.status(404).json({ error: 'Business not found' });
     
     let parsedSettings = {};
@@ -88,7 +67,18 @@ router.get('/profile', async (req: any, res: any) => {
       }
     } catch (e) {}
     
-    res.json({ ...business, settings: parsedSettings });
+    const token = jwt.sign(
+      {
+        userId: req.user?.userId || req.user?.id || 'admin',
+        businessId: business.id,
+        role: req.user?.role || 'ADMIN',
+        email: req.user?.email || business.email
+      },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+    
+    res.json({ ...business, settings: parsedSettings, token });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -97,7 +87,14 @@ router.get('/profile', async (req: any, res: any) => {
 // Update Business Profile
 router.post('/profile', async (req: any, res: any) => {
   try {
-    const { businessId } = req.user;
+    let { businessId } = req.user;
+    let targetBiz = await db.selectFrom('Business').select('id').where('id', '=', businessId).executeTakeFirst();
+    if (!targetBiz) {
+      targetBiz = await db.selectFrom('Business').select('id').executeTakeFirst();
+      if (targetBiz) {
+        businessId = targetBiz.id;
+      }
+    }
     const { name, settings, apiKey } = req.body;
         // Defensively ensure settings is a string since Prisma schema defines it as String
       let finalSettings = settings;

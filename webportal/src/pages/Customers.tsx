@@ -1,16 +1,15 @@
-let cachedCustomers: any[] = [];
-let isCustomersLoaded = false;
 import { useState, useEffect } from 'react';
 import { Search, Plus, Star, Edit2, Trash2, Mail, RefreshCw } from 'lucide-react';
 import CustomerModal from '../components/Customers/CustomerModal';
 import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
 import { useConfirm } from '../context/ConfirmContext';
+import { getCachedData, setCachedData } from '../lib/cache';
 
 export default function Customers() {
   const { confirm } = useConfirm();
-  const [customers, setCustomers] = useState<any[]>(cachedCustomers);
-  const [loading, setLoading] = useState(!isCustomersLoaded);
+  const [customers, setCustomers] = useState<any[]>(() => getCachedData('customers_list', []));
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [emailCustomer, setEmailCustomer] = useState<any>(null);
@@ -26,19 +25,21 @@ export default function Customers() {
   const fetchCustomers = async () => {
     const token = localStorage.getItem('whiz-token');
     try {
+      setIsRefreshing(true);
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
       const res = await fetch(`${API_BASE_URL}/api/customers`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      cachedCustomers = data;
-      isCustomersLoaded = true;
-      setCustomers(data);
-    } catch (err) {
-        console.error(err);
-      } finally {
-        if (!isCustomersLoaded) setLoading(false);
+      if (Array.isArray(data)) {
+        setCustomers(data);
+        setCachedData('customers_list', data);
       }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -148,9 +149,7 @@ export default function Customers() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr><td colSpan={5} className="text-center py-8 text-[color:var(--text-muted)]">Loading...</td></tr>
-                ) : customers.length > 0 ? (
+                {customers.length > 0 ? (
                   customers.map(c => (
                     <tr key={c.id}>
                       <td>
@@ -190,7 +189,7 @@ export default function Customers() {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={5} className="text-center py-8 text-[color:var(--text-muted)]">No customers found. Add your first customer.</td></tr>
+                  <tr><td colSpan={5} className="text-center py-8 text-[color:var(--text-muted)]">{isRefreshing ? 'Fetching latest customers...' : 'No customers found. Add your first customer.'}</td></tr>
                 )}
               </tbody>
             </table>
@@ -198,9 +197,7 @@ export default function Customers() {
 
           {/* Mobile Card View */}
           <div className="md:hidden divide-y divide-[color:var(--border-glass)]">
-            {loading ? (
-              <div className="p-4 text-center text-[color:var(--text-muted)]">Loading...</div>
-            ) : customers.length > 0 ? (
+            {customers.length > 0 ? (
               customers.map(c => (
                 <div key={c.id} className="p-4 flex flex-col gap-2">
                   <div className="flex justify-between items-start">

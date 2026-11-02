@@ -29,10 +29,22 @@ import documentsRoutes from './routes/documents.js';
 import clientsRoutes from './routes/clients.js';
 import savedDocsRoutes from './routes/saved-documents.js';
 import downloadsRoutes from './routes/downloads.js';
+import kraRoutes from './routes/kra.js';
+import backupRoutes from './routes/backup.js';
+import usersRoutes from './routes/users.js';
 
 import { wafMiddleware } from './middleware/waf.js';
 
 dotenv.config();
+
+// Prevent transient network/socket errors from crashing the server
+process.on('uncaughtException', (err) => {
+  console.error('[WebPortal] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[WebPortal] Unhandled Rejection:', reason);
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -77,8 +89,28 @@ const PORT = isViteDev ? 5050 : (process.env.PORT || 3000);
 
 // Enable CORS for all origins dynamically (needed for Electron desktop POS clients with credentials)
 app.use(cors({
-  origin: '*',
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'X-API-KEY']
+  origin: (origin, callback) => callback(null, true),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-api-key',
+    'X-API-KEY',
+    'x-outlet-id',
+    'X-Outlet-Id',
+    'x-business-id',
+    'X-Business-Id',
+    'x-terminal-id',
+    'X-Terminal-Id',
+    'x-location-id',
+    'X-Location-Id',
+    'x-device-id',
+    'X-Device-Id',
+    'Accept',
+    'Origin',
+    'X-Requested-With'
+  ]
 }));
 
 app.use(express.json({ limit: '50mb' }));
@@ -87,7 +119,10 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Apply Security WAF & Rate-Limiter Middleware
 app.use(wafMiddleware);
 
-// Global Suspension Check Middleware
+// Global Suspension Check Middleware (in-memory cached for 60s to prevent roundtrip latency on every API request)
+const suspensionCache = new Map<string, { isSuspended: boolean; timestamp: number }>();
+const SUSPENSION_CACHE_TTL = 60 * 1000;
+
 app.use(async (req, res, next) => {
   if (req.path.startsWith('/api/') && req.headers.authorization && !req.path.includes('/auth') && !req.path.includes('/admin')) {
      const token = req.headers.authorization.split(' ')[1];
@@ -97,11 +132,24 @@ app.use(async (req, res, next) => {
        const decoded = jwt.default.verify(token, JWT_SECRET) as any;
        
        if (decoded.businessId && !decoded.isSuperAdmin) {
-         const b = await prisma.business.findUnique({ where: { id: decoded.businessId }, select: { settings: true } });
-         if (b && b.settings) {
-           let settings = b.settings as any;
-           if (typeof settings === 'string') settings = JSON.parse(settings);
-           if (settings.isSuspended) {
+         const cached = suspensionCache.get(decoded.businessId);
+         const now = Date.now();
+         if (cached && (now - cached.timestamp < SUSPENSION_CACHE_TTL)) {
+           if (cached.isSuspended) {
+             return res.status(403).json({ error: 'ACCOUNT_SUSPENDED', message: 'Your business account has been suspended.' });
+           }
+         } else {
+           const b = await prisma.business.findUnique({ where: { id: decoded.businessId }, select: { settings: true } });
+           let isSuspended = false;
+           if (b && b.settings) {
+             let settings = b.settings as any;
+             if (typeof settings === 'string') {
+               try { settings = JSON.parse(settings); } catch(e) {}
+             }
+             if (settings?.isSuspended) isSuspended = true;
+           }
+           suspensionCache.set(decoded.businessId, { isSuspended, timestamp: now });
+           if (isSuspended) {
              return res.status(403).json({ error: 'ACCOUNT_SUSPENDED', message: 'Your business account has been suspended.' });
            }
          }
@@ -139,6 +187,9 @@ app.use('/api/documents', documentsRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/saved-documents', savedDocsRoutes);
 app.use('/api/downloads', downloadsRoutes);
+app.use('/api/kra', kraRoutes);
+app.use('/api/backup', backupRoutes);
+app.use('/api/users', usersRoutes);
 
 // Health check
 

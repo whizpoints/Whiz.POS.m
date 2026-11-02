@@ -17,7 +17,7 @@ router.post('/request', async (req, res) => {
       data: {
         type: type || 'SERVER',
         status: 'PENDING',
-        deviceInfo: deviceInfo || {},
+        deviceInfo: typeof deviceInfo === 'object' ? JSON.stringify(deviceInfo) : (deviceInfo ? String(deviceInfo) : null),
         expiresAt
       }
     });
@@ -96,6 +96,15 @@ router.post('/:requestId/approve', async (req: any, res: any) => {
         apiKey
       }
     });
+
+    try {
+      req.app.get('io')?.to(`business_${businessId}`).emit('terminal_status_changed', {
+        type: 'SERVER_APPROVED',
+        serverId,
+        locationId,
+        apiKey
+      });
+    } catch (e) {}
 
     res.json({ success: true, message: 'Request approved' });
   } catch (err) {
