@@ -3,6 +3,75 @@ import { Router } from 'express';
 import db from '../db.js';
 
 const router = Router();
+import fs from 'fs';
+import { getServerConfigPath } from '../paths.js';
+
+// Verify Cloud API Key via local server (avoids browser CORS issues)
+router.post('/verify-key', async (req, res) => {
+  const { apiKey, cloudUrl } = req.body;
+  if (!apiKey) return res.status(400).json({ error: 'API key is required' });
+  const targetCloud = (cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+
+  try {
+    const locRes = await fetch(`${targetCloud}/api/business/locations`, {
+      headers: { 'x-api-key': apiKey.trim() }
+    });
+    if (!locRes.ok) {
+      const err = await locRes.json().catch(() => ({}));
+      return res.status(locRes.status).json({ error: err.error || 'Invalid API Key' });
+    }
+    const locData = await locRes.json();
+
+    const profRes = await fetch(`${targetCloud}/api/business/profile`, {
+      headers: { 'x-api-key': apiKey.trim() }
+    });
+    const profData = profRes.ok ? await profRes.json() : {};
+
+    return res.json({
+      success: true,
+      locations: locData.locations || [],
+      profile: profData.business || profData
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: `Cannot reach cloud at ${targetCloud}: ${err.message}` });
+  }
+});
+
+// Factory Reset: Wipes all local server database tables and settings to allow a clean fresh setup
+router.post('/factory-reset', async (req, res) => {
+  try {
+    console.log('[Setup] Executing Factory Reset on Local Server...');
+
+    // 1. Wipe all local tables
+    await db.deleteFrom('SyncLog').execute().catch(() => {});
+    await db.deleteFrom('MpesaTransaction').execute().catch(() => {});
+    await db.deleteFrom('ReceiptItem').execute().catch(() => {});
+    await db.deleteFrom('Receipt').execute().catch(() => {});
+    await db.deleteFrom('Product').execute().catch(() => {});
+    await db.deleteFrom('Category').execute().catch(() => {});
+    await db.deleteFrom('Customer').execute().catch(() => {});
+    await db.deleteFrom('Supplier').execute().catch(() => {});
+    await db.deleteFrom('Terminal').execute().catch(() => {});
+    await db.deleteFrom('Outlet').execute().catch(() => {});
+    await db.deleteFrom('StoreLocation').execute().catch(() => {});
+    await db.deleteFrom('User').execute().catch(() => {});
+    await db.deleteFrom('Business').execute().catch(() => {});
+
+    // 2. Remove server-config.json
+    try {
+      const configPath = getServerConfigPath();
+      if (fs.existsSync(configPath)) {
+        fs.unlinkSync(configPath);
+      }
+    } catch (e) {}
+
+    console.log('[Setup] Factory Reset completed successfully.');
+    res.json({ success: true, message: 'Server reset complete. You can now run a fresh setup.' });
+  } catch (err: any) {
+    console.error('[Setup] Factory Reset failed:', err);
+    res.status(500).json({ error: err.message || 'Failed to reset server data' });
+  }
+});
 
 router.post('/sync', async (req, res) => {
   const { outletId, cloudToken, business, users } = req.body;

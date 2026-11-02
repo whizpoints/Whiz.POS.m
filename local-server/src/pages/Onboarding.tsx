@@ -25,7 +25,7 @@ export default function Onboarding() {
     e.preventDefault();
     setLoading(true);
     try {
-      const CLOUD_API = (process.env.NODE_ENV === 'production' ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
+      const CLOUD_API = 'https://backoffice.whizpoint.app';
       
       const res = await fetch(`${CLOUD_API}/api/pairing/request`, {
         method: 'POST',

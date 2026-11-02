@@ -195,7 +195,7 @@ function ApiKeyRow({ label, keyStr, status, badge }: { label: string; keyStr: st
 function SecurityPanel({ profile, fetchProfile }: any) {
   const isAlreadyLinked = !!(profile?.settings?.backOfficeApiKey && (profile?.settings?.cloudLocationId || profile?.settings?.cloudLocationName));
 
-  const [url, setUrl] = useState(profile?.settings?.backOfficeUrl || 'https://api.whizpoint.app');
+  const [url, setUrl] = useState(profile?.settings?.backOfficeUrl || 'https://backoffice.whizpoint.app');
   const [apiKey, setApiKey] = useState(profile?.settings?.backOfficeApiKey || '');
   const [pairingCode, setPairingCode] = useState('');
   const [pairingMode, setPairingMode] = useState<'browser' | 'manual'>('browser');
@@ -206,6 +206,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
   const [error, setError] = useState('');
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null);
   const [pollIntervalId, setPollIntervalId] = useState<any>(null);
+  const [isResetting, setIsResetting] = useState(false);
   const { confirm } = useConfirm();
 
   useEffect(() => {
@@ -224,7 +225,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
     setIsVerifying(true);
     setError('');
     try {
-      const cleanUrl = (url || 'https://api.whizpoint.app').replace(/\/+$/, '');
+      const cleanUrl = (url || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
       
       const res = await fetch(`${cleanUrl}/api/pairing/request`, {
         method: 'POST',
@@ -343,7 +344,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
     setIsConfirming(true);
     setError('');
     try {
-      const cleanUrl = (url || 'https://api.whizpoint.app').replace(/\/+$/, '');
+      const cleanUrl = (url || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
       
       const res = await fetch(`${cleanUrl}/api/auth/validate-pairing`, {
         method: 'POST',
@@ -425,7 +426,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
   const handleTestSync = async () => {
     setTestingSync(true);
     try {
-      const cleanUrl = (profile?.settings?.backOfficeUrl || url || 'https://api.whizpoint.app').replace(/\/+$/, '');
+      const cleanUrl = (profile?.settings?.backOfficeUrl || url || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
       const keyToUse = profile?.settings?.backOfficeApiKey || apiKey;
       const start = Date.now();
       const res = await fetch(`${cleanUrl}/api/business/locations`, {
@@ -478,6 +479,38 @@ function SecurityPanel({ profile, fetchProfile }: any) {
       toast.success('Server unlinked successfully');
     } catch (err) {
       toast.error('Failed to unlink server');
+    }
+  };
+
+  const handleFactoryReset = async () => {
+    const ok = await confirm({
+      title: 'Factory Reset Local Server?',
+      message: 'CRITICAL WARNING: This will permanently erase all local databases, cached products, orders, customers, receipts, and server connection tokens. You will need to complete fresh onboarding to re-link this server. This CANNOT be undone.',
+      confirmText: 'Yes, Wipe All Data & Reset'
+    });
+    if (!ok) return;
+
+    setIsResetting(true);
+    try {
+      const API_BASE_URL = getApiBaseUrl();
+      const res = await fetch(`${API_BASE_URL}/api/setup/factory-reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Reset failed');
+      }
+      toast.success('Local server data wiped. Redirecting to setup...');
+      localStorage.removeItem('whiz-token');
+      localStorage.removeItem('whiz-user');
+      localStorage.removeItem('whiz-business');
+      setTimeout(() => {
+        window.location.href = '/setup';
+      }, 1200);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to execute factory reset');
+      setIsResetting(false);
     }
   };
 
@@ -716,7 +749,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
                   value={url}
                   onChange={e => setUrl(e.target.value)}
                   className="input w-full font-mono text-xs"
-                  placeholder="https://api.whizpoint.app"
+                  placeholder="https://backoffice.whizpoint.app"
                 />
               </div>
 
@@ -762,7 +795,7 @@ function SecurityPanel({ profile, fetchProfile }: any) {
                     value={url}
                     onChange={e => setUrl(e.target.value)}
                     className="input w-full font-mono text-xs"
-                    placeholder="https://api.whizpoint.app"
+                    placeholder="https://backoffice.whizpoint.app"
                   />
                 </div>
 
@@ -820,6 +853,40 @@ function SecurityPanel({ profile, fetchProfile }: any) {
           )}
         </div>
       )}
+
+      {/* FACTORY RESET / DANGER ZONE */}
+      <div className="glass-panel p-6 rounded-3xl border border-red-500/20 bg-red-500/5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-800">Factory Reset & Wipe Data</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Permanently wipes all local server databases, cached products, orders, and configuration files to start a fresh setup.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleFactoryReset}
+            disabled={isResetting}
+            className="btn bg-red-600 hover:bg-red-700 text-white font-bold !px-4 !py-2.5 text-xs rounded-xl shadow-md shadow-red-500/20 inline-flex items-center gap-2 shrink-0 disabled:opacity-50"
+          >
+            {isResetting ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Resetting Data...
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4" />
+                Reset All Server Data
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

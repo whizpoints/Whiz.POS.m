@@ -55,6 +55,7 @@ declare global {
       kraSyncQueue: (businessSetup?: any) => Promise<{ success: boolean; synced: number; pending?: number; total?: number; error?: string }>;
       kraSubmitInvoice: (transaction: any, products: any[], businessSetup?: any) => Promise<any>;
       kraGetStats: () => Promise<{ queuedCount: number; queueDir: string; error?: string }>;
+      resetAllData?: () => Promise<{ success: boolean; error?: string }>;
       auth: {
         login: (userId: string, pin: string, deviceId?: string) => Promise<any>;
         logout: (token: string) => Promise<any>;

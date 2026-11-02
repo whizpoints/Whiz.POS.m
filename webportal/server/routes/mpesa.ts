@@ -426,19 +426,26 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
           const rawPhone = nameParts[0].trim();
           const customerName = nameParts.length > 1 ? nameParts.slice(1).join('-').trim() : rawPartyName;
           
-          // Format phone strictly to 07XX xxx XXX
-          let formattedPhone = rawPhone.replace(/^254/, '0');
-          if (formattedPhone.includes('*')) {
-              formattedPhone = formattedPhone.replace(/\*+/g, ' xxx ');
-          } else if (formattedPhone.length === 10) {
-              formattedPhone = `${formattedPhone.slice(0,4)} xxx ${formattedPhone.slice(-3)}`;
+          // Format phone cleanly: preserve full unmasked numbers e.g. 0740841168
+          let formattedPhone = rawPhone.replace(/\s+/g, '');
+          if (formattedPhone.startsWith('254') && formattedPhone.length === 12) {
+              formattedPhone = '0' + formattedPhone.slice(3);
           }
-          formattedPhone = formattedPhone.replace(/\s+/g, ' ').trim(); // ensure single spaces
+          if (formattedPhone.includes('*')) {
+              formattedPhone = formattedPhone.replace(/\*+/g, '***');
+          }
           
           await prisma.mpesaTransaction.updateMany({
             where: { transactionId: receiptNumber, businessId },
             data: { customerName, phoneNumber: formattedPhone, isEnriched: true }
           });
+
+          try {
+            await prisma.receipt.updateMany({
+              where: { mpesaCode: receiptNumber, businessId },
+              data: { customerPhone: formattedPhone }
+            });
+          } catch (e) {}
           
           console.log(`[Transaction Status] Enriched ${receiptNumber}: Name=${customerName}, Phone=${formattedPhone}`);
 

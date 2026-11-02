@@ -85,7 +85,7 @@ router.get('/cloud', async (req, res) => {
         }
         catch (e) { }
         res.json({
-            cloudUrl: config.backOfficeUrl || 'https://api.whizpoint.app',
+            cloudUrl: config.backOfficeUrl || 'https://backoffice.whizpoint.app',
             cloudToken: config.cloudToken || config.backOfficeApiKey || ''
         });
     }

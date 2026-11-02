@@ -95,7 +95,7 @@ export default function AuthPage() {
   };
 
   
-  const handleVerifyApiKey = async () => { if (!apiKey) return toast.error('Please enter an API key'); setLoading(true); try { const CLOUD_API = (process.env.NODE_ENV === 'production' ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app'); const res = await fetch(`${CLOUD_API}/api/business/locations`, { headers: { 'x-api-key': apiKey } }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Invalid API Key'); const profileRes = await fetch(`${CLOUD_API}/api/business/profile`, { headers: { 'x-api-key': apiKey } }); const profileData = await profileRes.json(); if (profileRes.ok) { setBusinessName(profileData.business?.name || profileData.name || ''); setBusinessData(profileData.business || profileData); } setAvailableLocations(data.locations || []); if (data.locations && data.locations.length > 0) { setSelectedLocationId(data.locations[0].id); } setIsApiKeyVerified(true); toast.success('Successfully connected to cloud!'); } catch (err: any) { toast.error(err.message); } finally { setLoading(false); } }; // --- NEW: Modern Browser Authorization Flow ---
+  const handleVerifyApiKey = async () => { if (!apiKey) return toast.error('Please enter an API key'); setLoading(true); try { const CLOUD_API = 'https://backoffice.whizpoint.app'; const res = await fetch(`${CLOUD_API}/api/business/locations`, { headers: { 'x-api-key': apiKey } }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Invalid API Key'); const profileRes = await fetch(`${CLOUD_API}/api/business/profile`, { headers: { 'x-api-key': apiKey } }); const profileData = await profileRes.json(); if (profileRes.ok) { setBusinessName(profileData.business?.name || profileData.name || ''); setBusinessData(profileData.business || profileData); } setAvailableLocations(data.locations || []); if (data.locations && data.locations.length > 0) { setSelectedLocationId(data.locations[0].id); } setIsApiKeyVerified(true); toast.success('Successfully connected to cloud!'); } catch (err: any) { toast.error(err.message); } finally { setLoading(false); } }; // --- NEW: Modern Browser Authorization Flow ---
   const [pollIntervalId, setPollIntervalId] = useState<any>(null);
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export default function AuthPage() {
   const handleLinkAccount = async () => {
     setLoading(true);
     try {
-      const CLOUD_API = (process.env.NODE_ENV === 'production' ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
+      const CLOUD_API = 'https://backoffice.whizpoint.app';
       
       const res = await fetch(`${CLOUD_API}/api/pairing/request`, {
         method: 'POST',

@@ -114,7 +114,6 @@ function createWindow() {
       });
     };
     tryLoad();
-    mainWindow.webContents.openDevTools();
   }
 
   // Always launch on whole screen not restore

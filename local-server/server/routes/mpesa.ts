@@ -43,7 +43,7 @@ async function triggerTransactionStatus(config: any, receipt: string, businessId
         ? 'https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query'
         : 'https://sandbox.safaricom.co.ke/mpesa/transactionstatus/v1/query';
 
-      const baseDomain = config.environment === 'sandbox' ? (process.env.VITE_API_BASE_URL || 'https://api.whizpoint.app') : 'https://api.whizpoint.app';
+      const baseDomain = config.environment === 'sandbox' ? (process.env.VITE_API_BASE_URL || 'https://backoffice.whizpoint.app') : (process.env.CLOUD_API_URL || 'https://backoffice.whizpoint.app');
       
       const payload = {
         Initiator: config.initiatorName,
@@ -380,16 +380,24 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
           const rawPhone = nameParts[0].trim();
           const customerName = nameParts.length > 1 ? nameParts.slice(1).join('-').trim() : rawPartyName;
           
-          // Format phone strictly to 07XX xxx XXX
-          let formattedPhone = rawPhone.replace(/^254/, '0');
-          if (formattedPhone.includes('*')) {
-              formattedPhone = formattedPhone.replace(/\*+/g, ' xxx ');
-          } else if (formattedPhone.length === 10) {
-              formattedPhone = `${formattedPhone.slice(0,4)} xxx ${formattedPhone.slice(-3)}`;
+          // Format phone cleanly: preserve real unmasked numbers e.g. 0740841168
+          let formattedPhone = rawPhone.replace(/\s+/g, '');
+          if (formattedPhone.startsWith('254') && formattedPhone.length === 12) {
+              formattedPhone = '0' + formattedPhone.slice(3);
           }
-          formattedPhone = formattedPhone.replace(/\s+/g, ' ').trim(); // ensure single spaces
+          if (formattedPhone.includes('*')) {
+              formattedPhone = formattedPhone.replace(/\*+/g, '***');
+          }
           
-          await db.updateTable('MpesaTransaction').set({ customerName, phoneNumber: formattedPhone, isEnriched: true }).where('transactionId', '=', receiptNumber).where('businessId', '=', businessId).execute();
+          await db.updateTable('MpesaTransaction').set({ customerName, phoneNumber: formattedPhone, isEnriched: 1 as any }).where('transactionId', '=', receiptNumber).where('businessId', '=', businessId).execute();
+
+          try {
+            await db.updateTable('Receipt')
+              .set({ customerPhone: formattedPhone })
+              .where('mpesaCode', '=', receiptNumber)
+              .where('businessId', '=', businessId)
+              .execute();
+          } catch (e) {}
           
           console.log(`[Transaction Status] Enriched ${receiptNumber}: Name=${customerName}, Phone=${formattedPhone}`);
         }
@@ -411,7 +419,7 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
 
       // Also sync from cloud if reachable
       try {
-        const cloudUrl = process.env.CLOUD_API_URL || 'https://api.whizpoint.app';
+        const cloudUrl = process.env.CLOUD_API_URL || 'https://backoffice.whizpoint.app';
         const cloudRes = await fetch(`${cloudUrl}/api/mpesa/payments/search?businessId=${businessId}`, {
           signal: AbortSignal.timeout(3000)
         });
@@ -437,6 +445,12 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
                   timestamp: ctx.timestamp ? new Date(ctx.timestamp).toISOString() : new Date().toISOString(),
                   updatedAt: new Date().toISOString()
                 }).execute();
+              } else if (ctx.customerName && (!existing.customerName || ctx.isEnriched)) {
+                await db.updateTable('MpesaTransaction').set({
+                  customerName: ctx.customerName,
+                  phoneNumber: ctx.phoneNumber || existing.phoneNumber,
+                  isEnriched: (ctx.isEnriched ? 1 : 0) as any
+                }).where('transactionId', '=', ctx.transactionId).execute();
               }
             }
           }

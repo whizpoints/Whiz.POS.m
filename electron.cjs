@@ -2199,6 +2199,35 @@ setInterval(async () => {
     }
 }, 3 * 60 * 1000);
 
+ipcMain.handle('reset-all-data', async () => {
+    try {
+        console.log('[System Reset] Performing full POS data wipe...');
+        if (sqliteDb && typeof sqliteDb.closeDB === 'function') {
+            try { sqliteDb.closeDB(); } catch (e) {}
+        }
+        const fsSync = require('fs');
+        if (fsSync.existsSync(userDataPath)) {
+            const files = fsSync.readdirSync(userDataPath);
+            for (const f of files) {
+                try {
+                    const filePath = path.join(userDataPath, f);
+                    if (fsSync.statSync(filePath).isFile()) {
+                        fsSync.unlinkSync(filePath);
+                    }
+                } catch (e) {}
+            }
+        }
+        if (store && typeof store.clear === 'function') {
+            store.clear();
+        }
+        console.log('[System Reset] Data wipe successful.');
+        return { success: true };
+    } catch (err) {
+        console.error('[System Reset] Error resetting data:', err);
+        return { success: false, error: err.message };
+    }
+});
+
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') {
     if(server) server.close();

@@ -40,6 +40,7 @@ const DeveloperPage = () => {
     }>({
         isOpen: false, title: '', description: '', onConfirm: () => {}, variant: 'danger'
     });
+    const [isResettingData, setIsResettingData] = useState(false);
 
     // M-Pesa State
     const [mpesaConfig, setMpesaConfig] = useState({
@@ -413,6 +414,36 @@ const DeveloperPage = () => {
         } catch (e: any) {
             setError(e.message);
         }
+    };
+
+    const handleResetAllData = () => {
+        setConfirmDialogState({
+            isOpen: true,
+            title: 'Factory Reset POS Terminal?',
+            description: 'CRITICAL WARNING: This will permanently wipe all local sales transactions, offline products, local database records, and stored business configurations on this terminal. The app will restart into fresh setup mode. This CANNOT be undone.',
+            variant: 'danger',
+            onConfirm: async () => {
+                setIsResettingData(true);
+                try {
+                    if (window.electron && window.electron.resetAllData) {
+                        const res = await window.electron.resetAllData();
+                        if (!res.success) {
+                            throw new Error(res.error || 'Failed to wipe database');
+                        }
+                    }
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    setSuccessMsg('POS data wiped successfully. Restarting...');
+                    toast.success('POS data wiped successfully. Restarting...');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1200);
+                } catch (err: any) {
+                    setError(err.message || 'Error performing system reset');
+                    setIsResettingData(false);
+                }
+            }
+        });
     };
 
     const handleLogout = () => {
@@ -966,6 +997,41 @@ const DeveloperPage = () => {
                                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${businessData.onScreenKeyboard ? 'translate-x-6' : 'translate-x-1'}`} />
                                                 </button>
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Danger Zone: Factory Reset */}
+                                    <div className="bg-red-50/60 p-5 rounded-xl border border-red-200 mt-6 space-y-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-start gap-3">
+                                                <div className="p-2 bg-red-100 text-red-600 rounded-lg shrink-0 mt-0.5">
+                                                    <AlertTriangle className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-red-900">Factory Reset & Data Wipe</h3>
+                                                    <p className="text-xs text-red-700/80 mt-0.5">
+                                                        Permanently wipe all local transactions, cached catalog data, and business configuration files to return this terminal to initial onboarding setup.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleResetAllData}
+                                                disabled={isResettingData}
+                                                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm transition shrink-0"
+                                            >
+                                                {isResettingData ? (
+                                                    <>
+                                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                                        Resetting...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Trash2 className="w-4 h-4" />
+                                                        Reset All Data
+                                                    </>
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>

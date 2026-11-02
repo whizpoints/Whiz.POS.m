@@ -1,6 +1,6 @@
 export class MpesaCallbackUrlService {
   private static get baseUrl(): string {
-    return process.env.API_BASE_URL || 'https://api.whizpoint.app';
+    return process.env.API_BASE_URL || 'https://backoffice.whizpoint.app';
   }
 
   static getStkCallbackUrl(businessId: string): string {

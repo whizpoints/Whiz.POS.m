@@ -235,5 +235,6 @@ contextBridge.exposeInMainWorld('electron', {
   kraInitDevice: (businessSetup) => ipcRenderer.invoke('kra-init-device', businessSetup),
   kraSyncQueue: (businessSetup) => ipcRenderer.invoke('kra-sync-queue', businessSetup),
   kraSubmitInvoice: (transaction, products, businessSetup) => ipcRenderer.invoke('kra-submit-invoice', transaction, products, businessSetup),
-  kraGetStats: () => ipcRenderer.invoke('kra-get-stats')
+  kraGetStats: () => ipcRenderer.invoke('kra-get-stats'),
+  resetAllData: () => ipcRenderer.invoke('reset-all-data')
 });
