@@ -40,8 +40,23 @@ function getTimestamp() {
     now.getSeconds().toString().padStart(2, '0');
 }
 
+// In-memory deduplication cache with 45s TTL to prevent duplicate status checks
+const statusQueryLocks = new Map<string, number>();
+
+function isStatusCheckLocked(receipt: string): boolean {
+  const now = Date.now();
+  const expiresAt = statusQueryLocks.get(receipt);
+  if (expiresAt && expiresAt > now) return true;
+  statusQueryLocks.set(receipt, now + 45000);
+  return false;
+}
+
 async function triggerTransactionStatus(config: any, receipt: string, businessId: string) {
     if (!config.initiatorName || !config.initiatorPassword) return;
+    if (!receipt || isStatusCheckLocked(receipt)) {
+      console.log(`[Local M-Pesa] Deduplicating transaction status query for ${receipt}`);
+      return;
+    }
     try {
       const token = await getOAuthToken(config.consumerKey, config.consumerSecret, config.environment);
       const securityCredential = await generateSecurityCredential(config.initiatorPassword, config.certificateBase64);
@@ -282,8 +297,8 @@ const handleLocalC2bValidation = async (req: any, res: any) => {
       TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode, TransTime
     } = req.body;
     
-    let config = rawBusinessId ? await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', rawBusinessId).executeTakeFirst() : null;
-    if (!config && BusinessShortCode) {
+    let config = null;
+    if (BusinessShortCode) {
       const bsc = String(BusinessShortCode).trim();
       config = await db.selectFrom('MpesaConfig')
         .selectAll()
@@ -293,6 +308,9 @@ const handleLocalC2bValidation = async (req: any, res: any) => {
           eb('paybillNumber', '=', bsc)
         ]))
         .executeTakeFirst();
+    }
+    if (!config && rawBusinessId) {
+      config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', rawBusinessId).executeTakeFirst();
     }
 
     const resolvedBusinessId = config?.businessId || rawBusinessId;
@@ -370,8 +388,8 @@ const handleLocalC2bConfirmation = async (req: any, res: any) => {
       TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode, TransTime
     } = req.body;
     
-    let config = rawBusinessId ? await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', rawBusinessId).executeTakeFirst() : null;
-    if (!config && BusinessShortCode) {
+    let config = null;
+    if (BusinessShortCode) {
       const bsc = String(BusinessShortCode).trim();
       config = await db.selectFrom('MpesaConfig')
         .selectAll()
@@ -381,6 +399,9 @@ const handleLocalC2bConfirmation = async (req: any, res: any) => {
           eb('paybillNumber', '=', bsc)
         ]))
         .executeTakeFirst();
+    }
+    if (!config && rawBusinessId) {
+      config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', rawBusinessId).executeTakeFirst();
     }
 
     const resolvedBusinessId = config?.businessId || rawBusinessId;
@@ -563,9 +584,25 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
       const cleanQ = q.trim();
       const digits = cleanQ.replace(/\D/g, '');
 
+      // Resolve all business IDs sharing the same shortcode/till
+      const myConfig = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
+      const matchingCodes = [myConfig?.shortcode, myConfig?.tillNumber, myConfig?.paybillNumber].filter(Boolean);
+      let businessIds = [businessId];
+      if (matchingCodes.length > 0) {
+        const sharedConfigs = await db.selectFrom('MpesaConfig')
+          .select('businessId')
+          .where((eb) => eb.or([
+            eb('shortcode', 'in', matchingCodes),
+            eb('tillNumber', 'in', matchingCodes),
+            eb('paybillNumber', 'in', matchingCodes)
+          ]))
+          .execute();
+        businessIds = Array.from(new Set([businessId, ...sharedConfigs.map(c => c.businessId)]));
+      }
+
       let query = db.selectFrom('MpesaTransaction')
         .selectAll()
-        .where('businessId', '=', businessId)
+        .where('businessId', 'in', businessIds)
         .where('status', '=', 'UNLINKED')
         .orderBy('timestamp', 'desc')
         .limit(50);
@@ -592,7 +629,7 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
       if (cleanQ && txns.length === 0) {
         let claimedQuery = db.selectFrom('MpesaTransaction')
           .selectAll()
-          .where('businessId', '=', businessId)
+          .where('businessId', 'in', businessIds)
           .orderBy('timestamp', 'desc')
           .limit(10);
 

@@ -39,8 +39,23 @@ function getTimestamp() {
     now.getSeconds().toString().padStart(2, '0');
 }
 
+// In-memory deduplication cache with 45s TTL to prevent duplicate status checks
+const statusQueryLocks = new Map<string, number>();
+
+function isStatusCheckLocked(receipt: string): boolean {
+  const now = Date.now();
+  const expiresAt = statusQueryLocks.get(receipt);
+  if (expiresAt && expiresAt > now) return true;
+  statusQueryLocks.set(receipt, now + 45000);
+  return false;
+}
+
 async function triggerTransactionStatus(config: any, receipt: string, businessId: string) {
     if (!config.initiatorName || !config.initiatorPassword) return;
+    if (!receipt || isStatusCheckLocked(receipt)) {
+      console.log(`[Transaction Status] Deduplicating query for ${receipt} (already in-flight or queried recently).`);
+      return;
+    }
     try {
       const token = await getOAuthToken(config.consumerKey, config.consumerSecret, config.environment);
       const plaintextPassword = decrypt(config.initiatorPassword);
@@ -316,9 +331,9 @@ const handleC2bValidation = async (req: any, res: any) => {
       TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode, TransTime
     } = req.body;
     
-    // Loosely resolve business config
-    let config = rawBusinessId ? await prisma.mpesaConfig.findFirst({ where: { businessId: rawBusinessId } }) : null;
-    if (!config && BusinessShortCode) {
+    // Prioritize BusinessShortCode to map to active registered business
+    let config = null;
+    if (BusinessShortCode) {
       const bsc = String(BusinessShortCode).trim();
       config = await prisma.mpesaConfig.findFirst({
         where: {
@@ -327,8 +342,12 @@ const handleC2bValidation = async (req: any, res: any) => {
             { tillNumber: bsc },
             { paybillNumber: bsc }
           ]
-        }
+        },
+        orderBy: { updatedAt: 'desc' }
       });
+    }
+    if (!config && rawBusinessId) {
+      config = await prisma.mpesaConfig.findFirst({ where: { businessId: rawBusinessId } });
     }
 
     const resolvedBusinessId = config?.businessId || rawBusinessId;
@@ -364,11 +383,11 @@ const handleC2bValidation = async (req: any, res: any) => {
           phoneNumber: rawPhone,
           customerName,
           status: 'UNLINKED',
-          isEnriched: true,
+          isEnriched: customerName !== 'M-Pesa Customer',
           timestamp
         },
         update: {
-          customerName,
+          customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
           phoneNumber: rawPhone || undefined,
           amount: cleanAmount || undefined
         }
@@ -381,7 +400,7 @@ const handleC2bValidation = async (req: any, res: any) => {
           amount: cleanAmount,
           phoneNumber: rawPhone,
           customerName,
-          isEnriched: true,
+          isEnriched: customerName !== 'M-Pesa Customer',
           timestamp: timestamp.toISOString(),
           businessId: resolvedBusinessId
         };
@@ -411,9 +430,9 @@ const handleC2bConfirmation = async (req: any, res: any) => {
       TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode, TransTime
     } = req.body;
     
-    // Loosely resolve business config
-    let config = rawBusinessId ? await prisma.mpesaConfig.findFirst({ where: { businessId: rawBusinessId } }) : null;
-    if (!config && BusinessShortCode) {
+    // Prioritize BusinessShortCode to map to active registered business
+    let config = null;
+    if (BusinessShortCode) {
       const bsc = String(BusinessShortCode).trim();
       config = await prisma.mpesaConfig.findFirst({
         where: {
@@ -422,8 +441,12 @@ const handleC2bConfirmation = async (req: any, res: any) => {
             { tillNumber: bsc },
             { paybillNumber: bsc }
           ]
-        }
+        },
+        orderBy: { updatedAt: 'desc' }
       });
+    }
+    if (!config && rawBusinessId) {
+      config = await prisma.mpesaConfig.findFirst({ where: { businessId: rawBusinessId } });
     }
 
     const resolvedBusinessId = config?.businessId || rawBusinessId;
@@ -438,6 +461,7 @@ const handleC2bConfirmation = async (req: any, res: any) => {
     if (rawPhone.startsWith('+')) rawPhone = rawPhone.slice(1);
 
     const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || req.body.CustomerName || 'M-Pesa Customer';
+    const isEnriched = customerName !== 'M-Pesa Customer';
 
     // Parse timestamp if available
     let timestamp = new Date();
@@ -464,7 +488,7 @@ const handleC2bConfirmation = async (req: any, res: any) => {
           phoneNumber: rawPhone,
           customerName,
           status: 'UNLINKED',
-          isEnriched: true,
+          isEnriched,
           timestamp
         },
         update: {
@@ -481,7 +505,7 @@ const handleC2bConfirmation = async (req: any, res: any) => {
           amount: cleanAmount,
           phoneNumber: rawPhone,
           customerName,
-          isEnriched: true,
+          isEnriched,
           timestamp: timestamp.toISOString(),
           businessId: resolvedBusinessId
         };
@@ -490,8 +514,8 @@ const handleC2bConfirmation = async (req: any, res: any) => {
         console.log(`[M-Pesa Webhook] C2B Confirmation saved & emitted: ${cleanTransId} for KSh ${cleanAmount} (${customerName})`);
       }
 
-      // Trigger Transaction Status Background Job if needed for additional metadata
-      if (config?.initiatorName && config?.initiatorPassword) {
+      // Query full status if phone is masked or name is missing, deduplicated with lock
+      if (config?.initiatorName && config?.initiatorPassword && (rawPhone.length < 9 || !isEnriched)) {
         triggerTransactionStatus(config, cleanTransId, resolvedBusinessId);
       }
     }
@@ -517,51 +541,59 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
     if (result && (result.ResultCode === 0 || result.ResultCode === "0") && result.ResultParameters) {
       const params = result.ResultParameters.ResultParameter;
       const receiptNumber = params.find((p: any) => p.Key === 'ReceiptNo')?.Value;
-        const rawPartyName = params.find((p: any) => p.Key === 'DebitPartyName')?.Value || params.find((p: any) => p.Key === 'SenderPartyName')?.Value;
+      const rawPartyName = params.find((p: any) => p.Key === 'DebitPartyName')?.Value || params.find((p: any) => p.Key === 'SenderPartyName')?.Value;
+      
+      if (receiptNumber && rawPartyName) {
+        const nameParts = rawPartyName.split('-');
+        const rawPhone = nameParts[0].trim();
+        const customerName = nameParts.length > 1 ? nameParts.slice(1).join('-').trim() : rawPartyName;
         
-        if (receiptNumber && rawPartyName) {
-          // DebitPartyName usually comes as "254740***168 - JOHN DOE". 
-          const nameParts = rawPartyName.split('-');
-          const rawPhone = nameParts[0].trim();
-          const customerName = nameParts.length > 1 ? nameParts.slice(1).join('-').trim() : rawPartyName;
-          
-          // Format phone cleanly: preserve full unmasked numbers e.g. 0740841168
-          let formattedPhone = rawPhone.replace(/\s+/g, '');
-          if (formattedPhone.startsWith('254') && formattedPhone.length === 12) {
-              formattedPhone = '0' + formattedPhone.slice(3);
-          }
-          if (formattedPhone.includes('*')) {
-              formattedPhone = formattedPhone.replace(/\*+/g, '***');
-          }
-          
-          await prisma.mpesaTransaction.updateMany({
-            where: { transactionId: receiptNumber, businessId },
-            data: { customerName, phoneNumber: formattedPhone, isEnriched: true }
-          });
-
-          try {
-            await prisma.receipt.updateMany({
-              where: { mpesaCode: receiptNumber, businessId },
-              data: { customerPhone: formattedPhone }
-            });
-          } catch (e) {}
-          
-          console.log(`[Transaction Status] Enriched ${receiptNumber}: Name=${customerName}, Phone=${formattedPhone}`);
-
-          // Emit real-time Socket.IO update so POS terminals refresh the payment instantly
-          const io = req.app.get('io');
-          if (io) {
-            io.to(`business_${businessId}`).emit('mpesa_payment_enriched', {
-              transactionId: receiptNumber,
-              customerName,
-              phoneNumber: formattedPhone,
-              isEnriched: true,
-              businessId
-            });
-          }
-        } else {
-          console.warn(`[Transaction Status] Could not find ReceiptNo or PartyName in result params. Params:`, JSON.stringify(params));
+        let formattedPhone = rawPhone.replace(/\s+/g, '');
+        if (formattedPhone.startsWith('254') && formattedPhone.length === 12) {
+            formattedPhone = '0' + formattedPhone.slice(3);
         }
+        if (formattedPhone.includes('*')) {
+            formattedPhone = formattedPhone.replace(/\*+/g, '***');
+        }
+        
+        // Update transaction wherever it is stored without businessId constraint
+        await prisma.mpesaTransaction.updateMany({
+          where: { transactionId: receiptNumber },
+          data: { customerName, phoneNumber: formattedPhone, isEnriched: true }
+        });
+
+        const updatedTxn = await prisma.mpesaTransaction.findUnique({
+          where: { transactionId: receiptNumber }
+        });
+
+        try {
+          await prisma.receipt.updateMany({
+            where: { mpesaCode: receiptNumber },
+            data: { customerPhone: formattedPhone }
+          });
+        } catch (e) {}
+        
+        console.log(`[Transaction Status] Enriched ${receiptNumber}: Name=${customerName}, Phone=${formattedPhone}`);
+
+        // Emit real-time Socket.IO update so POS terminals refresh the payment instantly
+        const io = req.app.get('io');
+        if (io) {
+          const enrichPayload = {
+            transactionId: receiptNumber,
+            customerName,
+            phoneNumber: formattedPhone,
+            isEnriched: true,
+            businessId: updatedTxn?.businessId || businessId
+          };
+          if (updatedTxn?.businessId) {
+            io.to(`business_${updatedTxn.businessId}`).emit('mpesa_payment_enriched', enrichPayload);
+          }
+          io.to(`business_${businessId}`).emit('mpesa_payment_enriched', enrichPayload);
+          io.emit('mpesa_payment_enriched', enrichPayload);
+        }
+      } else {
+        console.warn(`[Transaction Status] Could not find ReceiptNo or PartyName in result params. Params:`, JSON.stringify(params));
+      }
     } else if (result) {
       console.warn(`[Transaction Status] Non-zero result for business ${businessId}: Code=${result.ResultCode}, Desc=${result.ResultDesc}`);
     }
@@ -569,76 +601,91 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
   } catch (error) {
     console.error('Transaction Status Callback Error:', error);
     res.json({ "ResultCode": 1, "ResultDesc": "Error" });
-
   }
 });
 
-  // 7. Payment Search / Polling for POS
-  router.get('/payments/search', async (req: any, res: any) => {
-    try {
-      const rawBiz = req.query.businessId;
-      const businessId = Array.isArray(rawBiz) ? String(rawBiz[0]) : (rawBiz ? String(rawBiz) : '');
-      const rawQ = req.query.q;
-      const q = Array.isArray(rawQ) ? String(rawQ[0]) : (rawQ ? String(rawQ) : '');
-      const cleanQ = q.trim();
-      
-      if (!businessId) return res.status(400).json({ error: 'Missing businessId' });
+// 7. Payment Search / Polling for POS
+router.get('/payments/search', async (req: any, res: any) => {
+  try {
+    const rawBiz = req.query.businessId;
+    const businessId = Array.isArray(rawBiz) ? String(rawBiz[0]) : (rawBiz ? String(rawBiz) : '');
+    const rawQ = req.query.q;
+    const q = Array.isArray(rawQ) ? String(rawQ[0]) : (rawQ ? String(rawQ) : '');
+    const cleanQ = q.trim();
+    
+    if (!businessId) return res.status(400).json({ error: 'Missing businessId' });
 
-      const orConditions: any[] = [];
-      if (cleanQ) {
-        // Case-insensitive substring matching for M-Pesa Receipt Code (e.g. first 3 or last 3 chars like 'SK9', '9X2')
-        orConditions.push({ transactionId: { contains: cleanQ, mode: 'insensitive' } });
-        // Case-insensitive customer name matching
-        orConditions.push({ customerName: { contains: cleanQ, mode: 'insensitive' } });
-        // Phone number matching
-        orConditions.push({ phoneNumber: { contains: cleanQ, mode: 'insensitive' } });
+    // Look up business config to identify all matching shortcodes/tills
+    const myConfig = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+    const matchingCodes = [myConfig?.shortcode, myConfig?.tillNumber, myConfig?.paybillNumber].filter(Boolean) as string[];
 
-        // If digits provided (e.g. phone number digits), also search phone suffix
-        const digits = cleanQ.replace(/\D/g, '');
-        if (digits.length >= 3) {
-          orConditions.push({ phoneNumber: { contains: digits } });
-        }
-        if (digits.length >= 9) {
-          orConditions.push({ phoneNumber: { contains: digits.slice(-9) } });
-        }
+    let businessIds = [businessId];
+    if (matchingCodes.length > 0) {
+      const sharedConfigs = await prisma.mpesaConfig.findMany({
+        where: {
+          OR: [
+            { shortcode: { in: matchingCodes } },
+            { tillNumber: { in: matchingCodes } },
+            { paybillNumber: { in: matchingCodes } }
+          ]
+        },
+        select: { businessId: true }
+      });
+      businessIds = Array.from(new Set([businessId, ...sharedConfigs.map(c => c.businessId)]));
+    }
+
+    const orConditions: any[] = [];
+    if (cleanQ) {
+      // In SQLite with Prisma, 'contains' is case-insensitive for ASCII text without 'mode' option
+      orConditions.push({ transactionId: { contains: cleanQ } });
+      orConditions.push({ customerName: { contains: cleanQ } });
+      orConditions.push({ phoneNumber: { contains: cleanQ } });
+
+      const digits = cleanQ.replace(/\D/g, '');
+      if (digits.length >= 3) {
+        orConditions.push({ phoneNumber: { contains: digits } });
       }
+      if (digits.length >= 9) {
+        orConditions.push({ phoneNumber: { contains: digits.slice(-9) } });
+      }
+    }
 
-      // First query unlinked transactions
-      let txns = await prisma.mpesaTransaction.findMany({
-        where: { 
-          businessId,
-          status: 'UNLINKED',
-          ...(orConditions.length > 0 ? { OR: orConditions } : {})
+    // First query unlinked transactions across all business IDs sharing this shortcode/till
+    let txns = await prisma.mpesaTransaction.findMany({
+      where: { 
+        businessId: { in: businessIds },
+        status: 'UNLINKED',
+        ...(orConditions.length > 0 ? { OR: orConditions } : {})
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 50
+    });
+
+    // If user searched explicitly for something and 0 unlinked were found, also check if it was already claimed
+    if (cleanQ && txns.length === 0) {
+      const claimedTxns = await prisma.mpesaTransaction.findMany({
+        where: {
+          businessId: { in: businessIds },
+          OR: orConditions
         },
         orderBy: { timestamp: 'desc' },
-        take: 50
+        take: 10
       });
 
-      // If user searched explicitly for something and 0 unlinked were found, also check if it was already claimed
-      if (cleanQ && txns.length === 0) {
-        const claimedTxns = await prisma.mpesaTransaction.findMany({
-          where: {
-            businessId,
-            OR: orConditions
-          },
-          orderBy: { timestamp: 'desc' },
-          take: 10
-        });
-
-        if (claimedTxns.length > 0) {
-          txns = claimedTxns.map((t: any) => ({
-            ...t,
-            isAlreadyClaimed: t.status === 'LINKED'
-          }));
-        }
+      if (claimedTxns.length > 0) {
+        txns = claimedTxns.map((t: any) => ({
+          ...t,
+          isAlreadyClaimed: t.status === 'LINKED'
+        }));
       }
-
-      res.json(txns);
-    } catch (err: any) {
-      console.error('M-Pesa payment search error:', err);
-      res.status(500).json({ error: 'Internal server error' });
     }
-  });
+
+    res.json(txns);
+  } catch (err: any) {
+    console.error('M-Pesa payment search error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
   // 7b. Business M-Pesa Statement (All Money-In / Till Transactions)
   router.get('/statement', async (req: any, res: any) => {

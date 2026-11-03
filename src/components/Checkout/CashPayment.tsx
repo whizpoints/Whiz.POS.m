@@ -5,10 +5,14 @@ import { useToast } from '../ui/use-toast';
 
 interface Props {
   totalAmount: number;
+  remainingAmount?: number;
   formattedTotal: string;
+  onAddSplit?: (tender: any) => void;
+  isSplitActive?: boolean;
 }
 
-export default function CashPayment({ totalAmount, formattedTotal }: Props) {
+export default function CashPayment({ totalAmount, remainingAmount, formattedTotal, onAddSplit, isSplitActive }: Props) {
+  const targetAmount = (remainingAmount !== undefined && remainingAmount >= 0) ? remainingAmount : totalAmount;
   const [tendered, setTendered] = useState<string>('');
   const { completeTransaction } = usePosStore();
   const { toast } = useToast();
@@ -39,21 +43,42 @@ export default function CashPayment({ totalAmount, formattedTotal }: Props) {
   };
 
   const handleSetExact = () => {
-    setTendered(totalAmount.toString());
+    setTendered(targetAmount.toString());
   };
 
   const tenderedNum = parseFloat(tendered) || 0;
-  const change = Math.max(0, tenderedNum - totalAmount);
-  const remaining = Math.max(0, totalAmount - tenderedNum);
-  const isSufficient = tenderedNum >= totalAmount && totalAmount > 0;
+  const change = Math.max(0, tenderedNum - targetAmount);
+  const remaining = Math.max(0, targetAmount - tenderedNum);
+  const isSufficient = tenderedNum >= targetAmount && targetAmount > 0;
+  const canAddToSplit = onAddSplit && tenderedNum > 0;
 
   const handleComplete = () => {
+    if (onAddSplit && isSplitActive) {
+      onAddSplit({
+        method: 'cash',
+        amount: Math.min(tenderedNum, targetAmount),
+        change: change > 0 ? change : 0
+      });
+      setTendered('');
+      return;
+    }
+
     if (!isSufficient) {
       toast('Amount tendered is less than the total due.', 'error');
       return;
     }
     
     completeTransaction('cash', undefined, { amountTendered: tenderedNum, change });
+  };
+
+  const handleAddPartialSplit = () => {
+    if (!onAddSplit || tenderedNum <= 0) return;
+    onAddSplit({
+      method: 'cash',
+      amount: Math.min(tenderedNum, targetAmount),
+      change: change > 0 ? change : 0
+    });
+    setTendered('');
   };
 
   // Keyboard support for typing amount directly
@@ -208,21 +233,33 @@ export default function CashPayment({ totalAmount, formattedTotal }: Props) {
         </div>
       </div>
 
-      {/* Confirm Payment Button */}
-      <button
-        type="button"
-        onClick={handleComplete}
-        disabled={!isSufficient}
-        className={`w-full py-4 sm:py-5 rounded-2xl font-black text-lg sm:text-xl md:text-2xl flex items-center justify-center gap-3 transition-all uppercase tracking-wide shadow-md ${
-          isSufficient
-            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 cursor-pointer active:scale-[0.99]'
-            : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-        }`}
-      >
-        <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" />
-        <span>CONFIRM PAYMENT</span>
-        <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6" />
-      </button>
+      {/* Confirm Payment Button or Split Add */}
+      <div className="space-y-2">
+        {onAddSplit && tenderedNum > 0 && !isSufficient && (
+          <button
+            type="button"
+            onClick={handleAddPartialSplit}
+            className="w-full py-3.5 rounded-2xl font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 shadow-sm transition-all"
+          >
+            <span>+ Add KSh {tenderedNum.toFixed(2)} to Split Bill</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleComplete}
+          disabled={!isSufficient && !(onAddSplit && isSplitActive && tenderedNum > 0)}
+          className={`w-full py-4 sm:py-5 rounded-2xl font-black text-lg sm:text-xl md:text-2xl flex items-center justify-center gap-3 transition-all uppercase tracking-wide shadow-md ${
+            isSufficient || (isSplitActive && tenderedNum > 0)
+              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 cursor-pointer active:scale-[0.99]'
+              : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+          }`}
+        >
+          <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" />
+          <span>{isSplitActive ? 'ADD CASH TO SPLIT' : 'CONFIRM PAYMENT'}</span>
+          <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6" />
+        </button>
+      </div>
     </div>
   );
 }

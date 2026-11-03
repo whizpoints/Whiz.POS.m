@@ -21,6 +21,14 @@ export interface CartItem {
   quantity: number;
 }
 
+export interface SplitPaymentRecord {
+  method: 'cash' | 'mpesa' | 'credit' | 'card' | 'bank';
+  amount: number;
+  mpesaCode?: string;
+  customerName?: string;
+  phoneNumber?: string;
+}
+
 export interface Transaction {
   id: string;
   timestamp: string;
@@ -28,7 +36,7 @@ export interface Transaction {
   subtotal: number;
   tax: number;
   total: number;
-  paymentMethod: 'cash' | 'mpesa' | 'credit' | 'card' | 'bank';
+  paymentMethod: 'cash' | 'mpesa' | 'credit' | 'card' | 'bank' | 'split';
   cashier: string;
   creditCustomer?: string;
   status: 'completed' | 'pending' | 'refunded';
@@ -38,6 +46,7 @@ export interface Transaction {
   phoneNumber?: string;
   mpesaName?: string;
   customerName?: string;
+  splitPayments?: SplitPaymentRecord[];
   kraDetails?: {
     qrCode?: string;
     invoiceNumber?: string;

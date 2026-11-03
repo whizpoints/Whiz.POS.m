@@ -7,10 +7,15 @@ import MpesaQR from './MpesaQR';
 
 interface Props {
   totalAmount: number;
+  remainingAmount?: number;
   formattedTotal: string;
+  onAddSplit?: (tender: any) => void;
+  isSplitActive?: boolean;
 }
 
-export default function MpesaPayment({ totalAmount, formattedTotal }: Props) {
+export default function MpesaPayment({ totalAmount, remainingAmount, formattedTotal, onAddSplit, isSplitActive }: Props) {
+  const targetAmount = (remainingAmount !== undefined && remainingAmount >= 0) ? remainingAmount : totalAmount;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex flex-col gap-4 flex-1">
@@ -19,11 +24,11 @@ export default function MpesaPayment({ totalAmount, formattedTotal }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
           <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex flex-col justify-center">
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">Send STK Push</h4>
-            <StkPush totalAmount={totalAmount} />
+            <StkPush totalAmount={targetAmount} />
           </div>
           
           <div className="bg-gray-50 rounded-xl p-2 border border-gray-100 flex flex-col justify-center items-center">
-            <MpesaQR totalAmount={totalAmount} />
+            <MpesaQR totalAmount={targetAmount} />
           </div>
         </div>
 
@@ -34,7 +39,12 @@ export default function MpesaPayment({ totalAmount, formattedTotal }: Props) {
 
         {/* Bottom Half: Confirmation / Till Monitor */}
         <div className="flex-1 bg-gray-50 rounded-xl p-3 border border-gray-100 flex flex-col min-h-[140px]">
-          <TillMonitor totalAmount={totalAmount} />
+          <TillMonitor 
+            totalAmount={totalAmount} 
+            remainingAmount={remainingAmount} 
+            onAddSplit={onAddSplit}
+            isSplitActive={isSplitActive}
+          />
         </div>
       </div>
 

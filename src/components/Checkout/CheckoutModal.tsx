@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePosStore } from '../../store/posStore';
-import { X, ShoppingBag } from 'lucide-react';
+import { X, ShoppingBag, Banknote, CreditCard, Landmark, UserCheck, Search, Split, Trash2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Modal } from '../ui/modal';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import CashPayment from './CashPayment';
@@ -10,15 +10,25 @@ import BankChequePayment from './BankChequePayment';
 import CreditPayment from './CreditPayment';
 import KeyboardShortcuts from './KeyboardShortcuts';
 import SearchModal from './MpesaPayment/SearchModal';
-import { Banknote, CreditCard, Landmark, UserCheck, Search } from 'lucide-react';
 
 export type PaymentMethodType = 'cash' | 'mpesa' | 'card' | 'bank' | 'credit';
+
+export interface SplitTender {
+  id: string;
+  method: 'cash' | 'mpesa' | 'card' | 'bank' | 'credit';
+  amount: number;
+  mpesaCode?: string;
+  customerName?: string;
+  phoneNumber?: string;
+  change?: number;
+}
 
 export default function CheckoutModal() {
   const { isCheckoutOpen, closeCheckout, cart, completeTransaction, currentCashier, activeSettlingBillId, openBills } = usePosStore();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodType>('cash');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
+  const [splitTenders, setSplitTenders] = useState<SplitTender[]>([]);
 
   // Active bill if settling an open tab
   const activeBill = activeSettlingBillId 
@@ -29,6 +39,12 @@ export default function CheckoutModal() {
   const totalAmount = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const totalUnits = cart.reduce((sum, item) => sum + item.quantity, 0);
   
+  // Split payment totals
+  const totalPaid = splitTenders.reduce((sum, item) => sum + item.amount, 0);
+  const remainingDue = Math.max(0, totalAmount - totalPaid);
+  const isSplitActive = splitTenders.length > 0;
+  const isFullyPaid = isSplitActive && totalPaid >= totalAmount;
+
   // Format currency properly KSh 4,850.00
   const formattedTotal = new Intl.NumberFormat('en-KE', {
     style: 'currency',
@@ -36,11 +52,12 @@ export default function CheckoutModal() {
     minimumFractionDigits: 2
   }).format(totalAmount).replace('KES', 'KSh');
 
-  // Reset to cash when opened
+  // Reset when opened
   useEffect(() => {
     if (isCheckoutOpen) {
       setSelectedMethod('cash');
       setShowMobileSummary(false);
+      setSplitTenders([]);
     }
   }, [isCheckoutOpen]);
 
@@ -55,8 +72,64 @@ export default function CheckoutModal() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isCheckoutOpen, closeCheckout]);
 
-  /** Called when cashier picks a payment from SearchModal — completes the sale */
+  const handleAddSplitTender = (tender: Omit<SplitTender, 'id'>) => {
+    const newItem: SplitTender = {
+      ...tender,
+      id: `SPLIT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    };
+    setSplitTenders(prev => [...prev, newItem]);
+  };
+
+  const handleRemoveSplitTender = (id: string) => {
+    setSplitTenders(prev => prev.filter(t => t.id !== id));
+  };
+
+  const handleClearSplits = () => {
+    setSplitTenders([]);
+  };
+
+  /** Completes split payment sale when totalPaid >= totalAmount */
+  const handleFinalizeSplitSale = async () => {
+    if (!isFullyPaid) return;
+
+    // Pick single primary customer name for receipt (stores all in split payments)
+    const primaryCustomer = splitTenders.find(t => t.customerName && t.customerName !== 'Customer' && t.customerName !== 'M-Pesa Customer')?.customerName 
+      || splitTenders[0]?.customerName 
+      || 'M-Pesa Customer';
+
+    const primaryPhone = splitTenders.find(t => t.phoneNumber)?.phoneNumber || '';
+    const mpesaCodes = splitTenders.filter(t => t.method === 'mpesa' && t.mpesaCode).map(t => t.mpesaCode);
+
+    completeTransaction('split', undefined, {
+      amountTendered: totalPaid,
+      change: Math.max(0, totalPaid - totalAmount),
+      splitPayments: splitTenders.map(s => ({
+        method: s.method,
+        amount: s.amount,
+        mpesaCode: s.mpesaCode,
+        customerName: s.customerName,
+        phoneNumber: s.phoneNumber
+      })),
+      mpesaCode: mpesaCodes.join(', '),
+      customerName: primaryCustomer,
+      mpesaName: primaryCustomer,
+      phoneNumber: primaryPhone
+    });
+  };
+
+  /** Called when cashier picks a payment from SearchModal */
   const handlePaymentSelected = (txn: { transactionId: string; amount: number; phoneNumber: string; customerName: string | null }) => {
+    if (isSplitActive) {
+      handleAddSplitTender({
+        method: 'mpesa',
+        amount: txn.amount,
+        mpesaCode: txn.transactionId,
+        customerName: txn.customerName || 'M-Pesa Customer',
+        phoneNumber: txn.phoneNumber
+      });
+      return;
+    }
+
     completeTransaction('mpesa', undefined, {
       mpesaCode: txn.transactionId,
       phoneNumber: txn.phoneNumber,
@@ -154,8 +227,15 @@ export default function CheckoutModal() {
             </button>
 
             <div className="text-right pl-3 border-l border-gray-200">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Total Amount Due</p>
-              <p className="text-xl md:text-2xl font-black text-gray-900 font-mono tracking-tight">{formattedTotal}</p>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
+                {isSplitActive ? (isFullyPaid ? 'Total Settled' : 'Remaining Due') : 'Total Amount Due'}
+              </p>
+              <p className={`text-xl md:text-2xl font-black font-mono tracking-tight ${isSplitActive ? (isFullyPaid ? 'text-emerald-600' : 'text-blue-600') : 'text-gray-900'}`}>
+                {isSplitActive ? `KSh ${isFullyPaid ? totalPaid.toFixed(2) : remainingDue.toFixed(2)}` : formattedTotal}
+              </p>
+              {isSplitActive && (
+                <p className="text-[10px] text-gray-400 font-medium">Bill Total: {formattedTotal}</p>
+              )}
             </div>
             
             <button 
@@ -195,8 +275,110 @@ export default function CheckoutModal() {
 
           {/* Column 2: Dynamic Payment Tender Area */}
           <div className="flex-1 p-3 md:p-6 overflow-y-auto bg-white flex flex-col min-w-0">
-            {selectedMethod === 'cash' && <CashPayment totalAmount={totalAmount} formattedTotal={formattedTotal} />}
-            {selectedMethod === 'mpesa' && <MpesaPayment totalAmount={totalAmount} formattedTotal={formattedTotal} />}
+            
+            {/* Split Payment Progress Ledger (Appears when 1+ partial payment is recorded) */}
+            {isSplitActive && (
+              <div className="mb-4 bg-slate-50 border border-blue-200 rounded-2xl p-3.5 shadow-2xs">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded-lg bg-blue-100 text-blue-700">
+                      <Split className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                        Split Tender Ledger
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        {isFullyPaid ? 'Total bill covered in full' : `Needs KSh ${remainingDue.toFixed(2)} more to complete`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleClearSplits}
+                    className="text-[11px] text-rose-600 hover:text-rose-800 font-bold hover:underline flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" /> Clear Splits
+                  </button>
+                </div>
+
+                {/* Split Items Badges */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {splitTenders.map((s, idx) => (
+                    <div 
+                      key={s.id || idx}
+                      className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs text-xs"
+                    >
+                      <span className="font-bold text-slate-800 uppercase text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">
+                        {s.method}
+                      </span>
+                      <span className="font-mono font-black text-slate-900">
+                        KSh {s.amount.toFixed(2)}
+                      </span>
+                      {s.mpesaCode && (
+                        <span className="font-mono text-[10px] text-blue-600 font-bold">
+                          {s.mpesaCode}
+                        </span>
+                      )}
+                      {s.customerName && (
+                        <span className="text-[10px] text-slate-500 truncate max-w-[100px]">
+                          {s.customerName}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSplitTender(s.id)}
+                        className="text-slate-400 hover:text-rose-600 p-0.5 rounded-full"
+                        title="Remove partial payment"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full bg-slate-200 rounded-full h-2 mb-2 overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ${isFullyPaid ? 'bg-emerald-500' : 'bg-blue-600'}`}
+                    style={{ width: `${Math.min(100, (totalPaid / totalAmount) * 100)}%` }}
+                  ></div>
+                </div>
+
+                {/* Action button when fully covered */}
+                {isFullyPaid && (
+                  <button
+                    type="button"
+                    onClick={handleFinalizeSplitSale}
+                    className="w-full mt-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-200 transition-all active:scale-[0.99]"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    COMPLETE SPLIT SALE (KSh {totalAmount.toFixed(2)} SETTLED)
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {selectedMethod === 'cash' && (
+              <CashPayment 
+                totalAmount={totalAmount} 
+                remainingAmount={isSplitActive ? remainingDue : totalAmount}
+                formattedTotal={formattedTotal} 
+                onAddSplit={handleAddSplitTender}
+                isSplitActive={isSplitActive}
+              />
+            )}
+            {selectedMethod === 'mpesa' && (
+              <MpesaPayment 
+                totalAmount={totalAmount} 
+                remainingAmount={isSplitActive ? remainingDue : totalAmount}
+                formattedTotal={formattedTotal} 
+                onAddSplit={handleAddSplitTender}
+                isSplitActive={isSplitActive}
+              />
+            )}
             {selectedMethod === 'card' && <CardPayment totalAmount={totalAmount} formattedTotal={formattedTotal} />}
             {selectedMethod === 'bank' && <BankChequePayment totalAmount={totalAmount} formattedTotal={formattedTotal} />}
             {selectedMethod === 'credit' && <CreditPayment totalAmount={totalAmount} formattedTotal={formattedTotal} />}

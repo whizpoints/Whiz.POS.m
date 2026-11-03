@@ -59,18 +59,36 @@ async function generateReceipt(transaction, businessSetup, isReprint = false, is
     const servedByFirstName = cashierName.split(' ')[0];
     template = template.replace('{{servedBy}}', servedByFirstName);
 
-    let customerName = 'Walk Through Customer';
-    if (paymentMethod === 'CREDIT' && transaction.creditCustomer) {
-        customerName = transaction.creditCustomer;
-    } else if (paymentMethod === 'MPESA' && transaction.mpesaName) {
-        customerName = transaction.mpesaName;
+    // Format single clean customer name for receipt (system stores full records)
+    let singleCustomerName = 'Walk Through Customer';
+    if (transaction.creditCustomer) {
+        singleCustomerName = transaction.creditCustomer;
+    } else if (transaction.mpesaName || transaction.customerName) {
+        let rawName = transaction.mpesaName || transaction.customerName;
+        if (rawName.includes(' - ')) {
+            const parts = rawName.split(' - ');
+            rawName = parts[parts.length - 1].trim();
+        }
+        singleCustomerName = rawName;
     }
-    template = template.replace('{{customer}}', customerName);
+    template = template.replace('{{customer}}', singleCustomerName);
 
     template = template.replace('{{paymentMethod}}', paymentMethod);
 
     let paymentDetailsHtml = '';
-    if (paymentMethod === 'CASH' && transaction.amountTendered !== undefined) {
+    if (transaction.splitPayments && transaction.splitPayments.length > 0) {
+        paymentDetailsHtml = `
+            <div style="font-size: 11px; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 4px;">
+                <div style="font-weight: bold; margin-bottom: 3px; text-align: center;">SPLIT PAYMENT SETTLEMENT</div>
+                ${transaction.splitPayments.map(p => `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                        <span>${(p.method || 'PAYMENT').toUpperCase()}${p.mpesaCode ? ` (${p.mpesaCode})` : ''}:</span>
+                        <span style="font-weight: bold;">Ksh ${parseFloat(p.amount || 0).toFixed(2)}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else if (paymentMethod === 'CASH' && transaction.amountTendered !== undefined) {
         paymentDetailsHtml = `
             <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 2px;">
                 <span>Amount Tendered:</span>
@@ -85,7 +103,6 @@ async function generateReceipt(transaction, businessSetup, isReprint = false, is
         paymentDetailsHtml = `
             <div style="font-size: 11px; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 4px;">
                 <div style="font-weight: bold; margin-bottom: 2px; text-align: center;">M-PESA PAYMENT</div>
-                ${(transaction.mpesaName || transaction.customerName) ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Customer:</span><span style="font-weight: bold; text-align: right;">${transaction.mpesaName || transaction.customerName}</span></div>` : ''}
                 ${transaction.phoneNumber ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Phone:</span><span>${transaction.phoneNumber.replace(/^(\d{4})\d{3}(\d{3})$/, '$1***$2')}</span></div>` : ''}
                 ${transaction.mpesaCode ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Ref Code:</span><span style="font-weight: bold;">${transaction.mpesaCode}</span></div>` : ''}
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Amount:</span><span style="font-weight: bold;">Ksh ${total.toFixed(2)}</span></div>
