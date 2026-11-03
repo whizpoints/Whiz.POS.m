@@ -410,7 +410,7 @@ router.post('/', async (req, res) => {
             for (const op of body) {
                 if (!op || !op.type)
                     continue;
-                if (op.type === 'new-transaction') {
+                if (op.type === 'new-transaction' || op.type === 'transaction') {
                     await recordTransaction(op.data);
                     processedCount++;
                 }
@@ -423,34 +423,232 @@ router.post('/', async (req, res) => {
                         processedCount++;
                     }
                 }
+                else if (op.type === 'delete-transaction') {
+                    if (op.data?.id) {
+                        await db.deleteFrom('Receipt')
+                            .where('id', '=', String(op.data.id))
+                            .execute();
+                        processedCount++;
+                    }
+                }
+                else if (op.type === 'add-product' || op.type === 'product') {
+                    const p = op.data;
+                    if (p && p.name) {
+                        const sku = String(p.sku || p.barcode || p.id);
+                        const prodId = String(p.id || p.productId || randomUUID());
+                        const existingProd = await db.selectFrom('Product').selectAll()
+                            .where('businessId', '=', businessId)
+                            .where(eb => eb.or([eb('id', '=', prodId), eb('sku', '=', sku)]))
+                            .executeTakeFirst();
+                        if (existingProd) {
+                            await db.updateTable('Product').set({
+                                name: String(p.name),
+                                category: p.category ? String(p.category) : null,
+                                price: Number(p.price) || 0,
+                                costPrice: Number(p.costPrice) || 0,
+                                barcode: p.barcode ? String(p.barcode) : null,
+                                updatedAt: new Date().toISOString()
+                            }).where('id', '=', existingProd.id).execute();
+                        }
+                        else {
+                            await db.insertInto('Product').values({
+                                id: prodId,
+                                businessId,
+                                sku: String(sku),
+                                barcode: p.barcode ? String(p.barcode) : null,
+                                name: String(p.name),
+                                category: p.category ? String(p.category) : null,
+                                price: Number(p.price) || 0,
+                                costPrice: Number(p.costPrice) || 0,
+                                reorderLevel: Number(p.minStockLevel || 5),
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString()
+                            }).execute();
+                        }
+                        const finalProdId = existingProd?.id || prodId;
+                        let inv = null;
+                        if (targetOutletId) {
+                            inv = await db.selectFrom('ProductInventory').selectAll()
+                                .where('productId', '=', finalProdId)
+                                .where('outletId', '=', targetOutletId)
+                                .executeTakeFirst();
+                        }
+                        if (!inv && targetLocationId) {
+                            inv = await db.selectFrom('ProductInventory').selectAll()
+                                .where('productId', '=', finalProdId)
+                                .where('locationId', '=', targetLocationId)
+                                .executeTakeFirst();
+                        }
+                        const stockVal = Number(p.stock) || 0;
+                        if (inv) {
+                            if (p.stock !== undefined) {
+                                await db.updateTable('ProductInventory').set({
+                                    stock: stockVal,
+                                    updatedAt: new Date().toISOString()
+                                }).where('id', '=', inv.id).execute();
+                            }
+                        }
+                        else {
+                            await db.insertInto('ProductInventory').values({
+                                id: randomUUID(),
+                                productId: finalProdId,
+                                locationId: targetLocationId,
+                                outletId: targetOutletId || null,
+                                stock: stockVal,
+                                reorderLevel: Number(p.minStockLevel || 5),
+                                updatedAt: new Date().toISOString()
+                            }).execute();
+                            if (stockVal > 0) {
+                                await db.insertInto('StockMovement').values({
+                                    id: randomUUID(),
+                                    businessId,
+                                    productId: finalProdId,
+                                    locationId: targetLocationId,
+                                    outletId: targetOutletId || null,
+                                    type: 'INITIAL',
+                                    quantity: stockVal,
+                                    reference: 'Initial Stock from POS',
+                                    timestamp: new Date().toISOString(),
+                                    updatedAt: new Date().toISOString()
+                                }).execute().catch(() => { });
+                            }
+                        }
+                        processedCount++;
+                    }
+                }
+                else if (op.type === 'update-product') {
+                    const { id, updates } = op.data || {};
+                    if (id && updates) {
+                        const prod = await db.selectFrom('Product').selectAll()
+                            .where('businessId', '=', businessId)
+                            .where(eb => eb.or([eb('id', '=', String(id)), eb('sku', '=', String(id))]))
+                            .executeTakeFirst();
+                        if (prod) {
+                            const pUpdates = { updatedAt: new Date().toISOString() };
+                            if (updates.name !== undefined)
+                                pUpdates.name = String(updates.name);
+                            if (updates.price !== undefined)
+                                pUpdates.price = Number(updates.price);
+                            if (updates.costPrice !== undefined)
+                                pUpdates.costPrice = Number(updates.costPrice);
+                            if (updates.category !== undefined)
+                                pUpdates.category = String(updates.category);
+                            if (updates.barcode !== undefined)
+                                pUpdates.barcode = String(updates.barcode);
+                            await db.updateTable('Product').set(pUpdates).where('id', '=', prod.id).execute();
+                            if (updates.stock !== undefined) {
+                                let inv = null;
+                                if (targetOutletId) {
+                                    inv = await db.selectFrom('ProductInventory').selectAll()
+                                        .where('productId', '=', prod.id)
+                                        .where('outletId', '=', targetOutletId)
+                                        .executeTakeFirst();
+                                }
+                                if (!inv && targetLocationId) {
+                                    inv = await db.selectFrom('ProductInventory').selectAll()
+                                        .where('productId', '=', prod.id)
+                                        .where('locationId', '=', targetLocationId)
+                                        .executeTakeFirst();
+                                }
+                                const newStock = Number(updates.stock) || 0;
+                                if (inv) {
+                                    const currentStock = Number(inv.stock) || 0;
+                                    const diff = newStock - currentStock;
+                                    await db.updateTable('ProductInventory').set({
+                                        stock: newStock,
+                                        updatedAt: new Date().toISOString()
+                                    }).where('id', '=', inv.id).execute();
+                                    if (diff !== 0) {
+                                        await db.insertInto('StockMovement').values({
+                                            id: randomUUID(),
+                                            businessId,
+                                            productId: prod.id,
+                                            locationId: targetLocationId,
+                                            outletId: targetOutletId || null,
+                                            type: diff > 0 ? 'ADJUSTMENT_UP' : 'ADJUSTMENT_DOWN',
+                                            quantity: Math.abs(diff),
+                                            reference: 'POS Stock Update',
+                                            timestamp: new Date().toISOString(),
+                                            updatedAt: new Date().toISOString()
+                                        }).execute().catch(() => { });
+                                    }
+                                    if (io)
+                                        io.emit('stock_updated', { productId: prod.id, stock: newStock, outletId: targetOutletId });
+                                }
+                            }
+                            processedCount++;
+                        }
+                    }
+                }
+                else if (op.type === 'delete-product') {
+                    if (op.data?.id) {
+                        await db.deleteFrom('Product')
+                            .where('businessId', '=', businessId)
+                            .where('id', '=', String(op.data.id))
+                            .execute();
+                        processedCount++;
+                    }
+                }
                 else if (op.type === 'add-inventory-log') {
                     const log = op.data;
                     if (log && log.productId) {
                         try {
+                            const movementType = String(log.type || log.reason || 'ADJUSTMENT').toUpperCase();
+                            let qty = Number(log.variance !== undefined ? log.variance : log.quantity) || 0;
+                            let isDeduction = ['SALE', 'TRANSFER_OUT', 'ADJUSTMENT_DOWN', 'SUBTRACT', 'OUT'].includes(movementType) || qty < 0;
+                            let absQty = Math.abs(qty);
                             await db.insertInto('StockMovement').values({
-                                id: randomUUID(),
+                                id: log.id || randomUUID(),
                                 businessId,
                                 productId: String(log.productId),
                                 locationId: targetLocationId,
                                 outletId: targetOutletId || null,
-                                type: log.type || log.reason || 'ADJUSTMENT',
-                                quantity: Math.abs(Number(log.variance) || 0),
+                                type: movementType,
+                                quantity: absQty,
                                 reference: String(log.reference || log.id || 'SYNC'),
-                                timestamp: new Date(log.timestamp || Date.now()).toISOString()
+                                timestamp: new Date(log.timestamp || Date.now()).toISOString(),
+                                updatedAt: new Date().toISOString()
                             }).execute();
+                            // Atomically update ProductInventory
+                            const delta = isDeduction ? -absQty : absQty;
+                            let inv = null;
+                            if (targetOutletId) {
+                                inv = await db.selectFrom('ProductInventory')
+                                    .selectAll()
+                                    .where('productId', '=', String(log.productId))
+                                    .where('outletId', '=', targetOutletId)
+                                    .executeTakeFirst();
+                            }
+                            if (!inv && targetLocationId) {
+                                inv = await db.selectFrom('ProductInventory')
+                                    .selectAll()
+                                    .where('productId', '=', String(log.productId))
+                                    .where('locationId', '=', targetLocationId)
+                                    .executeTakeFirst();
+                            }
+                            if (inv) {
+                                const newStock = Math.max(0, (Number(inv.stock) || 0) + delta);
+                                await db.updateTable('ProductInventory').set({
+                                    stock: newStock,
+                                    updatedAt: new Date().toISOString()
+                                }).where('id', '=', inv.id).execute();
+                                if (io)
+                                    io.emit('stock_updated', { productId: log.productId, stock: newStock, outletId: targetOutletId });
+                            }
                             processedCount++;
                         }
                         catch (e) { }
                     }
                 }
-                else if (op.type === 'add-credit-customer' || op.type === 'update-credit-customer') {
+                else if (op.type === 'add-credit-customer' || op.type === 'update-credit-customer' || op.type === 'customer' || op.type === 'add-loyalty-customer' || op.type === 'update-loyalty-customer') {
                     const cust = op.data;
                     if (cust && cust.name) {
                         const existingCust = await db.selectFrom('Customer').selectAll().where('businessId', '=', businessId).where('name', '=', String(cust.name)).executeTakeFirst();
                         if (existingCust) {
                             await db.updateTable('Customer').set({
                                 phone: cust.phone || null,
-                                email: cust.email || null
+                                email: cust.email || null,
+                                updatedAt: new Date().toISOString()
                             }).where('id', '=', existingCust.id).execute();
                         }
                         else {
@@ -459,9 +657,48 @@ router.post('/', async (req, res) => {
                                 businessId,
                                 name: String(cust.name),
                                 phone: cust.phone || null,
-                                email: cust.email || null
+                                email: cust.email || null,
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString()
                             }).execute();
                         }
+                        processedCount++;
+                    }
+                }
+                else if (op.type === 'delete-credit-customer') {
+                    if (op.data?.id) {
+                        await db.deleteFrom('Customer').where('businessId', '=', businessId).where('id', '=', String(op.data.id)).execute();
+                        processedCount++;
+                    }
+                }
+                else if (op.type === 'add-supplier' || op.type === 'supplier' || op.type === 'update-supplier') {
+                    const supp = op.data;
+                    if (supp && supp.name) {
+                        const existingSupp = await db.selectFrom('Supplier').selectAll().where('businessId', '=', businessId).where('name', '=', String(supp.name)).executeTakeFirst();
+                        if (existingSupp) {
+                            await db.updateTable('Supplier').set({
+                                contact: supp.contact || supp.phone || null,
+                                email: supp.email || null,
+                                updatedAt: new Date().toISOString()
+                            }).where('id', '=', existingSupp.id).execute();
+                        }
+                        else {
+                            await db.insertInto('Supplier').values({
+                                id: randomUUID(),
+                                businessId,
+                                name: String(supp.name),
+                                contact: supp.contact || supp.phone || null,
+                                email: supp.email || null,
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString()
+                            }).execute();
+                        }
+                        processedCount++;
+                    }
+                }
+                else if (op.type === 'delete-supplier') {
+                    if (op.data?.id) {
+                        await db.deleteFrom('Supplier').where('businessId', '=', businessId).where('id', '=', String(op.data.id)).execute();
                         processedCount++;
                     }
                 }

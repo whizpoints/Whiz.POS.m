@@ -32,13 +32,24 @@ router.use(authenticate);
 // List staff/users
 router.get('/', async (req: any, res: any) => {
   try {
-    const businessId = req.user.businessId || req.user.id;
+    const businessId = req.user.businessId || req.user.userId || req.user.id;
     const { locationId } = req.query;
+    const isFiltered = locationId && 
+                       locationId !== 'ALL' && 
+                       locationId !== 'undefined' && 
+                       locationId !== 'null';
 
     const users = await prisma.user.findMany({
       where: {
         businessId,
-        ...(locationId && locationId !== 'ALL' ? { locationId } : {})
+        ...(isFiltered ? { 
+          OR: [
+            { locationId: String(locationId) },
+            { locationId: null },
+            { role: 'ADMIN' },
+            { role: 'MANAGER' }
+          ]
+        } : {})
       },
       select: {
         id: true,

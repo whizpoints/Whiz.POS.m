@@ -10,7 +10,9 @@ import { io as ClientIO } from 'socket.io-client';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { getServerConfigPath } from './paths.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import authRoutes from './routes/auth.js';
@@ -64,8 +66,17 @@ io.on('connection', (socket) => {
 });
 app.set('io', io);
 // 2. Cloud Socket.io Client (Connects to Web Portal)
-const isProd = process.env.NODE_ENV === 'production';
-const CLOUD_URL = process.env.CLOUD_API_URL || (isProd ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
+let initialCloudUrl = 'https://backoffice.whizpoint.app';
+try {
+    const cfgPath = getServerConfigPath();
+    if (fs.existsSync(cfgPath)) {
+        const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+        if (cfg.backOfficeUrl)
+            initialCloudUrl = cfg.backOfficeUrl;
+    }
+}
+catch (e) { }
+const CLOUD_URL = (process.env.CLOUD_API_URL || initialCloudUrl).replace(/\/+$/, '');
 let cloudSocket;
 try {
     cloudSocket = ClientIO(CLOUD_URL, {
@@ -193,7 +204,6 @@ app.get('/api/health', (req, res) => {
 });
 // Serve React Frontend (Monolith Architecture)
 // Determine __dirname equivalent in ES Modules
-import fs from 'fs';
 const clientBuildPath = path.join(__dirname, '../dist');
 app.use((req, res, next) => {
     if (req.path.startsWith('/api/'))
@@ -235,13 +245,27 @@ app.use((req, res, next) => {
 // -----------------------------------------
 setInterval(async () => {
     try {
-        const isProd = process.env.NODE_ENV === 'production';
-        const CLOUD_API = process.env.CLOUD_API_URL || (isProd ? 'https://pos.whizpoint.app' : 'https://api.whizpoint.app');
         const business = await db.selectFrom('Business').selectAll().executeTakeFirst();
         const location = await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
-        if (!business || !business.apiKey || !location)
+        if (!business || !location)
             return;
-        const apiKey = business.apiKey;
+        let bSettings = {};
+        try {
+            bSettings = typeof business.settings === 'string' ? JSON.parse(business.settings) : (business.settings || {});
+        }
+        catch (e) { }
+        let serverConfig = {};
+        try {
+            const cfgPath = getServerConfigPath();
+            if (fs.existsSync(cfgPath)) {
+                serverConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+            }
+        }
+        catch (e) { }
+        const CLOUD_API = (process.env.CLOUD_API_URL || bSettings.backOfficeUrl || serverConfig.backOfficeUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+        const apiKey = bSettings.backOfficeApiKey || serverConfig.apiKey || serverConfig.cloudToken || business.apiKey;
+        if (!apiKey)
+            return;
         // --- NEW: PUSH DELTA TO CLOUD ---
         try {
             const lastPushLog = await db.selectFrom('SyncLog')
@@ -274,6 +298,7 @@ setInterval(async () => {
                     method: 'POST',
                     headers: {
                         'x-api-key': apiKey,
+                        'Authorization': `Bearer ${apiKey}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
@@ -284,7 +309,17 @@ setInterval(async () => {
                         transactions: localTransactions,
                         outlets: localOutlets,
                         terminals: localTerminals,
-                        inventoryLogs: localStockMovements.map(sm => ({ ...sm, variance: sm.quantity })), // Map local quantity to cloud variance
+                        inventoryLogs: localStockMovements.map(sm => {
+                            const mType = String(sm.type || '').toUpperCase();
+                            const isDeduction = ['SALE', 'TRANSFER_OUT', 'ADJUSTMENT_DOWN', 'SUBTRACT', 'OUT'].includes(mType);
+                            const qty = Number(sm.quantity) || 0;
+                            return {
+                                ...sm,
+                                type: mType,
+                                quantity: Math.abs(qty),
+                                variance: isDeduction ? -Math.abs(qty) : Math.abs(qty)
+                            };
+                        }),
                         businessSetup
                     })
                 });
@@ -314,7 +349,8 @@ setInterval(async () => {
                 .orderBy('createdAt', 'desc')
                 .executeTakeFirst();
             const pullSinceStr = lastPullLog ? new Date(lastPullLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
-            const pullRes = await fetch(`${CLOUD_API}/api/sync/delta?since=${encodeURIComponent(pullSinceStr)}&locationId=${(business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {}).cloudLocationId || location.id}`, {
+            const pullLocationId = bSettings.cloudLocationId || serverConfig.outletId || location.id;
+            const pullRes = await fetch(`${CLOUD_API}/api/sync/delta?since=${encodeURIComponent(pullSinceStr)}&locationId=${pullLocationId}`, {
                 headers: {
                     'x-api-key': apiKey,
                     'Authorization': `Bearer ${apiKey}`

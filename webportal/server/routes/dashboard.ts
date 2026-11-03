@@ -11,13 +11,19 @@ const authenticate = (req: any, res: any, next: any) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload: any = jwt.verify(token, JWT_SECRET);
+    if (!payload.businessId && (payload.userId || payload.id)) {
+      payload.businessId = payload.userId || payload.id;
+    }
     req.user = payload;
     next();
   } catch (err) {
     try {
       const decoded: any = jwt.decode(token);
       if (decoded) {
+        if (!decoded.businessId && (decoded.userId || decoded.id)) {
+          decoded.businessId = decoded.userId || decoded.id;
+        }
         req.user = decoded;
         return next();
       }
@@ -190,12 +196,24 @@ router.get('/sales', async (req: any, res: any) => {
 
 router.get('/staff', async (req: any, res: any) => {
   try {
-    const { businessId } = req.user;
+    const businessId = req.user.businessId || req.user.userId || req.user.id;
     const { locationId } = req.query;
+    const isFiltered = locationId && 
+                       locationId !== 'ALL' && 
+                       locationId !== 'undefined' && 
+                       locationId !== 'null';
+
     const staff = await prisma.user.findMany({
       where: { 
         businessId, 
-        ...(locationId && locationId !== 'ALL' ? { locationId } : {}) 
+        ...(isFiltered ? { 
+          OR: [
+            { locationId: String(locationId) },
+            { locationId: null },
+            { role: 'ADMIN' },
+            { role: 'MANAGER' }
+          ]
+        } : {}) 
       },
       select: { 
         id: true, 
@@ -206,7 +224,8 @@ router.get('/staff', async (req: any, res: any) => {
         outletId: true,
         locationId: true,
         createdAt: true 
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     });
     res.json({ staff });
   } catch (error) {

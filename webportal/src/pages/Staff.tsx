@@ -10,7 +10,10 @@ import { getCachedData, setCachedData } from '../lib/cache';
 export default function Staff() {
   const { confirm } = useConfirm();
   const { activeLocationId } = useBranchContext();
-  const cacheKey = `staff_${activeLocationId || 'ALL'}`;
+  const validLocation = (!activeLocationId || activeLocationId === 'ALL' || activeLocationId === 'undefined' || activeLocationId === 'null') 
+    ? 'ALL' 
+    : activeLocationId;
+  const cacheKey = `staff_${validLocation}`;
   const [staff, setStaff] = useState<any[]>(() => getCachedData(cacheKey, []));
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,7 +24,7 @@ export default function Staff() {
       setIsRefreshing(true);
       const token = localStorage.getItem('whiz-token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-      const query = activeLocationId === 'ALL' ? '' : `?locationId=${activeLocationId}`;
+      const query = validLocation === 'ALL' ? '' : `?locationId=${validLocation}`;
       const response = await fetch(`${API_BASE_URL}/api/dashboard/staff${query}`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -44,7 +47,7 @@ export default function Staff() {
   useEffect(() => {
     setStaff(getCachedData(cacheKey, []));
     fetchStaff();
-  }, [activeLocationId, cacheKey]);
+  }, [validLocation, cacheKey]);
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
       title: 'Confirm Action',

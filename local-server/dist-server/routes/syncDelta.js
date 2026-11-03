@@ -573,9 +573,10 @@ router.post('/', async (req, res) => {
                             invExistingQuery = invExistingQuery.where('outletId', 'is', null);
                         const invExisting = await invExistingQuery.executeTakeFirst();
                         let stockChange = Number(m.quantity);
-                        if (m.type === 'SALE' || m.type === 'TRANSFER_OUT' || m.type === 'ADJUSTMENT_DOWN' || m.type === 'subtract')
+                        const mType = String(m.type || '').toUpperCase();
+                        if (['SALE', 'TRANSFER_OUT', 'ADJUSTMENT_DOWN', 'SUBTRACT', 'OUT'].includes(mType))
                             stockChange = -Math.abs(stockChange);
-                        else if (m.type === 'TRANSFER_IN' || m.type === 'PO' || m.type === 'INITIAL' || m.type === 'RETURN' || m.type === 'ADJUSTMENT_UP' || m.type === 'add')
+                        else if (['TRANSFER_IN', 'PO', 'INITIAL', 'RETURN', 'ADJUSTMENT_UP', 'ADD', 'IN'].includes(mType))
                             stockChange = Math.abs(stockChange);
                         if (invExisting) {
                             await db.updateTable('ProductInventory')

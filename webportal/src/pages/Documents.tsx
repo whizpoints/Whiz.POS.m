@@ -149,6 +149,24 @@ export default function InvoiceGenerator() {
 
   // Fetch saved clients and documents on load
   useEffect(() => {
+    // Immediate hydration from tenant-specific cache
+    try {
+      const userStr = localStorage.getItem('whiz-user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        const bId = u.businessId || u.id;
+        if (bId) {
+          const cached = localStorage.getItem(`whiz-documents-${bId}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              usePosStore.setState({ documents: parsed });
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('whiz-token');
@@ -156,36 +174,74 @@ export default function InvoiceGenerator() {
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
         const headers = { 'Authorization': `Bearer ${token}` };
         
-        const [clientsRes, docsRes, profileRes] = await Promise.all([
+        const [clientsRes, customersRes, docsRes, profileRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/clients`, { headers }),
+          fetch(`${API_BASE_URL}/api/customers`, { headers }),
           fetch(`${API_BASE_URL}/api/saved-documents`, { headers }),
           fetch(`${API_BASE_URL}/api/business/profile`, { headers })
         ]);
+
+        let unifiedClients: any[] = [];
         if (clientsRes.ok) {
            const clients = await clientsRes.json();
-           usePosStore.setState({ creditCustomers: clients });
+           if (Array.isArray(clients)) unifiedClients.push(...clients);
         }
+        if (customersRes.ok) {
+           const customers = await customersRes.json();
+           if (Array.isArray(customers)) {
+             customers.forEach(c => {
+               if (!unifiedClients.some(existing => existing.name === c.name || (c.id && existing.id === c.id))) {
+                 unifiedClients.push(c);
+               }
+             });
+           }
+        }
+        if (unifiedClients.length > 0) {
+           usePosStore.setState({ creditCustomers: unifiedClients });
+        }
+
         if (docsRes.ok) {
            const docs = await docsRes.json();
-           usePosStore.setState({ documents: docs.map((d: any) => ({
-             id: d.id,
-             type: d.type,
-             name: d.customerName || `Untitled ${d.type}`,
-             date: d.date,
-             data: {
-               ...d.metadata,
-               items: d.items,
-               subtotal: d.subtotal,
-               taxAmount: d.tax,
-               total: d.total,
-               notes: d.notes,
-               clientName: d.customerName,
-               clientCompany: d.customerName,
-               clientEmail: d.customerEmail,
-               clientAddress: d.customerAddress,
+           const formattedDocs = (Array.isArray(docs) ? docs : []).map((d: any) => {
+             const meta = d.metadata || {};
+             const docItems = (Array.isArray(d.items) && d.items.length > 0) ? d.items : (meta.items || []);
+             return {
+               id: d.id,
+               type: d.type || meta.docType || 'INVOICE',
+               name: d.customerName || meta.customerName || meta.clientCompany || meta.clientName || `Untitled ${d.type}`,
+               date: d.date || meta.date || new Date().toISOString(),
+               status: d.status,
+               data: {
+                 ...meta,
+                 docNumber: meta.docNumber || d.id,
+                 date: meta.date || (d.date ? String(d.date).split('T')[0] : new Date().toISOString().split('T')[0]),
+                 dueDate: meta.dueDate || (d.dueDate ? String(d.dueDate).split('T')[0] : ''),
+                 items: docItems,
+                 subtotal: Number(d.subtotal ?? meta.subtotal ?? 0),
+                 taxAmount: Number(d.tax ?? meta.taxAmount ?? 0),
+                 total: Number(d.total ?? meta.total ?? 0),
+                 notes: d.notes ?? meta.notes ?? '',
+                 clientName: d.customerName || meta.clientName || '',
+                 clientCompany: d.customerName || meta.clientCompany || '',
+                 clientEmail: d.customerEmail || meta.clientEmail || '',
+                 clientAddress: d.customerAddress || meta.clientAddress || '',
+               }
+             };
+           });
+           usePosStore.setState({ documents: formattedDocs });
+
+           try {
+             const userStr = localStorage.getItem('whiz-user');
+             if (userStr) {
+               const u = JSON.parse(userStr);
+               const bId = u.businessId || u.id;
+               if (bId) {
+                 localStorage.setItem(`whiz-documents-${bId}`, JSON.stringify(formattedDocs));
+               }
              }
-           })) });
+           } catch (e) {}
         }
+
         if (profileRes.ok) {
            const profile = await profileRes.json();
            try {
@@ -195,7 +251,7 @@ export default function InvoiceGenerator() {
            if (profile.settings?.documentDefaults) {
              usePosStore.setState({ documentSettings: profile.settings.documentDefaults });
            } else {
-             // CRITICAL FIX: Reset documentSettings to clean, tenant-isolated defaults
+             // Reset documentSettings to clean, tenant-isolated defaults
              const defaultBizPayment = profile.settings?.mpesaTill
                ? `M-PESA TILL: ${profile.settings.mpesaTill}\nBUSINESS: ${profile.name}`
                : (profile.phone ? `M-PESA: ${profile.phone}\nBUSINESS: ${profile.name}` : '');
@@ -222,7 +278,23 @@ export default function InvoiceGenerator() {
     setIsSavingDoc(true);
     const docData = { docNumber, date, dueDate, clientName, clientCompany, clientAddress, clientEmail, items, subtotal, taxAmount, total, taxRate, notes, paymentInfo, subject, bodyText: templateString, partialAmount, settlementDate, daysNotice, paymentMode, projectReference, branding: { logoImage, headerImage, backgroundImage: showWatermark ? backgroundImage : null, useCustomHeader } };
     const newDocId = currentDocId || `DOC${Date.now()}`;
-    const apiDoc = { id: newDocId, type: docType, date: new Date().toISOString(), customerName: clientCompany || clientName || 'Unknown', customerEmail: clientEmail, customerPhone: clientAddress, customerAddress: clientAddress, items: items, subtotal: subtotal, tax: taxAmount, total: total, notes: notes, status: 'DRAFT', metadata: docData };
+    const apiDoc = { 
+      id: newDocId, 
+      type: docType, 
+      date: new Date(date).toISOString(), 
+      dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+      customerName: clientCompany || clientName || 'Unknown', 
+      customerEmail: clientEmail, 
+      customerPhone: clientAddress, 
+      customerAddress: clientAddress, 
+      items: items, 
+      subtotal: Number(subtotal) || 0, 
+      tax: Number(taxAmount) || 0, 
+      total: Number(total) || 0, 
+      notes: notes, 
+      status: 'DRAFT', 
+      metadata: docData 
+    };
     
     try {
         const token = localStorage.getItem('whiz-token');
@@ -234,10 +306,29 @@ export default function InvoiceGenerator() {
         });
         if (res.ok) {
             const savedDoc = await res.json();
-            const localFormat: SavedDocument = { id: savedDoc.id, type: savedDoc.type, name: savedDoc.customerName || `Untitled ${savedDoc.type}`, date: savedDoc.date, data: docData };
+            const localFormat: SavedDocument = { 
+              id: savedDoc.id, 
+              type: savedDoc.type, 
+              name: savedDoc.customerName || clientCompany || clientName || `Untitled ${savedDoc.type}`, 
+              date: savedDoc.date, 
+              data: docData 
+            };
             saveDocument(localFormat);
             setCurrentDocId(savedDoc.id);
-            toast.success('Document saved permanently to Neon Database!');
+
+            try {
+              const userStr = localStorage.getItem('whiz-user');
+              if (userStr) {
+                const u = JSON.parse(userStr);
+                const bId = u.businessId || u.id;
+                if (bId) {
+                  const existingDocs = usePosStore.getState().documents;
+                  localStorage.setItem(`whiz-documents-${bId}`, JSON.stringify(existingDocs));
+                }
+              }
+            } catch (e) {}
+
+            toast.success('Document saved successfully!');
         } else { toast.error('Failed to save document to cloud.'); }
     } catch (e) { toast.error('Network error saving document.'); } finally { setIsSavingDoc(false); }
   };
@@ -261,42 +352,45 @@ export default function InvoiceGenerator() {
         if (res.ok) {
             const savedClient = await res.json();
             usePosStore.setState((s: any) => ({ creditCustomers: [...s.creditCustomers, savedClient] }));
-            toast.success('Client permanently saved to Neon Database!');
+            toast.success('Client saved successfully!');
         } else { const err = await res.json(); toast.error(err.error || 'Failed to save client to cloud.'); }
     } catch (e) { toast.error('Network error saving client.'); } finally { setIsSavingClient(false); }
   };
 
   const handleLoadDocument = (doc: SavedDocument) => {
-    const d = doc.data;
-    setDocType(doc.type as DocumentType);
-    setDocNumber(d.docNumber);
-    setDate(d.date);
-    setDueDate(d.dueDate);
-    setClientName(d.clientName);
-    setClientCompany(d.clientCompany);
-    setClientAddress(d.clientAddress);
-    setClientEmail(d.clientEmail);
-    setItems(d.items || []);
-    setNotes(d.notes);
-    setPaymentInfo(d.paymentInfo);
-    setSubject(d.subject);
-    setTemplateString(d.bodyText);
-    setPartialAmount(d.partialAmount);
-    setSettlementDate(d.settlementDate);
-    setDaysNotice(d.daysNotice);
-    setPaymentMode(d.paymentMode);
-    setProjectReference(d.projectReference);
+    const d = doc.data || {};
+    setDocType((doc.type || d.type || 'INVOICE') as DocumentType);
+    setDocNumber(d.docNumber || doc.id || `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`);
+    setDate(d.date ? String(d.date).split('T')[0] : new Date().toISOString().split('T')[0]);
+    setDueDate(d.dueDate ? String(d.dueDate).split('T')[0] : '');
+    setClientName(d.clientName || d.clientCompany || doc.name || '');
+    setClientCompany(d.clientCompany || d.clientName || doc.name || '');
+    setClientAddress(d.clientAddress || '');
+    setClientEmail(d.clientEmail || '');
+    setItems((d.items && Array.isArray(d.items) && d.items.length > 0) ? d.items : [
+      { id: '1', description: 'Service / Product Description', quantity: 1, price: 0 }
+    ]);
+    setNotes(d.notes || 'Thank you for your business!');
+    setPaymentInfo(d.paymentInfo || '');
+    setSubject(d.subject || '');
+    setTemplateString(d.bodyText || '');
+    setPartialAmount(d.partialAmount || 0);
+    setSettlementDate(d.settlementDate || '');
+    setDaysNotice(d.daysNotice || 7);
+    setPaymentMode(d.paymentMode || '');
+    setProjectReference(d.projectReference || '');
 
     if (d.branding) {
-      setLogoImage(d.branding.logoImage);
-      setHeaderImage(d.branding.headerImage);
-      setBackgroundImage(d.branding.backgroundImage);
+      setLogoImage(d.branding.logoImage || null);
+      setHeaderImage(d.branding.headerImage || null);
+      setBackgroundImage(d.branding.backgroundImage || null);
       setShowWatermark(!!d.branding.backgroundImage);
-      setUseCustomHeader(d.branding.useCustomHeader);
+      setUseCustomHeader(!!d.branding.useCustomHeader);
     }
 
     setCurrentDocId(doc.id);
     setShowSavedDocs(false);
+    toast.success(`Loaded document ${doc.name || doc.id}`);
   };
 
   const handleDeleteDocument = async (id: string, e: React.MouseEvent) => {
@@ -306,8 +400,28 @@ export default function InvoiceGenerator() {
       message: 'Are you sure you want to delete this saved document?'
     });
     if (confirmed) {
+      try {
+        const token = localStorage.getItem('whiz-token');
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+        await fetch(`${API_BASE_URL}/api/saved-documents/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch (e) {}
       deleteDocument(id);
       if (currentDocId === id) setCurrentDocId(null);
+      try {
+        const userStr = localStorage.getItem('whiz-user');
+        if (userStr) {
+          const u = JSON.parse(userStr);
+          const bId = u.businessId || u.id;
+          if (bId) {
+            const currentDocs = usePosStore.getState().documents.filter((d: any) => d.id !== id);
+            localStorage.setItem(`whiz-documents-${bId}`, JSON.stringify(currentDocs));
+          }
+        }
+      } catch (e) {}
+      toast.success('Document deleted');
     }
   };
 
@@ -510,13 +624,14 @@ export default function InvoiceGenerator() {
               </div>
             </div>
             <div className="max-h-[60vh] overflow-y-auto p-2">
-              {creditCustomers.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase())).map(client => (
+              {creditCustomers.filter(c => c && c.name && c.name.toLowerCase().includes(clientSearch.toLowerCase())).map(client => (
                 <button
-                  key={client.id}
+                  key={client.id || Math.random().toString()}
                   onClick={() => {
-                    setClientCompany(client.name);
+                    setClientCompany(client.name || '');
+                    setClientName(client.name || '');
                     setClientEmail(client.email || '');
-                    setClientAddress(client.phone || '');
+                    setClientAddress(client.phone || client.address || '');
                     setShowClientModal(false);
                   }}
                   className="w-full text-left p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0"
@@ -551,11 +666,11 @@ export default function InvoiceGenerator() {
                        <div key={doc.id} onClick={() => handleLoadDocument(doc)} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group">
                           <div className="flex items-center gap-3">
                              <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center text-sky-600 font-bold text-xs uppercase">
-                               {doc.type.substring(0, 3)}
+                               {(doc.type || 'DOC').substring(0, 3)}
                              </div>
                              <div>
-                                <div className="font-medium text-slate-800">{doc.name}</div>
-                                <div className="text-xs text-slate-500">{new Date(doc.date).toLocaleDateString()} • {doc.id}</div>
+                                <div className="font-medium text-slate-800">{doc.name || 'Untitled Document'}</div>
+                                <div className="text-xs text-slate-500">{doc.date ? new Date(doc.date).toLocaleDateString() : 'Recent'} • {doc.id}{doc.status ? ` • ${doc.status}` : ''}</div>
                              </div>
                           </div>
                           <button onClick={(e) => handleDeleteDocument(doc.id, e)} className="p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
