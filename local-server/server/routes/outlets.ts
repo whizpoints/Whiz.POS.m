@@ -231,9 +231,41 @@ router.put('/:id', async (req: any, res: any) => {
 // 6. Delete Outlet
 router.delete('/:id', async (req: any, res: any) => {
   try {
+    const outletId = req.params.id;
+    const businessId = await getLocalBusinessId(req.user);
+
     await db.deleteFrom('Outlet')
-      .where('id', '=', req.params.id)
+      .where('id', '=', outletId)
       .execute();
+
+    // Record deletion tombstone in Business.settings so future syncs never resurrect it
+    if (businessId) {
+      const b = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
+      if (b) {
+        let settings: any = {};
+        try { settings = typeof b.settings === 'string' ? JSON.parse(b.settings) : (b.settings || {}); } catch(e) {}
+        const deletedOutletIds = Array.isArray(settings.deletedOutletIds) ? settings.deletedOutletIds : [];
+        if (!deletedOutletIds.includes(outletId)) {
+          deletedOutletIds.push(outletId);
+          settings.deletedOutletIds = deletedOutletIds;
+          await db.updateTable('Business').set({
+            settings: JSON.stringify(settings),
+            updatedAt: new Date().toISOString()
+          }).where('id', '=', businessId).execute();
+        }
+
+        // Forward deletion directly to Cloud if connected
+        const CLOUD_API = (process.env.CLOUD_API_URL || settings.backOfficeUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+        const apiKey = settings.backOfficeApiKey || b.apiKey;
+        if (CLOUD_API && apiKey) {
+          fetch(`${CLOUD_API}/api/outlets/${outletId}`, {
+            method: 'DELETE',
+            headers: { 'x-api-key': apiKey, 'Authorization': `Bearer ${apiKey}` }
+          }).catch(e => console.error('[Outlets] Forward delete to cloud failed:', e.message));
+        }
+      }
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('Outlets DELETE error:', error);

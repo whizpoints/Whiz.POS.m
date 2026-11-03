@@ -207,6 +207,11 @@ router.get('/', async (req: any, res: any) => {
         terminals,
         clients,
         savedDocuments,
+        deletedOutletIds: (() => {
+          let bSettings: any = {};
+          try { bSettings = typeof businessData?.settings === 'string' ? JSON.parse(businessData.settings) : (businessData?.settings || {}); } catch(e) {}
+          return Array.isArray(bSettings.deletedOutletIds) ? bSettings.deletedOutletIds : [];
+        })(),
         businessSetup: businessData && new Date(businessData.updatedAt) > sinceDate ? (() => {
           let bSettings: any = {};
           try { bSettings = typeof businessData.settings === 'string' ? JSON.parse(businessData.settings) : (businessData.settings || {}); } catch(e) {}
@@ -257,7 +262,7 @@ router.get('/', async (req: any, res: any) => {
 router.post('/', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, outlets, terminals, businessSetup, documents, savedDocuments, clients, mpesaConfigs, isFromCloud } = req.body;
+    const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, outlets, terminals, businessSetup, documents, savedDocuments, clients, mpesaConfigs, isFromCloud, deletedOutletIds } = req.body;
 
     let targetLocationId: string | null = null;
     let targetOutletId: string | null = null;
@@ -332,31 +337,39 @@ router.post('/', async (req: any, res: any) => {
       return new Date(incoming.updatedAt) > new Date(existing.updatedAt);
     };
 
+    // 0. Deleted Outlets (Tombstones)
+    if (deletedOutletIds && Array.isArray(deletedOutletIds) && deletedOutletIds.length > 0) {
+      await db.deleteFrom('Outlet').where('id', 'in', deletedOutletIds).execute().catch(() => {});
+    }
+
     // 1. Outlets (Synced first so dependent records can reference them)
     if (outlets && Array.isArray(outlets)) {
       for (const o of outlets) {
         if (!o.name) continue;
+        if (Array.isArray(deletedOutletIds) && deletedOutletIds.includes(o.id)) continue;
         const targetLoc = mappedLocalLocationId || targetLocationId || o.locationId;
         const loc = targetLoc ? await db.selectFrom('StoreLocation').selectAll().where('id', '=', targetLoc).executeTakeFirst() : await db.selectFrom('StoreLocation').selectAll().executeTakeFirst();
         if (!loc) continue;
 
         const existing = await db.selectFrom('Outlet').selectAll().where('id', '=', o.id).executeTakeFirst();
-        if (existing) {
-          await db.updateTable('Outlet')
-            .set({ name: o.name, locationId: loc.id, businessId, updatedAt: o.updatedAt || new Date().toISOString() })
-            .where('id', '=', o.id)
-            .execute();
-        } else {
-          await db.insertInto('Outlet')
-            .values({
-              id: o.id,
-              name: o.name,
-              businessId,
-              locationId: loc.id,
-              createdAt: o.createdAt || new Date().toISOString(),
-              updatedAt: o.updatedAt || new Date().toISOString()
-            })
-            .execute();
+        if (resolveConflict(o, existing)) {
+          if (existing) {
+            await db.updateTable('Outlet')
+              .set({ name: o.name, locationId: loc.id, businessId, updatedAt: o.updatedAt || new Date().toISOString() })
+              .where('id', '=', o.id)
+              .execute();
+          } else {
+            await db.insertInto('Outlet')
+              .values({
+                id: o.id,
+                name: o.name,
+                businessId,
+                locationId: loc.id,
+                createdAt: o.createdAt || new Date().toISOString(),
+                updatedAt: o.updatedAt || new Date().toISOString()
+              })
+              .execute();
+          }
         }
       }
     }
@@ -403,21 +416,46 @@ router.post('/', async (req: any, res: any) => {
         
         const existing = await db.selectFrom('User').selectAll().where('email', '=', fallbackEmail).executeTakeFirst();
         if (resolveConflict(u, existing)) {
+            // Robust role normalization (handles 'ADMIN', 'admin', 'SYSTEM_ADMIN', etc.)
+            const rawUpper = String(u.role || '').trim().toUpperCase();
             let role = 'CASHIER';
-            if (u.role === 'SYSTEM_ADMIN' || u.role === 'Admin') role = 'ADMIN';
-            else if (u.role === 'STORE_MANAGER' || u.role === 'Manager') role = 'MANAGER';
+            if (['ADMIN', 'SYSTEM_ADMIN', 'ADMINISTRATOR', 'OWNER'].includes(rawUpper)) {
+              role = 'ADMIN';
+            } else if (['MANAGER', 'STORE_MANAGER'].includes(rawUpper)) {
+              role = 'MANAGER';
+            } else if (['SUPER_ADMIN', 'SUPERADMIN'].includes(rawUpper)) {
+              role = 'SUPER_ADMIN';
+            }
 
-            await db.insertInto('User')
-// @ts-ignore
-.values({
+            // CRITICAL SAFEGUARD: Never demote an existing Admin or Manager to Cashier via background sync
+            if (existing) {
+              const existingRoleUpper = String(existing.role || '').trim().toUpperCase();
+              if (role === 'CASHIER' && ['ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(existingRoleUpper)) {
+                role = existingRoleUpper;
+              }
+            }
+
+            const nowIso = (u.updatedAt ? new Date(u.updatedAt) : new Date()).toISOString();
+            if (existing) {
+              await db.updateTable('User').set({
+                name: u.name,
+                role: role as any,
+                locationId: targetLocationId || existing.locationId,
+                updatedAt: nowIso
+              }).where('email', '=', fallbackEmail).execute();
+            } else {
+              await db.insertInto('User').values({
                 id: u.id || randomUUID(),
-                businessId, locationId: targetLocationId, email: fallbackEmail,
-                password: u.pin || 'pos1234', name: u.name, role: role as any,
-                updatedAt: (u.updatedAt ? new Date(u.updatedAt) : new Date()).toISOString()
-              }).onConflict((oc) => oc.column('email').doUpdateSet({
-                name: u.name, role: role as any, locationId: targetLocationId,
-                updatedAt: (u.updatedAt ? new Date(u.updatedAt) : new Date()).toISOString()
-              })).execute();
+                businessId,
+                locationId: targetLocationId,
+                email: fallbackEmail,
+                password: u.pin || 'pos1234',
+                name: u.name,
+                role: role as any,
+                createdAt: nowIso,
+                updatedAt: nowIso
+              }).execute();
+            }
             results.users++;
         } else {
             results.skipped++;
@@ -865,30 +903,42 @@ router.post('/', async (req: any, res: any) => {
        }
     }
     
-    // Update business settings safely by merging
+    // Update business settings safely by merging (never overwrite with empty values)
     if (businessSetup) {
        const b = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
        if (b) {
-           let currentSettings = {};
+           let currentSettings: any = {};
            if (b.settings) {
                try {
                    currentSettings = typeof b.settings === 'string' ? JSON.parse(b.settings) : b.settings;
                } catch (e) {}
            }
            // Ensure businessSetup is an object
-           const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : businessSetup;
+           const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : { ...businessSetup };
            
-             // Prevent terminals from poisoning the server with their local terminal-specific properties
-             delete incomingSetup.apiKey;
-             delete incomingSetup.terminalName;
-             delete incomingSetup.outletId;
-             delete incomingSetup.deviceRole;
-             delete incomingSetup.lanAdminIp;
-             delete incomingSetup.apiUrl;
-             delete incomingSetup.isLoggedIn;
-             delete incomingSetup.isSetup;
+           // Prevent terminals from poisoning the server with their local terminal-specific properties
+           delete incomingSetup.apiKey;
+           delete incomingSetup.terminalName;
+           delete incomingSetup.outletId;
+           delete incomingSetup.deviceRole;
+           delete incomingSetup.lanAdminIp;
+           delete incomingSetup.apiUrl;
+           delete incomingSetup.isLoggedIn;
+           delete incomingSetup.isSetup;
 
-             const mergedSettings = { ...currentSettings, ...incomingSetup };
+           // Clean incoming values so empty strings do not wipe existing settings
+           const cleanIncoming: any = {};
+           for (const [k, v] of Object.entries(incomingSetup)) {
+             if (v !== undefined && v !== null && v !== '') {
+               if (typeof v === 'object' && !Array.isArray(v) && currentSettings[k] && typeof currentSettings[k] === 'object') {
+                 cleanIncoming[k] = { ...currentSettings[k], ...v };
+               } else {
+                 cleanIncoming[k] = v;
+               }
+             }
+           }
+
+           const mergedSettings = { ...currentSettings, ...cleanIncoming };
            
            const updateBiz: any = { 
              settings: JSON.stringify(mergedSettings), 

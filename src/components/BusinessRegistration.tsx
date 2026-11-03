@@ -4,7 +4,7 @@ import { usePosStore } from '../store/posStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Server, HardDrive, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { soundManager } from '../lib/soundUtils';
-import setupBg from '../assets/setup_install_bg.png';
+import authBgImage from '../assets/auth-bg.jpg';
 import toast from 'react-hot-toast';
 
 export default function BusinessRegistration() {
@@ -163,11 +163,16 @@ export default function BusinessRegistration() {
   };
 
   return (
-    <div 
-      className="min-h-screen bg-cover bg-center flex items-center justify-center p-4 relative"
-      style={{ backgroundImage: `url(${setupBg})` }}
-    >
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden select-none">
+      {/* Full Landscape Background Image (dimmed & responsive across all screens) */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={authBgImage}
+          alt="Terminal Setup Background"
+          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+        />
+        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+      </div>
       
       <div className="relative z-10 w-full max-w-4xl bg-slate-900/80 border border-slate-700 shadow-2xl rounded-3xl overflow-hidden flex flex-col md:flex-row min-h-[600px]">
         {/* Left Side Branding */}

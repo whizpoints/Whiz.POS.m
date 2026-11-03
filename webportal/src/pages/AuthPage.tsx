@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Mail, Lock, Building2, ArrowRight, Eye, EyeOff, LogOut, CheckCircle2, ShieldCheck, Activity, CreditCard, PieChart, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import authBgImage from '../assets/auth-bg.jpg';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -170,13 +171,23 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-[#F7F9FC] lg:bg-white font-sans selection:bg-[#0A9EF5]/30 selection:text-white overflow-hidden">
+    <div className="min-h-screen w-full flex relative font-sans selection:bg-[#0A9EF5]/30 selection:text-white overflow-hidden bg-slate-950">
       
+      {/* Full Landscape Background Image (dimmed & responsive across all mobile, tablet, desktop) */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={authBgImage}
+          alt="Retail Checkout Background"
+          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+        />
+        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+      </div>
+
       {/* ========================================================= */}
       {/* LEFT PANEL - PREMIUM SAAS BRANDING (DESKTOP) */}
       {/* ========================================================= */}
-      <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 xl:p-16" 
-           style={{ background: `linear-gradient(135deg, ${colors.primaryNavy} 0%, ${colors.darkIndigo} 50%, ${colors.primaryBlue} 100%)` }}>
+      <div className="hidden lg:flex lg:w-[45%] relative z-10 overflow-hidden flex-col justify-between p-12 xl:p-16 border-r border-white/10" 
+           style={{ background: 'linear-gradient(135deg, rgba(7, 24, 63, 0.88) 0%, rgba(21, 27, 85, 0.82) 50%, rgba(10, 158, 245, 0.78) 100%)', backdropFilter: 'blur(8px)' }}>
         
         {/* Animated Glowing Orbs */}
         <div className="absolute inset-0 z-0 overflow-hidden opacity-60">
@@ -209,7 +220,7 @@ export default function AuthPage() {
           </p>
 
           {/* Floating UI Mockup */}
-          <div className="relative w-[110%] max-w-[600px] bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl transform rotate-[-2deg] transition-transform hover:rotate-0 duration-500">
+          <div className="relative w-[110%] max-w-[600px] bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl transform rotate-[-2deg] transition-transform hover:rotate-0 duration-500">
              <div className="flex items-center gap-2 mb-4 border-b border-white/10 pb-3">
                 <div className="flex gap-1.5">
                    <div className="w-3 h-3 rounded-full bg-red-400/80"></div>
@@ -251,17 +262,17 @@ export default function AuthPage() {
       {/* ========================================================= */}
       {/* RIGHT PANEL - AUTHENTICATION CONTENT */}
       {/* ========================================================= */}
-      <div className="flex-1 flex flex-col p-6 sm:p-12 relative overflow-y-auto bg-[#F7F9FC] lg:bg-white justify-center items-center">
+      <div className="flex-1 flex flex-col p-4 sm:p-8 lg:p-12 relative z-10 overflow-y-auto justify-center items-center">
         
         {/* Mobile Header Logo */}
         <div className="absolute top-6 left-6 lg:hidden flex items-center gap-2 z-20">
-          <div className="w-10 h-10 bg-[#07183F] rounded-[12px] flex items-center justify-center shadow-md">
+          <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-[12px] flex items-center justify-center border border-white/20 shadow-md">
              <img src="/logo.png" alt="WhizPOS" className="w-6 h-6 brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           </div>
-          <h1 className="text-xl font-black text-[#07183F] tracking-tight">Whiz<span style={{ color: colors.primaryBlue }}>POS</span></h1>
+          <h1 className="text-xl font-black text-white tracking-tight">Whiz<span style={{ color: colors.cyan }}>POS</span></h1>
         </div>
 
-        <div className="w-full max-w-[440px] mx-auto pt-16 lg:pt-0 pb-8">
+        <div className="w-full max-w-[460px] mx-auto pt-16 lg:pt-0 pb-8 bg-white/95 backdrop-blur-xl border border-white/40 shadow-2xl rounded-3xl p-6 sm:p-8 my-auto">
           
           {isSuspended && (
             <div className="mb-6 p-4 bg-[#FF2A55]/10 border border-[#FF2A55]/20 rounded-[16px] flex items-start gap-3 animate-in fade-in slide-in-from-top-4">

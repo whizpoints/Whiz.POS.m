@@ -6,6 +6,7 @@ import {
   CreditCard, CheckCircle2, Cloud
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import authBgImage from '../assets/auth-bg.jpg';
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
@@ -241,9 +242,19 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col md:flex-row bg-white">
+    <div className="min-h-screen relative flex flex-col md:flex-row bg-slate-950 overflow-hidden items-stretch">
+      {/* Full Landscape Background Image (dimmed & responsive across all screens) */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={authBgImage}
+          alt="Retail Checkout Background"
+          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+        />
+        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+      </div>
+
       {/* Split Screen - Left Side */}
-      <div className="hidden md:flex md:w-5/12 p-12 flex-col justify-center items-start text-white relative overflow-hidden" style={{ background: 'var(--accent-primary)' }}>
+      <div className="hidden md:flex md:w-5/12 p-12 flex-col justify-center items-start text-white relative z-10 overflow-hidden border-r border-white/10" style={{ background: 'linear-gradient(135deg, rgba(7, 24, 63, 0.88) 0%, rgba(21, 27, 85, 0.82) 50%, rgba(10, 158, 245, 0.78) 100%)', backdropFilter: 'blur(8px)' }}>
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
         <div className="relative z-10 w-full">
           <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mb-8 backdrop-blur-sm border border-white/20">
@@ -261,18 +272,18 @@ export default function AuthPage() {
       </div>
 
       {/* Split Screen - Right Side */}
-      <div className="w-full md:w-7/12 flex items-center justify-center p-4 sm:p-8 sm:py-12 bg-gray-50">
+      <div className="w-full md:w-7/12 flex items-center justify-center p-4 sm:p-8 sm:py-12 relative z-10">
         <div className="w-full max-w-[500px] relative z-10 transition-all duration-500">
           
           {/* Mobile Header (Hidden on Desktop) */}
           <div className="md:hidden flex flex-col items-center justify-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm bg-white border border-gray-100">
-               <img src="/logo.png" alt="Whiz POS" className="w-10 h-10" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm bg-white/10 backdrop-blur-md border border-white/20">
+               <img src="/logo.png" alt="Whiz POS" className="w-10 h-10 brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-center text-gray-900">
+            <h1 className="text-2xl font-bold tracking-tight text-center text-white">
               {businessData?.name ? businessData.name : 'Whiz Local Server'}
             </h1>
-            <p className="text-sm mt-2 text-center text-gray-500">
+            <p className="text-sm mt-2 text-center text-slate-300">
               {isLogin ? 'Secure access to your back office' : 'Initialize your local environment'}
             </p>
           </div>

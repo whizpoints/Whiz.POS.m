@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Monitor, CheckCircle, XCircle, Loader2, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
+import authBgImage from '../assets/auth-bg.jpg';
 
 export default function ConnectServer() {
   const { requestId } = useParams();
@@ -96,25 +97,54 @@ export default function ConnectServer() {
   };
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center bg-gray-50">
-      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+    <div className="flex h-screen items-center justify-center relative overflow-hidden bg-slate-950 p-4">
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={authBgImage}
+          alt="Connecting"
+          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+        />
+        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+      </div>
+      <div className="relative z-10 bg-white/95 backdrop-blur-xl p-8 rounded-2xl shadow-2xl border border-white/20 flex flex-col items-center">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-3" />
+        <p className="text-slate-700 font-semibold text-sm">Validating connection request...</p>
+      </div>
     </div>
   );
 
   if (error) return (
-    <div className="flex h-screen items-center justify-center bg-gray-50">
-      <div className="bg-white p-8 rounded-2xl shadow max-w-md w-full text-center">
+    <div className="flex h-screen items-center justify-center relative overflow-hidden bg-slate-950 p-4">
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={authBgImage}
+          alt="Connecting"
+          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+        />
+        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+      </div>
+      <div className="relative z-10 bg-white/95 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border border-white/30">
         <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold mb-2">Connection Failed</h2>
-        <p className="text-gray-600 mb-6">{error}</p>
-        <button onClick={() => navigate('/dashboard')} className="btn btn-primary w-full">Back to Dashboard</button>
+        <h2 className="text-xl font-bold mb-2 text-slate-900">Connection Failed</h2>
+        <p className="text-slate-600 mb-6">{error}</p>
+        <button onClick={() => navigate('/dashboard')} className="btn btn-primary w-full py-3 rounded-xl font-semibold">Back to Dashboard</button>
       </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen items-center justify-center bg-slate-50 p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 max-w-md w-full relative overflow-hidden">
+    <div className="min-h-screen relative flex items-center justify-center bg-slate-950 p-4 overflow-hidden">
+      {/* Full Landscape Background Image (dimmed & responsive across all screens) */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={authBgImage}
+          alt="Device Pairing Background"
+          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+        />
+        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+      </div>
+
+      <div className="relative z-10 bg-white/95 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/40 max-w-md w-full overflow-hidden my-auto">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
         
         <div className="flex justify-center mb-6 relative">

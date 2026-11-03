@@ -937,17 +937,29 @@ router.post('/full', (req: any, res: any) => {
         if (!u.name) continue;
         const fallbackEmail = u.email || `${u.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${u.id}@pos.local`;
         
-        // Map POS roles to Cloud Roles
+        // Robust role normalization (handles 'ADMIN', 'admin', 'SYSTEM_ADMIN', etc.)
+        const rawUpper = String(u.role || '').trim().toUpperCase();
         let role = 'CASHIER';
-        if (u.role === 'SYSTEM_ADMIN' || u.role === 'Admin') role = 'ADMIN';
-        else if (u.role === 'STORE_MANAGER' || u.role === 'Manager') role = 'MANAGER';
+        if (['ADMIN', 'SYSTEM_ADMIN', 'ADMINISTRATOR', 'OWNER'].includes(rawUpper)) {
+          role = 'ADMIN';
+        } else if (['MANAGER', 'STORE_MANAGER'].includes(rawUpper)) {
+          role = 'MANAGER';
+        } else if (['SUPER_ADMIN', 'SUPERADMIN'].includes(rawUpper)) {
+          role = 'SUPER_ADMIN';
+        }
 
         const existingUser = await db.selectFrom('User').selectAll().where('email', '=', fallbackEmail).executeTakeFirst();
         if (existingUser) {
+          // Never downgrade an existing Admin/Manager to Cashier on automatic terminal sync
+          const existingRoleUpper = String(existingUser.role || '').trim().toUpperCase();
+          if (role === 'CASHIER' && ['ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(existingRoleUpper)) {
+            role = existingRoleUpper;
+          }
           await db.updateTable('User').set({
             name: u.name,
             role: role as any,
-            locationId: targetLocationId
+            locationId: targetLocationId,
+            updatedAt: new Date().toISOString()
           }).where('email', '=', fallbackEmail).execute();
         } else {
           await db.insertInto('User').values({ id: randomUUID(),
@@ -956,7 +968,9 @@ router.post('/full', (req: any, res: any) => {
             email: fallbackEmail,
             password: u.pin || 'pos1234',
             name: u.name,
-            role: role as any
+            role: role as any,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           }).execute();
         }
         syncedUsers++;
@@ -1083,9 +1097,39 @@ router.post('/full', (req: any, res: any) => {
        }
     }
 
-    // Update settings if provided
+    // Update settings safely by merging (never raw overwrite or erase existing server settings)
     if (businessSetup) {
-       await db.updateTable('Business').set({ settings: JSON.stringify(businessSetup) }).where('id', '=', businessId).execute();
+       const b = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
+       if (b) {
+           let currentSettings: any = {};
+           try { currentSettings = typeof b.settings === 'string' ? JSON.parse(b.settings) : (b.settings || {}); } catch(e) {}
+           const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : { ...businessSetup };
+           
+           // Strip terminal-specific attributes so terminals don't poison the server
+           delete incomingSetup.apiKey;
+           delete incomingSetup.terminalName;
+           delete incomingSetup.outletId;
+           delete incomingSetup.deviceRole;
+           delete incomingSetup.lanAdminIp;
+           delete incomingSetup.apiUrl;
+           delete incomingSetup.isLoggedIn;
+           delete incomingSetup.isSetup;
+
+           // Only merge non-empty, non-null values to avoid erasing valid configured server fields
+           const cleanIncoming: any = {};
+           for (const [k, v] of Object.entries(incomingSetup)) {
+              if (v !== undefined && v !== null && v !== '') {
+                 cleanIncoming[k] = v;
+              }
+           }
+
+           const mergedSettings = { ...currentSettings, ...cleanIncoming };
+           await db.updateTable('Business').set({ 
+             settings: JSON.stringify(mergedSettings),
+             updatedAt: new Date().toISOString()
+           }).where('id', '=', businessId).execute();
+       }
+    }
 
        // Sync M-Pesa config from POS settings
        if (businessSetup.mpesaConfig && businessSetup.mpesaConfig.consumerKey) {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Store, ArrowRight, Loader2, CheckCircle2, Server, DownloadCloud } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import authBgImage from '../assets/auth-bg.jpg';
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -134,9 +135,16 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 bg-[#0a0a0a] overflow-hidden">
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px]" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px]" />
+    <div className="min-h-screen relative flex items-center justify-center p-4 bg-slate-950 overflow-hidden">
+      {/* Full Landscape Background Image (dimmed & responsive across all mobile, tablet, desktop) */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={authBgImage}
+          alt="Retail Checkout Background"
+          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+        />
+        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+      </div>
 
       <div className="w-full max-w-xl relative z-10">
         <div className="text-center mb-8">

@@ -5,6 +5,7 @@ import { Shield, ArrowRight, Delete, X, Fingerprint, Monitor } from 'lucide-reac
 import { useToast } from './ui/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { soundManager } from '../lib/soundUtils';
+import authBgImage from '../assets/auth-bg.jpg';
 
 const LoginScreen = () => {
   const { users, setSession, businessSetup } = usePosStore();
@@ -101,7 +102,8 @@ const LoginScreen = () => {
           soundManager.playSuccess();
           toast("Login Successful", "success");
           setSession(result.user, result.token);
-          if (result.user.role === 'ADMIN' || result.user.role === 'MANAGER') {
+          const roleUpper = String(result.user.role || '').toUpperCase();
+          if (['ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(roleUpper)) {
             navigate('/dashboard', { replace: true });
           } else {
             navigate('/', { replace: true });
@@ -116,7 +118,8 @@ const LoginScreen = () => {
         soundManager.playSuccess();
         toast("Login Successful (Dev Mode)", "success");
         setSession(userToLogin, 'dev-token');
-        if (String(userToLogin.role).toUpperCase() === 'ADMIN' || String(userToLogin.role).toUpperCase() === 'MANAGER') {
+        const devRoleUpper = String(userToLogin.role || '').toUpperCase();
+        if (['ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(devRoleUpper)) {
           navigate('/dashboard', { replace: true });
         } else {
           navigate('/', { replace: true });
@@ -133,11 +136,15 @@ const LoginScreen = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center relative overflow-hidden font-sans select-none">
 
-            {/* Background Mesh Gradient */}
-      <div className="absolute inset-0 bg-slate-950">
-        <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_0%,_var(--tw-gradient-stops))] from-cyan-900 via-slate-950 to-slate-950" />
-        <div className="absolute bottom-0 left-[-20%] w-[800px] h-[800px] bg-blue-900/30 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
-        <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-cyan-800/20 rounded-full blur-[100px] mix-blend-screen pointer-events-none" />
+      {/* Full Landscape Background Image (dimmed & responsive across all screen sizes) */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={authBgImage}
+          alt="Retail Checkout Background"
+          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+        />
+        <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-slate-950/70" />
       </div>
 
       {/* Main Container */}

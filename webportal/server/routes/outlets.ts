@@ -147,9 +147,10 @@ router.put('/:id', async (req: any, res: any) => {
   try {
     const businessId = req.user.businessId;
     const { name, locationId } = req.body;
+    const now = new Date();
     const outlet = await prisma.outlet.updateMany({
       where: { id: req.params.id, businessId },
-      data: { ...(name && { name }), ...(locationId && { locationId }) }
+      data: { ...(name && { name }), ...(locationId && { locationId }), updatedAt: now }
     });
     res.json(outlet);
   } catch (error) {
@@ -161,9 +162,27 @@ router.put('/:id', async (req: any, res: any) => {
 router.delete('/:id', async (req: any, res: any) => {
   try {
     const businessId = req.user.businessId;
+    const outletId = req.params.id;
     await prisma.outlet.deleteMany({
-      where: { id: req.params.id, businessId }
+      where: { id: outletId, businessId }
     });
+
+    // Record deletion tombstone in Business.settings so local servers pulling delta know it was deleted
+    const b = await prisma.business.findUnique({ where: { id: businessId } });
+    if (b) {
+      let settings: any = {};
+      try { settings = typeof b.settings === 'string' ? JSON.parse(b.settings) : (b.settings || {}); } catch(e) {}
+      const deletedOutletIds = Array.isArray(settings.deletedOutletIds) ? settings.deletedOutletIds : [];
+      if (!deletedOutletIds.includes(outletId)) {
+        deletedOutletIds.push(outletId);
+        settings.deletedOutletIds = deletedOutletIds;
+        await prisma.business.update({
+          where: { id: businessId },
+          data: { settings: JSON.stringify(settings), updatedAt: new Date() }
+        });
+      }
+    }
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete outlet' });

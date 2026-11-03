@@ -150,6 +150,11 @@ router.get('/', async (req: any, res: any) => {
         mpesaConfigs,
         clients,
         savedDocuments,
+        deletedOutletIds: (() => {
+          let s: any = {};
+          try { s = typeof business?.settings === 'string' ? JSON.parse(business.settings) : (business?.settings || {}); } catch(e) {}
+          return Array.isArray(s.deletedOutletIds) ? s.deletedOutletIds : [];
+        })(),
         businessSetup: business && business.updatedAt > sinceDate ? {
           ...(typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings),
           businessName: business.name
@@ -179,7 +184,8 @@ router.post('/', async (req: any, res: any) => {
       businessSetup,
       clients,
       savedDocuments,
-      documents
+      documents,
+      deletedOutletIds
     } = req.body;
 
     let targetLocationId = undefined;
@@ -219,6 +225,13 @@ router.post('/', async (req: any, res: any) => {
       return new Date(incoming.updatedAt) > new Date(existing.updatedAt);
     };
 
+    // 0. Deleted Outlets (Tombstones)
+    if (deletedOutletIds && Array.isArray(deletedOutletIds) && deletedOutletIds.length > 0) {
+      await prisma.outlet.deleteMany({
+        where: { id: { in: deletedOutletIds }, businessId }
+      }).catch(() => {});
+    }
+
     // 1. Users
     if (users && Array.isArray(users)) {
       for (const u of users) {
@@ -227,20 +240,36 @@ router.post('/', async (req: any, res: any) => {
         
         const existing = await prisma.user.findUnique({ where: { email: fallbackEmail } });
         if (resolveConflict(u, existing)) {
+            // Robust role normalization (handles 'ADMIN', 'admin', 'SYSTEM_ADMIN', etc.)
+            const rawUpper = String(u.role || '').trim().toUpperCase();
             let role = 'CASHIER';
-            if (u.role === 'SYSTEM_ADMIN' || u.role === 'Admin') role = 'ADMIN';
-            else if (u.role === 'STORE_MANAGER' || u.role === 'Manager') role = 'MANAGER';
+            if (['ADMIN', 'SYSTEM_ADMIN', 'ADMINISTRATOR', 'OWNER'].includes(rawUpper)) {
+              role = 'ADMIN';
+            } else if (['MANAGER', 'STORE_MANAGER'].includes(rawUpper)) {
+              role = 'MANAGER';
+            } else if (['SUPER_ADMIN', 'SUPERADMIN'].includes(rawUpper)) {
+              role = 'SUPER_ADMIN';
+            }
 
+            // CRITICAL SAFEGUARD: Never demote an existing Admin or Manager to Cashier via background sync
+            if (existing) {
+              const existingRoleUpper = String(existing.role || '').trim().toUpperCase();
+              if (role === 'CASHIER' && ['ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(existingRoleUpper)) {
+                role = existingRoleUpper;
+              }
+            }
+
+            const now = u.updatedAt ? new Date(u.updatedAt) : new Date();
             await prisma.user.upsert({
               where: { email: fallbackEmail },
               create: {
                 businessId, locationId: targetLocationId, email: fallbackEmail,
                 password: u.pin || 'pos1234', name: u.name, role: role as any,
-                updatedAt: u.updatedAt ? new Date(u.updatedAt) : new Date()
+                updatedAt: now
               },
               update: {
                 name: u.name, role: role as any, locationId: targetLocationId,
-                updatedAt: u.updatedAt ? new Date(u.updatedAt) : new Date()
+                updatedAt: now
               }
             });
             results.users++;
@@ -254,28 +283,32 @@ router.post('/', async (req: any, res: any) => {
     if (outlets && Array.isArray(outlets)) {
       for (const o of outlets) {
         if (!o.name) continue;
+        if (Array.isArray(deletedOutletIds) && deletedOutletIds.includes(o.id)) continue;
         const targetLocId = targetLocationId || o.locationId;
         const loc = (targetLocId && targetLocId !== 'ALL')
           ? (await prisma.storeLocation.findFirst({ where: { id: targetLocId, businessId } }) || await prisma.storeLocation.findFirst({ where: { businessId } }))
           : await prisma.storeLocation.findFirst({ where: { businessId } });
         if (!loc) continue;
 
-        await prisma.outlet.upsert({
-          where: { id: o.id },
-          create: {
-            id: o.id,
-            businessId,
-            locationId: loc.id,
-            name: o.name,
-            createdAt: o.createdAt ? new Date(o.createdAt) : new Date(),
-            updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date()
-          },
-          update: {
-            name: o.name,
-            locationId: loc.id,
-            updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date()
-          }
-        });
+        const existing = await prisma.outlet.findUnique({ where: { id: o.id } });
+        if (resolveConflict(o, existing)) {
+          await prisma.outlet.upsert({
+            where: { id: o.id },
+            create: {
+              id: o.id,
+              businessId,
+              locationId: loc.id,
+              name: o.name,
+              createdAt: o.createdAt ? new Date(o.createdAt) : new Date(),
+              updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date()
+            },
+            update: {
+              name: o.name,
+              locationId: loc.id,
+              updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date()
+            }
+          });
+        }
       }
     }
 
@@ -617,7 +650,7 @@ router.post('/', async (req: any, res: any) => {
       }
     }
     
-    // Update business settings safely by merging
+    // Update business settings safely by merging (never overwrite with empty values)
     if (businessSetup) {
        const b = await prisma.business.findUnique({ where: { id: businessId } });
        if (b) {
@@ -626,8 +659,31 @@ router.post('/', async (req: any, res: any) => {
              if (typeof b.settings === 'string') currentSettings = JSON.parse(b.settings || '{}');
              else if (typeof b.settings === 'object' && b.settings !== null) currentSettings = b.settings;
            } catch(e) {}
-           const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : businessSetup;
-           const mergedSettings = { ...currentSettings, ...incomingSetup };
+           const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : { ...businessSetup };
+           
+           // Strip terminal-specific attributes
+           delete incomingSetup.apiKey;
+           delete incomingSetup.terminalName;
+           delete incomingSetup.outletId;
+           delete incomingSetup.deviceRole;
+           delete incomingSetup.lanAdminIp;
+           delete incomingSetup.apiUrl;
+           delete incomingSetup.isLoggedIn;
+           delete incomingSetup.isSetup;
+
+           // Clean incoming values so empty strings do not wipe existing settings
+           const cleanIncoming: any = {};
+           for (const [k, v] of Object.entries(incomingSetup)) {
+             if (v !== undefined && v !== null && v !== '') {
+               if (typeof v === 'object' && !Array.isArray(v) && currentSettings[k] && typeof currentSettings[k] === 'object') {
+                 cleanIncoming[k] = { ...currentSettings[k], ...v };
+               } else {
+                 cleanIncoming[k] = v;
+               }
+             }
+           }
+
+           const mergedSettings = { ...currentSettings, ...cleanIncoming };
            
            const updateData: any = { 
                settings: JSON.stringify(mergedSettings), 

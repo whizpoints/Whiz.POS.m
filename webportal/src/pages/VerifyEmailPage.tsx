@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Mail, RefreshCw, LogOut, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import authBgImage from '../assets/auth-bg.jpg';
 
 export default function VerifyEmailPage() {
   const [loading, setLoading] = useState(false);
@@ -103,11 +104,18 @@ export default function VerifyEmailPage() {
 
   if (status === 'used') {
     return (
-      <div className="min-h-screen relative flex items-center justify-center p-4 bg-gray-50 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-[120px]" />
+      <div className="min-h-screen relative flex items-center justify-center p-4 bg-slate-950 overflow-hidden">
+        {/* Full Landscape Background Image */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          <img
+            src={authBgImage}
+            alt="Background"
+            className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+          />
+          <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+        </div>
 
-        <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl relative z-10 border border-gray-100 text-center animate-in fade-in zoom-in duration-500">
+        <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-2xl relative z-10 border border-white/30 text-center animate-in fade-in zoom-in duration-500">
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <AlertCircle className="w-10 h-10 text-red-500" />
           </div>
@@ -129,11 +137,18 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 bg-gray-50 overflow-hidden">
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px]" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px]" />
+    <div className="min-h-screen relative flex items-center justify-center p-4 bg-slate-950 overflow-hidden">
+      {/* Full Landscape Background Image */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={authBgImage}
+          alt="Background"
+          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+        />
+        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+      </div>
 
-      <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl relative z-10 border border-gray-100 text-center animate-in fade-in zoom-in duration-500">
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-2xl relative z-10 border border-white/30 text-center animate-in fade-in zoom-in duration-500">
         
         <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 relative">
           <Mail className="w-10 h-10 text-blue-600 absolute animate-pulse" />

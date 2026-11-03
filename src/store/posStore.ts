@@ -173,6 +173,8 @@ export interface User {
   isActive: boolean;
   createdAt: string;
   password?: string;
+  email?: string;
+  outletId?: string;
 }
 
 
@@ -272,6 +274,7 @@ export interface BusinessSetup {
   receiptHeader?: string;
   receiptFooter?: string;
   printerType: 'thermal' | 'standard';
+  printerIp?: string;
   selectedPrinter?: string;
   showPrintPreview?: boolean;
   onScreenKeyboard?: boolean;
@@ -1774,9 +1777,23 @@ export const usePosStore = create<PosState>()(
 
           const isTerminalMode = currentState.businessSetup?.deviceRole === 'TerminalMode' || !!(currentState.businessSetup?.apiUrl && currentState.businessSetup?.apiKey);
 
+          // Role normalizer for POS client ('admin' | 'manager' | 'cashier')
+          const mapToPosRole = (role: any): 'admin' | 'manager' | 'cashier' => {
+            const r = String(role || '').trim().toUpperCase();
+            if (['ADMIN', 'SYSTEM_ADMIN', 'ADMINISTRATOR', 'OWNER', 'SUPER_ADMIN'].includes(r)) return 'admin';
+            if (['MANAGER', 'STORE_MANAGER'].includes(r)) return 'manager';
+            return 'cashier';
+          };
+
           // For TerminalMode, server's assigned products and users for this outlet are authoritative
           let newProducts: any[];
           let newUsers: any[];
+
+          const rawUsers = Array.isArray(serverData.users) ? serverData.users : [];
+          const normalizedServerUsers = rawUsers.map((u: any) => ({
+            ...u,
+            role: mapToPosRole(u.role)
+          }));
 
           if (isTerminalMode && Array.isArray(serverData.products)) {
              newProducts = serverData.products;
@@ -1785,9 +1802,30 @@ export const usePosStore = create<PosState>()(
           }
 
           if (isTerminalMode && Array.isArray(serverData.users)) {
-             newUsers = serverData.users;
+             newUsers = normalizedServerUsers;
           } else {
-             newUsers = sanitizeAndMerge(currentState.users, serverData.users || []);
+             newUsers = sanitizeAndMerge(currentState.users, normalizedServerUsers);
+          }
+
+          // Safeguard: Protect existing local Admin/Manager users from demotion to cashier
+          if (Array.isArray(currentState.users) && Array.isArray(newUsers)) {
+             newUsers = newUsers.map((u: any) => {
+               const existing = currentState.users.find((eu: any) => eu.id === u.id || (eu.email && u.email && eu.email.toLowerCase() === u.email.toLowerCase()));
+               if (existing && ['admin', 'manager'].includes(existing.role) && u.role === 'cashier') {
+                 return { ...u, role: existing.role };
+               }
+               return u;
+             });
+          }
+
+          // CRITICAL FIX: Retain active user session across background syncs
+          const wasLoggedIn = Boolean(currentState.businessSetup?.isLoggedIn || currentState.currentCashier);
+          let preservedCashier = currentState.currentCashier;
+          if (preservedCashier && Array.isArray(newUsers)) {
+            const updatedMatch = newUsers.find((u: any) => u.id === preservedCashier!.id || (u.email && preservedCashier!.email && u.email.toLowerCase() === preservedCashier!.email.toLowerCase()));
+            if (updatedMatch) {
+              preservedCashier = { ...preservedCashier, ...updatedMatch, role: mapToPosRole(updatedMatch.role) };
+            }
           }
 
           const newExpenses = sanitizeAndMerge(currentState.expenses, serverData.expenses || []);
@@ -1812,15 +1850,29 @@ export const usePosStore = create<PosState>()(
             const resolvedCloudBizId = serverData.businessSetup.cloudBusinessId || currentState.businessSetup?.cloudBusinessId || resolvedBizId;
             const cloudBase = (serverData.businessSetup.backOfficeUrl || serverData.businessSetup.cloudUrl || currentState.businessSetup?.backOfficeUrl || currentState.businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
 
+            // Only merge non-empty, non-null values from server to avoid wiping configured settings
+            const cleanServerSetup: any = {};
+            for (const [k, v] of Object.entries(serverData.businessSetup)) {
+              if (v !== undefined && v !== null && v !== '') {
+                cleanServerSetup[k] = v;
+              }
+            }
+
             newBusinessSetup = {
               ...newBusinessSetup,
-              ...serverData.businessSetup,
-              // Retain local client terminal identifiers
+              ...cleanServerSetup,
+              // Strictly preserve active runtime login session so terminal never logs off
+              isLoggedIn: wasLoggedIn,
+              // Retain local client terminal identifiers and configured hardware settings
               terminalName: currentState.businessSetup?.terminalName || serverData.businessSetup.terminalName,
               apiKey: currentState.businessSetup?.apiKey || serverData.businessSetup.apiKey,
               apiUrl: currentState.businessSetup?.apiUrl || serverData.businessSetup.apiUrl,
               outletId: currentState.businessSetup?.outletId || serverData.businessSetup.outletId,
               deviceRole: currentState.businessSetup?.deviceRole || 'TerminalMode',
+              printerType: currentState.businessSetup?.printerType || serverData.businessSetup.printerType || 'thermal',
+              printerIp: currentState.businessSetup?.printerIp || serverData.businessSetup.printerIp,
+              receiptHeader: currentState.businessSetup?.receiptHeader || serverData.businessSetup.receiptHeader,
+              receiptFooter: currentState.businessSetup?.receiptFooter || serverData.businessSetup.receiptFooter,
               kraEnabled: currentState.businessSetup?.kraEnabled !== undefined ? currentState.businessSetup.kraEnabled : (serverData.businessSetup.kraEnabled ?? false),
               billModeEnabled: currentState.businessSetup?.billModeEnabled !== undefined ? currentState.businessSetup.billModeEnabled : (serverData.businessSetup.billModeEnabled ?? false),
               hospitalityReceiptPrinting: currentState.businessSetup?.hospitalityReceiptPrinting !== undefined ? currentState.businessSetup.hospitalityReceiptPrinting : (serverData.businessSetup.hospitalityReceiptPrinting ?? false),
@@ -1869,6 +1921,7 @@ export const usePosStore = create<PosState>()(
             suppliers: newSuppliers as Supplier[],
             documents: newDocuments as SavedDocument[],
             categories: newCategories,
+            currentCashier: preservedCashier,
           });
 
           saveDataToFile('products.json', newProducts);
@@ -2564,6 +2617,9 @@ export const usePosStore = create<PosState>()(
               return;
           }
 
+          const cleanBusinessSetup: any = state.businessSetup ? { ...state.businessSetup } : {};
+          delete cleanBusinessSetup.isLoggedIn;
+
           const payload = {
               products: state.products,
               users: state.users,
@@ -2571,7 +2627,7 @@ export const usePosStore = create<PosState>()(
               salaries: state.salaries,
               customers: state.creditCustomers,
               transactions: state.transactions,
-              businessSetup: state.businessSetup,
+              businessSetup: cleanBusinessSetup,
               suppliers: state.suppliers
           };
 
