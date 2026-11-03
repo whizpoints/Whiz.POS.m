@@ -119,69 +119,89 @@ function App() {
 
   // Setup Socket.io Real-Time Sync with dynamic reconnect on IP change
   const currentApiUrl = usePosStore(state => state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl);
+  const backOfficeUrl = usePosStore(state => state.businessSetup?.backOfficeUrl || (state.businessSetup as any)?.cloudUrl);
   const activeBusinessId = usePosStore(state => state.businessSetup?.businessId || (state.businessSetup as any)?.cloudBusinessId);
 
   useEffect(() => {
-    let apiUrl = currentApiUrl?.replace(/\/$/, '')?.replace(/\/api$/, '') || '';
+    const urlsToConnect = new Set<string>();
     
-    if (apiUrl) {
-      console.log('[Socket] Connecting socket to:', apiUrl);
-      const socket = io(apiUrl, {
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 10,
-      });
+    const cleanApi = currentApiUrl?.replace(/\/$/, '')?.replace(/\/api$/, '');
+    if (cleanApi) urlsToConnect.add(cleanApi);
 
-      socket.on('connect', () => {
-        console.log('[Socket] Connected to POS Server for real-time sync at', apiUrl);
-        const bId = usePosStore.getState().businessSetup?.businessId || (usePosStore.getState().businessSetup as any)?.cloudBusinessId;
-        if (bId) {
-          socket.emit('join_business', bId);
-        }
-      });
+    const cleanBackOffice = backOfficeUrl?.replace(/\/$/, '')?.replace(/\/api$/, '');
+    if (cleanBackOffice) urlsToConnect.add(cleanBackOffice);
 
-      socket.on('connect_error', (err) => {
-        console.warn(`[Socket] Connection error to ${apiUrl}:`, err.message);
-        // If connection fails, trigger background server discovery
-        if (window.electron && typeof window.electron.discoverLocalServer === 'function') {
-          window.electron.discoverLocalServer().then((discovered: any) => {
-            const foundUrl = Array.isArray(discovered) ? discovered[0]?.url : (discovered?.url || (typeof discovered === 'string' ? discovered : null));
-            if (foundUrl && foundUrl !== apiUrl) {
-              usePosStore.getState().updateServerUrl(foundUrl);
-            }
-          }).catch(() => {});
-        }
-      });
-
-      // Receive downward sync from Cloud or other POS terminals
-      socket.on('cloud_sync_received', (data) => {
-        console.log('[Socket] Received real-time sync data:', data);
-        if (typeof usePosStore.getState().syncFromServer === 'function') usePosStore.getState().syncFromServer(); // Trigger a pull to fetch new data
-      });
-
-      socket.on('stock_updated', (data) => {
-        console.log('[Socket] Stock updated remotely:', data);
-        if (typeof usePosStore.getState().syncFromServer === 'function') usePosStore.getState().syncFromServer();
-      });
-
-      socket.on('mpesa_payment_received', (data) => {
-        console.log('[Socket] Real-time M-Pesa payment received:', data);
-        window.dispatchEvent(new CustomEvent('mpesa_payment_received', { detail: data }));
-      });
-
-      return () => {
-        try {
-          if (socket.connected) {
-            socket.disconnect();
-          } else {
-            socket.once('connect', () => socket.disconnect());
-            socket.close();
-          }
-        } catch (e) {}
-      };
+    // Fallback development default if local backoffice is running on 3000
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      urlsToConnect.add('http://localhost:3000');
     }
-  }, [currentApiUrl, activeBusinessId]);
+
+    const activeSockets: any[] = [];
+
+    urlsToConnect.forEach((url) => {
+      try {
+        console.log('[Socket] Connecting socket to:', url);
+        const socket = io(url, {
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionAttempts: 10,
+        });
+
+        socket.on('connect', () => {
+          console.log('[Socket] Connected to server for real-time sync at', url);
+          const bId = usePosStore.getState().businessSetup?.businessId || (usePosStore.getState().businessSetup as any)?.cloudBusinessId;
+          if (bId) {
+            socket.emit('join_business', bId);
+          }
+        });
+
+        socket.on('connect_error', (err) => {
+          console.warn(`[Socket] Connection error to ${url}:`, err.message);
+        });
+
+        // Receive downward sync from Cloud or other POS terminals
+        socket.on('cloud_sync_received', (data) => {
+          console.log('[Socket] Received real-time sync data:', data);
+          if (typeof usePosStore.getState().syncFromServer === 'function') usePosStore.getState().syncFromServer();
+        });
+
+        socket.on('stock_updated', (data) => {
+          console.log('[Socket] Stock updated remotely:', data);
+          if (typeof usePosStore.getState().syncFromServer === 'function') usePosStore.getState().syncFromServer();
+        });
+
+        // Instant M-Pesa Payment Broadcasts
+        socket.on('mpesa_payment_received', (data) => {
+          console.log('[Socket] Real-time M-Pesa payment received:', data);
+          window.dispatchEvent(new CustomEvent('mpesa_payment_received', { detail: data }));
+        });
+
+        socket.on('mpesa_payment_enriched', (data) => {
+          console.log('[Socket] Real-time M-Pesa payment enriched:', data);
+          window.dispatchEvent(new CustomEvent('mpesa_payment_enriched', { detail: data }));
+        });
+
+        socket.on('mpesa_payment_claimed', (data) => {
+          console.log('[Socket] Real-time M-Pesa payment claimed:', data);
+          window.dispatchEvent(new CustomEvent('mpesa_payment_claimed', { detail: data }));
+        });
+
+        activeSockets.push(socket);
+      } catch (err) {
+        console.warn(`[Socket] Failed to create socket for ${url}:`, err);
+      }
+    });
+
+    return () => {
+      activeSockets.forEach(s => {
+        try {
+          if (s.connected) s.disconnect();
+          else s.close();
+        } catch (e) {}
+      });
+    };
+  }, [currentApiUrl, backOfficeUrl, activeBusinessId]);
 
   // Periodic Sync (Every 10 seconds)
   useEffect(() => {

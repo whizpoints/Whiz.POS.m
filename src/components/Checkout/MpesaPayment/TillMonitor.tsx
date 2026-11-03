@@ -29,6 +29,12 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
 
+  // Admin PIN Authorization modal for Reusing claimed code
+  const [reusePendingPayment, setReusePendingPayment] = useState<any>(null);
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [adminPinError, setAdminPinError] = useState<string | null>(null);
+  const [isVerifyingAdmin, setIsVerifyingAdmin] = useState(false);
+
   const { completeTransaction } = usePosStore();
   const { toast } = useToast();
 
@@ -61,6 +67,14 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
   };
 
   const selectCandidate = (cand: any) => {
+    const isClaimed = !!cand.isAlreadyClaimed || cand.status === 'LINKED';
+    if (isClaimed) {
+      setReusePendingPayment(cand);
+      setAdminPinInput('');
+      setAdminPinError(null);
+      return;
+    }
+
     const finalName = enrichCustomerName(cand);
     setDetectedPayment({
       transactionId: cand.transactionId,
@@ -94,27 +108,40 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
       const businessId = businessSetup?.cloudBusinessId || businessSetup?.businessId || (businessSetup as any)?.id;
       if (!businessId) return;
 
-      const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
-      const queryParam = queryText.trim() ? `&q=${encodeURIComponent(queryText.trim())}` : '';
-      let webportalUrl = `${webportalBase}/api/mpesa/payments/search?businessId=${encodeURIComponent(businessId)}${queryParam}`;
-      
+      const tillNumber = (businessSetup as any)?.mpesaTillNumber || (businessSetup as any)?.tillNumber || '3098707';
+      const shortcode = (businessSetup as any)?.mpesaPaybillNumber || (businessSetup as any)?.mpesaPaybill || (businessSetup as any)?.mpesaShortcode || (businessSetup as any)?.shortcode || '7128505';
+      const webportalBase = (businessSetup?.backOfficeUrl || (businessSetup as any)?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
       const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
-      const localServerUrl = localServerBase ? `${localServerBase}/api/mpesa/payments/search?businessId=${businessId}${queryParam}` : null;
+
+      const queryParam = queryText.trim() ? `&q=${encodeURIComponent(queryText.trim())}` : '';
+      const params = `businessId=${encodeURIComponent(businessId)}${queryParam}&tillNumber=${encodeURIComponent(tillNumber)}&shortcode=${encodeURIComponent(shortcode)}`;
+      
+      const candidateUrls = [
+        `${webportalBase}/api/mpesa/payments/search?${params}`,
+        localServerBase ? `${localServerBase}/api/mpesa/payments/search?${params}` : null,
+        `http://localhost:3000/api/mpesa/payments/search?${params}`
+      ].filter(Boolean) as string[];
 
       let res: Response | null = null;
-      try {
-        res = await fetch(webportalUrl, { signal: AbortSignal.timeout(3000) });
-      } catch (cloudErr) {
-        if (localServerUrl) {
-          try {
-            res = await fetch(localServerUrl, { signal: AbortSignal.timeout(2000) });
-          } catch (localErr) {}
-        }
+      for (const url of candidateUrls) {
+        try {
+          const r = await fetch(url, { signal: AbortSignal.timeout(2500) });
+          if (r.ok) {
+            res = r;
+            break;
+          }
+        } catch (e) {}
       }
 
       if (res && res.ok) {
         const txns = await res.json();
         const localUsedCodes = usePosStore.getState().transactions.map((t: any) => (t as any).mpesaCode).filter(Boolean);
+        let locallyClaimedList: string[] = [];
+        try {
+          locallyClaimedList = JSON.parse(localStorage.getItem('pos_claimed_mpesa_codes') || '[]');
+        } catch (e) {}
+
+        const isClaimedCode = (id: string) => locallyClaimedList.includes(id) || localUsedCodes.includes(id);
 
         if (Array.isArray(txns)) {
           // If this was an explicit search query
@@ -128,8 +155,8 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
             return;
           }
 
-          // Unlinked recent unclaimed payments
-          const unlinkedOnly = txns.filter((t: any) => !localUsedCodes.includes(t.transactionId) && t.status !== 'LINKED');
+          // Unlinked recent unclaimed payments only
+          const unlinkedOnly = txns.filter((t: any) => !isClaimedCode(t.transactionId) && t.status !== 'LINKED');
           
           setRecentTillPayments(prev => {
             if (arePaymentsEqual(prev, unlinkedOnly)) {
@@ -160,7 +187,12 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
       if (!data || !data.transactionId) return;
       const amt = Number(data.amount);
       const localUsedCodes = usePosStore.getState().transactions.map((t: any) => (t as any).mpesaCode).filter(Boolean);
-      if (localUsedCodes.includes(data.transactionId)) return;
+      let locallyClaimedList: string[] = [];
+      try {
+        locallyClaimedList = JSON.parse(localStorage.getItem('pos_claimed_mpesa_codes') || '[]');
+      } catch (err) {}
+
+      if (locallyClaimedList.includes(data.transactionId) || localUsedCodes.includes(data.transactionId)) return;
 
       // Add to recent payments immediately
       setRecentTillPayments(prev => {
@@ -209,11 +241,24 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
       }
     };
 
+    const handleMpesaClaimed = (e: any) => {
+      const data = e.detail;
+      if (!data || !data.transactionId) return;
+
+      setRecentTillPayments(prev => prev.filter(p => p.transactionId !== data.transactionId));
+      if (detectedPayment && detectedPayment.transactionId === data.transactionId && !data.reused) {
+        setDetectedPayment(null);
+        setIsPolling(true);
+      }
+    };
+
     window.addEventListener('mpesa_payment_received', handleMpesaReceived);
     window.addEventListener('mpesa_payment_enriched', handleMpesaEnriched);
+    window.addEventListener('mpesa_payment_claimed', handleMpesaClaimed);
     return () => {
       window.removeEventListener('mpesa_payment_received', handleMpesaReceived);
       window.removeEventListener('mpesa_payment_enriched', handleMpesaEnriched);
+      window.removeEventListener('mpesa_payment_claimed', handleMpesaClaimed);
     };
   }, [effectiveTargetAmount, detectedPayment]);
 
@@ -340,6 +385,83 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
       phoneNumber: cand.phoneNumber || ''
     });
     setDetectedPayment(null);
+  };
+
+  const handleAuthorizeReuse = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!reusePendingPayment) return;
+    const cleanPin = adminPinInput.trim();
+    if (!cleanPin) {
+      setAdminPinError('Please enter Manager/Admin PIN');
+      return;
+    }
+
+    setIsVerifyingAdmin(true);
+    setAdminPinError(null);
+
+    try {
+      const state = usePosStore.getState();
+      const matchedAdmin = (state.users || []).find(
+        (u: any) => String(u.pin) === cleanPin && ['admin', 'manager', 'ADMIN', 'MANAGER'].includes(u.role)
+      );
+
+      if (!matchedAdmin) {
+        setAdminPinError('Invalid Manager/Admin PIN. Re-use authorization denied.');
+        setIsVerifyingAdmin(false);
+        return;
+      }
+
+      // Call consume endpoint with adminPin
+      const businessSetup = state.businessSetup;
+      const businessId = businessSetup?.cloudBusinessId || businessSetup?.businessId || (businessSetup as any)?.id;
+      const webportalBase = (businessSetup?.backOfficeUrl || (businessSetup as any)?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+      const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
+
+      const payload = JSON.stringify({
+        transactionId: reusePendingPayment.transactionId,
+        businessId,
+        adminPin: cleanPin,
+        cashier: state.currentCashier?.name || 'Cashier'
+      });
+
+      const urls = [
+        `${webportalBase}/api/mpesa/payments/consume`,
+        localServerBase ? `${localServerBase}/api/mpesa/payments/consume` : null,
+        'http://localhost:3000/api/mpesa/payments/consume'
+      ].filter(Boolean) as string[];
+
+      for (const url of urls) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            signal: AbortSignal.timeout(3000)
+          });
+        } catch (err) {}
+      }
+
+      toast(`Payment reuse authorized by Admin (${matchedAdmin.name}).`, 'success');
+
+      // Select with asterisk prefix for audit
+      const finalName = enrichCustomerName(reusePendingPayment);
+      setDetectedPayment({
+        transactionId: `*${reusePendingPayment.transactionId}`,
+        amount: Number(reusePendingPayment.amount),
+        phoneNumber: reusePendingPayment.phoneNumber,
+        customerName: finalName,
+        timestamp: new Date().toISOString(),
+        isReused: true,
+        reusedApprovedBy: matchedAdmin.name
+      });
+      setCustomCustomerName(finalName);
+      setReusePendingPayment(null);
+      setIsPolling(false);
+    } catch (err: any) {
+      setAdminPinError(err.message || 'Authorization failed');
+    } finally {
+      setIsVerifyingAdmin(false);
+    }
   };
 
   const handleOfflineConfirm = () => {
@@ -689,21 +811,21 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
                         key={cand.transactionId || idx}
                         className={`p-2.5 rounded-xl border transition-all flex items-center justify-between shadow-2xs ${
                           isClaimed 
-                            ? 'bg-gray-100 border-gray-200 opacity-60 cursor-not-allowed'
+                            ? 'bg-amber-50/40 border-amber-200' 
                             : 'border-gray-200 hover:border-gray-300 bg-white'
                         }`}
                       >
                         <div 
                           className="min-w-0 flex-1 pr-2 cursor-pointer"
-                          onClick={() => !isClaimed && selectCandidate(cand)}
+                          onClick={() => selectCandidate(cand)}
                         >
                           <div className="flex items-center gap-2">
                             <p className="font-bold text-gray-900 text-xs truncate">
                               {cand.customerName || 'M-Pesa Customer'}
                             </p>
                             {isClaimed && (
-                              <span className="text-[9px] font-bold text-gray-600 bg-gray-200 px-1.5 py-0.2 rounded uppercase">
-                                Claimed
+                              <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded uppercase flex items-center gap-1">
+                                <ShieldCheck className="w-2.5 h-2.5" /> Claimed (PIN to Reuse)
                               </span>
                             )}
                           </div>
@@ -720,7 +842,15 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
                           <span className="text-xs font-black font-mono text-gray-900">
                             KSh {amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </span>
-                          {!isClaimed && (
+                          {isClaimed ? (
+                            <button
+                              type="button"
+                              onClick={() => { setReusePendingPayment(cand); setAdminPinInput(''); setAdminPinError(null); }}
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg shadow-2xs flex items-center gap-1"
+                            >
+                              <ShieldCheck className="w-3 h-3" /> REUSE (PIN)
+                            </button>
+                          ) : (
                             <div className="flex items-center gap-1.5">
                               {canBePartialSplit && (
                                 <button 
@@ -776,6 +906,69 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
           <WifiOff className="w-3 h-3" /> System Offline? Enter Manually
         </button>
       </div>
+
+      {/* 5. Manager / Admin PIN Authorization Modal for Code Reuse */}
+      {reusePendingPayment && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-amber-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-700">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-sm">Manager / Admin PIN Required</h3>
+                <p className="text-xs text-gray-500">Authorize payment reuse</p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 rounded-xl p-3 mb-4 text-xs text-amber-900 border border-amber-200/80">
+              <p className="font-bold">Transaction: {reusePendingPayment.transactionId}</p>
+              <p>Amount: KSh {Number(reusePendingPayment.amount).toFixed(2)}</p>
+              <p className="text-[11px] text-amber-700 mt-1">
+                This transaction has already been linked to a previous sale. To reuse it, enter a Manager or Admin PIN. The reuse will be logged for audit.
+              </p>
+            </div>
+
+            <form onSubmit={handleAuthorizeReuse} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
+                  Manager / Admin PIN
+                </label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  value={adminPinInput}
+                  onChange={(e) => { setAdminPinInput(e.target.value.replace(/\D/g, '')); setAdminPinError(null); }}
+                  placeholder="Enter 4-digit PIN"
+                  autoFocus
+                  className="w-full text-center text-xl font-mono tracking-[0.5em] p-2.5 border-2 border-gray-200 rounded-xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/20 outline-none transition-all font-bold"
+                />
+                {adminPinError && (
+                  <p className="text-xs text-red-600 font-semibold mt-1 text-center">{adminPinError}</p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setReusePendingPayment(null); setAdminPinInput(''); setAdminPinError(null); }}
+                  className="flex-1 py-2.5 border border-gray-300 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isVerifyingAdmin || !adminPinInput.trim()}
+                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  {isVerifyingAdmin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                  Authorize
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -498,21 +498,40 @@ router.post('/', async (req: any, res: any) => {
                       });
                   } else {
                       try {
-                          const createdReceipt = await prisma.receipt.create({
-                             data: {
-                                id: String(t.id),
-                                businessId, 
-                                locationId: targetLocationId || t.locationId || null, 
-                                outletId: null,
-                                serverId: t.serverId || req.user.serverId || null,
-                                terminalId: t.terminalId || null,
-                                receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
-                                paymentMethod: String(t.paymentMethod || "CASH"), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
-                                mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null, status: safeStatus as any,
-                                createdAt: t.timestamp ? new Date(t.timestamp) : undefined,
-                                updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date()
-                             }
-                          });
+                          let createdReceipt: any;
+                          try {
+                              createdReceipt = await prisma.receipt.create({
+                                 data: {
+                                    id: String(t.id),
+                                    businessId, 
+                                    locationId: targetLocationId || t.locationId || null, 
+                                    outletId: null,
+                                    serverId: t.serverId || req.user.serverId || null,
+                                    terminalId: t.terminalId || null,
+                                    receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
+                                    paymentMethod: String(t.paymentMethod || "CASH"), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
+                                    mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null, status: safeStatus as any,
+                                    createdAt: t.timestamp ? new Date(t.timestamp) : undefined,
+                                    updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date()
+                                 }
+                              });
+                          } catch (fkErr: any) {
+                              createdReceipt = await prisma.receipt.create({
+                                 data: {
+                                    id: String(t.id),
+                                    businessId, 
+                                    locationId: null, 
+                                    outletId: null,
+                                    serverId: null,
+                                    terminalId: null,
+                                    receiptNumber: String(t.id), totalAmount: Number(t.totalAmount || t.total) || 0,
+                                    paymentMethod: String(t.paymentMethod || "CASH"), customerPhone: t.customerPhone ? String(t.customerPhone) : null,
+                                    mpesaCode: t.mpesaCode ? String(t.mpesaCode) : null, status: safeStatus as any,
+                                    createdAt: t.timestamp ? new Date(t.timestamp) : undefined,
+                                    updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date()
+                                 }
+                              });
+                          }
                           
                           if (t.items && Array.isArray(t.items)) {
                               const receiptItemsToCreate = t.items.map((item: any) => ({

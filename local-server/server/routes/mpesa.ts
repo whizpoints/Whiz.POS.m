@@ -584,9 +584,12 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
       const cleanQ = q.trim();
       const digits = cleanQ.replace(/\D/g, '');
 
+      const queryTill = req.query.tillNumber ? String(req.query.tillNumber).trim() : '';
+      const queryShortcode = req.query.shortcode ? String(req.query.shortcode).trim() : '';
+
       // Resolve all business IDs sharing the same shortcode/till
       const myConfig = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
-      const matchingCodes = [myConfig?.shortcode, myConfig?.tillNumber, myConfig?.paybillNumber].filter(Boolean);
+      const matchingCodes = [myConfig?.shortcode, myConfig?.tillNumber, myConfig?.paybillNumber, queryTill, queryShortcode].filter(Boolean) as string[];
       let businessIds = [businessId];
       if (matchingCodes.length > 0) {
         const sharedConfigs = await db.selectFrom('MpesaConfig')
@@ -788,7 +791,7 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
 // 9. Consume Payment
 router.post('/payments/consume', async (req: any, res: any) => {
   try {
-    const { transactionId, businessId } = req.body;
+    const { transactionId, businessId, receiptNumber, cashier, adminPin } = req.body;
     if (!transactionId) return res.status(400).json({ error: 'Missing parameters' });
     
     const cleanTxnId = String(transactionId).trim();
@@ -802,13 +805,60 @@ router.post('/payments/consume', async (req: any, res: any) => {
     }
 
     if (existing.status === 'LINKED') {
-      return res.json({ success: true, alreadyConsumed: true, message: 'Transaction already claimed.' });
+      if (!adminPin) {
+        return res.status(403).json({
+          success: false,
+          isAlreadyClaimed: true,
+          error: 'This payment has already been claimed for another sale. Manager/Admin PIN is required to authorize reuse.'
+        });
+      }
+
+      const cleanPin = String(adminPin).trim();
+      const adminUser = await db.selectFrom('User')
+        .selectAll()
+        .where('pin', '=', cleanPin)
+        .where('role', 'in', ['admin', 'manager', 'ADMIN', 'MANAGER'])
+        .executeTakeFirst();
+
+      if (!adminUser) {
+        return res.status(401).json({ success: false, error: 'Invalid Manager/Admin PIN. Re-use authorization denied.' });
+      }
+
+      console.log(`[Local M-Pesa Audit] Transaction ${cleanTxnId} REUSED by cashier "${cashier || 'Cashier'}", authorized by Admin "${adminUser.name}" at ${new Date().toISOString()}`);
+
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('mpesa_payment_claimed', {
+          transactionId: cleanTxnId,
+          reused: true,
+          authorizedBy: adminUser.name,
+          cashier: cashier || 'Cashier'
+        });
+      }
+
+      return res.json({
+        success: true,
+        reused: true,
+        authorizedBy: adminUser.name,
+        message: 'Payment reuse approved by Admin.'
+      });
     }
 
     await db.updateTable('MpesaTransaction')
       .set({ status: 'LINKED' })
       .where('id', '=', existing.id)
       .execute();
+
+    console.log(`[Local M-Pesa Consume] Payment ${cleanTxnId} permanently LINKED to receipt ${receiptNumber || 'POS'} by ${cashier || 'Cashier'}`);
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('mpesa_payment_claimed', {
+        transactionId: cleanTxnId,
+        receiptNumber: receiptNumber || 'POS',
+        cashier: cashier || 'Cashier'
+      });
+    }
 
     res.json({ success: true, message: 'Payment claimed successfully.' });
   } catch (err) {

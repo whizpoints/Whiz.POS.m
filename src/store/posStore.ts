@@ -99,7 +99,7 @@ export interface Transaction {
   subtotal: number;
   tax: number;
   total: number;
-  paymentMethod: 'cash' | 'mpesa' | 'credit' | 'card' | 'bank';
+  paymentMethod: 'cash' | 'mpesa' | 'credit' | 'card' | 'bank' | 'split';
   cashier: string;
   creditCustomer?: string;
   status: 'completed' | 'pending' | 'refunded';
@@ -461,7 +461,7 @@ interface PosState {
 
   openTransactionSuccessPopup: (transaction: Transaction) => void;
   closeTransactionSuccessPopup: () => void;
-  completeTransaction: (paymentMethod: 'cash' | 'mpesa' | 'credit' | 'card' | 'bank', creditCustomer?: string, additionalData?: { amountTendered?: number; change?: number; mpesaCode?: string; phoneNumber?: string; customerName?: string; mpesaName?: string }) => Promise<void>;
+  completeTransaction: (paymentMethod: 'cash' | 'mpesa' | 'credit' | 'card' | 'bank' | 'split', creditCustomer?: string, additionalData?: { amountTendered?: number; change?: number; mpesaCode?: string; phoneNumber?: string; customerName?: string; mpesaName?: string; splitPayments?: any[]; [key: string]: any }) => Promise<void>;
   saveExpense: (expense: Expense) => void;
   loadUsers: () => Promise<void>;
   reprintTransaction: (transactionId: string) => void;
@@ -1074,10 +1074,65 @@ export const usePosStore = create<PosState>()(
             }
         }
 
-          // Print receipt if enabled
-          if (shouldPrintReceipt && window.electron && state.businessSetup) {
-              window.electron.printReceipt(transaction, state.businessSetup, false);
-          }
+        // --- CONSUME M-PESA PAYMENTS (MARK AS LINKED PERMANENTLY) ---
+        const codesToConsume: string[] = [];
+        if (transaction.mpesaCode) {
+            codesToConsume.push(transaction.mpesaCode);
+        }
+        if (Array.isArray((transaction as any).splitPayments)) {
+            for (const sp of (transaction as any).splitPayments) {
+                if (sp.mpesaCode && !codesToConsume.includes(sp.mpesaCode)) {
+                    codesToConsume.push(sp.mpesaCode);
+                }
+            }
+        }
+
+        if (codesToConsume.length > 0) {
+            try {
+                // Instantly record in local claimed set
+                const rawClaimed = localStorage.getItem('pos_claimed_mpesa_codes') || '[]';
+                const localClaimed: string[] = JSON.parse(rawClaimed);
+                codesToConsume.forEach(c => {
+                    if (!localClaimed.includes(c)) localClaimed.push(c);
+                    window.dispatchEvent(new CustomEvent('mpesa_payment_claimed', { detail: { transactionId: c } }));
+                });
+                localStorage.setItem('pos_claimed_mpesa_codes', JSON.stringify(localClaimed));
+            } catch (e) {}
+
+            const bId = state.businessSetup?.cloudBusinessId || state.businessSetup?.businessId || (state.businessSetup as any)?.id;
+            const webportalBase = (state.businessSetup?.backOfficeUrl || (state.businessSetup as any)?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+            const localServerBase = (state.businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
+
+            codesToConsume.forEach(async (code) => {
+                const payload = JSON.stringify({
+                    transactionId: code,
+                    businessId: bId,
+                    receiptNumber: transaction.id,
+                    cashier: state.currentCashier?.name || 'Cashier'
+                });
+
+                const targetUrls = [
+                    `${webportalBase}/api/mpesa/payments/consume`,
+                    localServerBase ? `${localServerBase}/api/mpesa/payments/consume` : null,
+                    'http://localhost:3000/api/mpesa/payments/consume'
+                ].filter(Boolean) as string[];
+
+                for (const url of targetUrls) {
+                    try {
+                        fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: payload
+                        }).catch(() => {});
+                    } catch (err) {}
+                }
+            });
+        }
+
+        // Print receipt if enabled
+        if (shouldPrintReceipt && window.electron && state.businessSetup) {
+            window.electron.printReceipt(transaction, state.businessSetup, false);
+        }
         },
 
       reprintTransaction: (transactionId) => {

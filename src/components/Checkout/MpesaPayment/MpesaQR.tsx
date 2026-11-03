@@ -105,7 +105,7 @@ export default function MpesaQR({ totalAmount }: Props) {
 
   const businessSetup = usePosStore(s => s.businessSetup);
   const tillOrShortcode = (businessSetup?.mpesaConfig?.partyB || businessSetup?.mpesaConfig?.shortcode || (businessSetup as any)?.tillNumber || (businessSetup as any)?.shortcode);
-  const isPaybill = businessSetup?.mpesaConfig?.type === 'paybill';
+  const isPaybill = (businessSetup?.mpesaConfig?.type as string)?.toLowerCase() === 'paybill' || businessSetup?.mpesaConfig?.type === 'Paybill';
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center p-2">

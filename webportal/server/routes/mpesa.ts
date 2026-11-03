@@ -1,4 +1,4 @@
-import prisma from '../db.js';
+import prisma, { withDbRetry } from '../db.js';
 import { Router } from 'express';
 import { MpesaCallbackUrlService } from '../services/mpesaUrls.js';
 import { generateSecurityCredential, decrypt } from '../utils/crypto.js';
@@ -373,24 +373,26 @@ const handleC2bValidation = async (req: any, res: any) => {
     }
 
     if (resolvedBusinessId && cleanTransId && cleanAmount > 0) {
-      await prisma.mpesaTransaction.upsert({
-        where: { transactionId: cleanTransId },
-        create: {
-          businessId: resolvedBusinessId,
-          locationId: config?.locationId || null,
-          transactionId: cleanTransId,
-          amount: cleanAmount,
-          phoneNumber: rawPhone,
-          customerName,
-          status: 'UNLINKED',
-          isEnriched: customerName !== 'M-Pesa Customer',
-          timestamp
-        },
-        update: {
-          customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
-          phoneNumber: rawPhone || undefined,
-          amount: cleanAmount || undefined
-        }
+      await withDbRetry(async () => {
+        return prisma.mpesaTransaction.upsert({
+          where: { transactionId: cleanTransId },
+          create: {
+            businessId: resolvedBusinessId,
+            locationId: config?.locationId || null,
+            transactionId: cleanTransId,
+            amount: cleanAmount,
+            phoneNumber: rawPhone,
+            customerName,
+            status: 'UNLINKED',
+            isEnriched: customerName !== 'M-Pesa Customer',
+            timestamp
+          },
+          update: {
+            customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
+            phoneNumber: rawPhone || undefined,
+            amount: cleanAmount || undefined
+          }
+        });
       });
 
       const io = req.app.get('io');
@@ -430,24 +432,28 @@ const handleC2bConfirmation = async (req: any, res: any) => {
       TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode, TransTime
     } = req.body;
     
-    // Prioritize BusinessShortCode to map to active registered business
-    let config = null;
-    if (BusinessShortCode) {
-      const bsc = String(BusinessShortCode).trim();
-      config = await prisma.mpesaConfig.findFirst({
-        where: {
-          OR: [
-            { shortcode: bsc },
-            { tillNumber: bsc },
-            { paybillNumber: bsc }
-          ]
-        },
-        orderBy: { updatedAt: 'desc' }
-      });
-    }
-    if (!config && rawBusinessId) {
-      config = await prisma.mpesaConfig.findFirst({ where: { businessId: rawBusinessId } });
-    }
+    const bsc = String(BusinessShortCode || '').trim();
+
+    // Look up config with retry
+    let config = await withDbRetry(async () => {
+      let found = null;
+      if (bsc) {
+        found = await prisma.mpesaConfig.findFirst({
+          where: {
+            OR: [
+              { shortcode: bsc },
+              { tillNumber: bsc },
+              { paybillNumber: bsc }
+            ]
+          },
+          orderBy: { updatedAt: 'desc' }
+        });
+      }
+      if (!found && rawBusinessId) {
+        found = await prisma.mpesaConfig.findFirst({ where: { businessId: rawBusinessId } });
+      }
+      return found;
+    });
 
     const resolvedBusinessId = config?.businessId || rawBusinessId;
     if (!resolvedBusinessId) {
@@ -478,24 +484,26 @@ const handleC2bConfirmation = async (req: any, res: any) => {
     }
     
     if (cleanTransId) {
-      await prisma.mpesaTransaction.upsert({
-        where: { transactionId: cleanTransId },
-        create: {
-          businessId: resolvedBusinessId,
-          locationId: config?.locationId || null,
-          transactionId: cleanTransId,
-          amount: cleanAmount,
-          phoneNumber: rawPhone,
-          customerName,
-          status: 'UNLINKED',
-          isEnriched,
-          timestamp
-        },
-        update: {
-          customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
-          phoneNumber: rawPhone || undefined,
-          amount: cleanAmount || undefined
-        }
+      await withDbRetry(async () => {
+        return prisma.mpesaTransaction.upsert({
+          where: { transactionId: cleanTransId },
+          create: {
+            businessId: resolvedBusinessId,
+            locationId: config?.locationId || null,
+            transactionId: cleanTransId,
+            amount: cleanAmount,
+            phoneNumber: rawPhone,
+            customerName,
+            status: 'UNLINKED',
+            isEnriched,
+            timestamp
+          },
+          update: {
+            customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
+            phoneNumber: rawPhone || undefined,
+            amount: cleanAmount || undefined
+          }
+        });
       });
 
       const io = req.app.get('io');
@@ -509,7 +517,33 @@ const handleC2bConfirmation = async (req: any, res: any) => {
           timestamp: timestamp.toISOString(),
           businessId: resolvedBusinessId
         };
+
+        // Broadcast to resolved business room
         io.to(`business_${resolvedBusinessId}`).emit('mpesa_payment_received', payload);
+        if (rawBusinessId && rawBusinessId !== resolvedBusinessId) {
+          io.to(`business_${rawBusinessId}`).emit('mpesa_payment_received', payload);
+        }
+
+        // Also broadcast to any other business configs sharing this ShortCode / Till
+        if (bsc) {
+          try {
+            const sharedConfigs = await prisma.mpesaConfig.findMany({
+              where: {
+                OR: [
+                  { shortcode: bsc },
+                  { tillNumber: bsc },
+                  { paybillNumber: bsc }
+                ]
+              },
+              select: { businessId: true }
+            });
+            sharedConfigs.forEach(sc => {
+              io.to(`business_${sc.businessId}`).emit('mpesa_payment_received', payload);
+            });
+          } catch (e) {}
+        }
+
+        // Global emission so any connected POS terminal on this store receives it in 0ms
         io.emit('mpesa_payment_received', payload);
         console.log(`[M-Pesa Webhook] C2B Confirmation saved & emitted: ${cleanTransId} for KSh ${cleanAmount} (${customerName})`);
       }
@@ -612,75 +646,84 @@ router.get('/payments/search', async (req: any, res: any) => {
     const rawQ = req.query.q;
     const q = Array.isArray(rawQ) ? String(rawQ[0]) : (rawQ ? String(rawQ) : '');
     const cleanQ = q.trim();
+    const queryTill = req.query.tillNumber ? String(req.query.tillNumber).trim() : '';
+    const queryShortcode = req.query.shortcode ? String(req.query.shortcode).trim() : '';
     
     if (!businessId) return res.status(400).json({ error: 'Missing businessId' });
 
-    // Look up business config to identify all matching shortcodes/tills
-    const myConfig = await prisma.mpesaConfig.findFirst({ where: { businessId } });
-    const matchingCodes = [myConfig?.shortcode, myConfig?.tillNumber, myConfig?.paybillNumber].filter(Boolean) as string[];
+    return await withDbRetry(async () => {
+      // Look up business config to identify all matching shortcodes/tills
+      const myConfig = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+      const matchingCodes = [
+        myConfig?.shortcode, 
+        myConfig?.tillNumber, 
+        myConfig?.paybillNumber,
+        queryTill,
+        queryShortcode
+      ].filter(Boolean) as string[];
 
-    let businessIds = [businessId];
-    if (matchingCodes.length > 0) {
-      const sharedConfigs = await prisma.mpesaConfig.findMany({
-        where: {
-          OR: [
-            { shortcode: { in: matchingCodes } },
-            { tillNumber: { in: matchingCodes } },
-            { paybillNumber: { in: matchingCodes } }
-          ]
-        },
-        select: { businessId: true }
-      });
-      businessIds = Array.from(new Set([businessId, ...sharedConfigs.map(c => c.businessId)]));
-    }
-
-    const orConditions: any[] = [];
-    if (cleanQ) {
-      // In SQLite with Prisma, 'contains' is case-insensitive for ASCII text without 'mode' option
-      orConditions.push({ transactionId: { contains: cleanQ } });
-      orConditions.push({ customerName: { contains: cleanQ } });
-      orConditions.push({ phoneNumber: { contains: cleanQ } });
-
-      const digits = cleanQ.replace(/\D/g, '');
-      if (digits.length >= 3) {
-        orConditions.push({ phoneNumber: { contains: digits } });
+      let businessIds = [businessId];
+      if (matchingCodes.length > 0) {
+        const sharedConfigs = await prisma.mpesaConfig.findMany({
+          where: {
+            OR: [
+              { shortcode: { in: matchingCodes } },
+              { tillNumber: { in: matchingCodes } },
+              { paybillNumber: { in: matchingCodes } }
+            ]
+          },
+          select: { businessId: true }
+        });
+        businessIds = Array.from(new Set([businessId, ...sharedConfigs.map(c => c.businessId)]));
       }
-      if (digits.length >= 9) {
-        orConditions.push({ phoneNumber: { contains: digits.slice(-9) } });
+
+      const orConditions: any[] = [];
+      if (cleanQ) {
+        orConditions.push({ transactionId: { contains: cleanQ } });
+        orConditions.push({ customerName: { contains: cleanQ } });
+        orConditions.push({ phoneNumber: { contains: cleanQ } });
+
+        const digits = cleanQ.replace(/\D/g, '');
+        if (digits.length >= 3) {
+          orConditions.push({ phoneNumber: { contains: digits } });
+        }
+        if (digits.length >= 9) {
+          orConditions.push({ phoneNumber: { contains: digits.slice(-9) } });
+        }
       }
-    }
 
-    // First query unlinked transactions across all business IDs sharing this shortcode/till
-    let txns = await prisma.mpesaTransaction.findMany({
-      where: { 
-        businessId: { in: businessIds },
-        status: 'UNLINKED',
-        ...(orConditions.length > 0 ? { OR: orConditions } : {})
-      },
-      orderBy: { timestamp: 'desc' },
-      take: 50
-    });
-
-    // If user searched explicitly for something and 0 unlinked were found, also check if it was already claimed
-    if (cleanQ && txns.length === 0) {
-      const claimedTxns = await prisma.mpesaTransaction.findMany({
-        where: {
+      // First query unlinked transactions across all business IDs sharing this shortcode/till
+      let txns = await prisma.mpesaTransaction.findMany({
+        where: { 
           businessId: { in: businessIds },
-          OR: orConditions
+          status: 'UNLINKED',
+          ...(orConditions.length > 0 ? { OR: orConditions } : {})
         },
         orderBy: { timestamp: 'desc' },
-        take: 10
+        take: 50
       });
 
-      if (claimedTxns.length > 0) {
-        txns = claimedTxns.map((t: any) => ({
-          ...t,
-          isAlreadyClaimed: t.status === 'LINKED'
-        }));
-      }
-    }
+      // If user searched explicitly for something and 0 unlinked were found, also check if it was already claimed
+      if (cleanQ && txns.length === 0) {
+        const claimedTxns = await prisma.mpesaTransaction.findMany({
+          where: {
+            businessId: { in: businessIds },
+            OR: orConditions
+          },
+          orderBy: { timestamp: 'desc' },
+          take: 10
+        });
 
-    res.json(txns);
+        if (claimedTxns.length > 0) {
+          txns = claimedTxns.map((t: any) => ({
+            ...t,
+            isAlreadyClaimed: t.status === 'LINKED'
+          }));
+        }
+      }
+
+      res.json(txns);
+    });
   } catch (err: any) {
     console.error('M-Pesa payment search error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -815,41 +858,105 @@ router.get('/payments/search', async (req: any, res: any) => {
 // 9. Consume Payment
 router.post('/payments/consume', async (req: any, res: any) => {
   try {
-    const { transactionId, businessId } = req.body;
+    const { transactionId, businessId, receiptNumber, cashier, adminPin } = req.body;
     if (!transactionId) return res.status(400).json({ error: 'Missing parameters' });
     
     const cleanTxnId = String(transactionId).trim();
     
-    // 1. Try to find the transaction for this business
-    let txn = await prisma.mpesaTransaction.findFirst({
-      where: {
-        transactionId: cleanTxnId,
-        ...(businessId ? { businessId } : {})
-      }
-    });
-
-    // Fallback: If not matched with businessId, find by transactionId alone
-    if (!txn) {
-      txn = await prisma.mpesaTransaction.findFirst({
-        where: { transactionId: cleanTxnId }
+    return await withDbRetry(async () => {
+      // 1. Try to find the transaction for this business
+      let txn = await prisma.mpesaTransaction.findFirst({
+        where: {
+          transactionId: cleanTxnId,
+          ...(businessId ? { businessId } : {})
+        }
       });
-    }
 
-    if (!txn) {
-      return res.status(404).json({ error: 'Transaction not found.' });
-    }
+      // Fallback: If not matched with businessId, find by transactionId alone
+      if (!txn) {
+        txn = await prisma.mpesaTransaction.findFirst({
+          where: { transactionId: cleanTxnId }
+        });
+      }
 
-    // Idempotent: If already LINKED, acknowledge success so cashier checkout is never blocked
-    if (txn.status === 'LINKED') {
-      return res.json({ success: true, alreadyConsumed: true, message: 'Transaction already claimed.' });
-    }
+      if (!txn) {
+        return res.status(404).json({ error: 'Transaction not found.' });
+      }
 
-    await prisma.mpesaTransaction.update({
-      where: { id: txn.id },
-      data: { status: 'LINKED' }
+      // If already LINKED, strictly require Manager or Admin PIN to authorize reuse
+      if (txn.status === 'LINKED') {
+        if (!adminPin) {
+          return res.status(403).json({ 
+            success: false, 
+            isAlreadyClaimed: true, 
+            error: 'This payment has already been claimed for another sale. Manager/Admin PIN is required to authorize reuse.' 
+          });
+        }
+
+        // Validate admin/manager PIN
+        const cleanPin = String(adminPin).trim();
+        const adminUser = await prisma.user.findFirst({
+          where: {
+            pin: cleanPin,
+            role: { in: ['admin', 'manager', 'ADMIN', 'MANAGER'] }
+          }
+        });
+
+        if (!adminUser) {
+          return res.status(401).json({ success: false, error: 'Invalid Manager/Admin PIN. Re-use authorization denied.' });
+        }
+
+        // Reused authorization granted!
+        await prisma.mpesaTransaction.update({
+          where: { id: txn.id },
+          data: {
+            status: 'LINKED',
+            updatedAt: new Date()
+          }
+        });
+
+        console.log(`[M-Pesa Audit] Transaction ${cleanTxnId} REUSED by cashier "${cashier || 'Cashier'}", authorized by Admin "${adminUser.name}" at ${new Date().toISOString()}`);
+
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('mpesa_payment_claimed', { 
+            transactionId: cleanTxnId, 
+            reused: true,
+            authorizedBy: adminUser.name,
+            cashier: cashier || 'Cashier' 
+          });
+        }
+
+        return res.json({ 
+          success: true, 
+          reused: true, 
+          authorizedBy: adminUser.name, 
+          message: 'Payment reuse approved by Admin.' 
+        });
+      }
+
+      // Regular first-time claim
+      await prisma.mpesaTransaction.update({
+        where: { id: txn.id },
+        data: { 
+          status: 'LINKED',
+          updatedAt: new Date()
+        }
+      });
+
+      console.log(`[M-Pesa Consume] Payment ${cleanTxnId} permanently LINKED to receipt ${receiptNumber || 'POS'} by ${cashier || 'Cashier'}`);
+
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('mpesa_payment_claimed', { 
+          transactionId: cleanTxnId, 
+          receiptNumber: receiptNumber || 'POS',
+          cashier: cashier || 'Cashier'
+        });
+      }
+
+      return res.json({ success: true, message: 'Payment claimed successfully.' });
     });
-
-    res.json({ success: true, message: 'Payment claimed successfully.' });
   } catch (err) {
     console.error('Consume error:', err);
     res.status(500).json({ error: 'Internal server error' });
