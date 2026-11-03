@@ -8,6 +8,57 @@ import {
 export default function FinancialLedgerPage() {
   const { transactions, expenses, salaries, purchaseOrders } = usePosStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'journal' | 'coa'>('overview');
+  const [manualEntries, setManualEntries] = useState<any[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('whiz_manual_journal') || '[]');
+    } catch (e) {
+      return [];
+    }
+  });
+  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
+  const [journalForm, setJournalForm] = useState({
+    description: '',
+    debitAccount: 'Expenses',
+    creditAccount: 'Assets',
+    amount: ''
+  });
+
+  const handleCreateJournalEntry = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(journalForm.amount);
+    if (!journalForm.description.trim() || isNaN(amt) || amt <= 0) {
+      toast.error('Please enter a valid description and amount');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const entryId = `MJ-${Date.now()}`;
+    const newItems = [
+      {
+        id: `${entryId}-DR`,
+        date: now,
+        description: journalForm.description.trim(),
+        account: journalForm.debitAccount,
+        debit: amt,
+        credit: 0
+      },
+      {
+        id: `${entryId}-CR`,
+        date: now,
+        description: journalForm.description.trim(),
+        account: journalForm.creditAccount,
+        debit: 0,
+        credit: amt
+      }
+    ];
+
+    const updated = [...newItems, ...manualEntries];
+    setManualEntries(updated);
+    localStorage.setItem('whiz_manual_journal', JSON.stringify(updated));
+    setIsJournalModalOpen(false);
+    setJournalForm({ description: '', debitAccount: 'Expenses', creditAccount: 'Assets', amount: '' });
+    toast.success('Journal entry posted successfully');
+  };
 
   // Compute Revenue
   const totalRevenue = useMemo(() => {
@@ -96,8 +147,8 @@ export default function FinancialLedgerPage() {
       });
     });
 
-    return entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, expenses, purchaseOrders]);
+    return [...manualEntries, ...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, expenses, purchaseOrders, manualEntries]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -196,7 +247,7 @@ export default function FinancialLedgerPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-800">General Journal</h2>
-              <button onClick={() => toast.success('Manual journal entries coming soon')} className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+              <button onClick={() => setIsJournalModalOpen(true)} className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm">
                  <Plus className="w-5 h-5 mr-2" /> Manual Entry
               </button>
             </div>
@@ -275,6 +326,97 @@ export default function FinancialLedgerPage() {
                    </ul>
                 </div>
              </div>
+          </div>
+        )}
+
+        {/* Manual Journal Entry Modal */}
+        {isJournalModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col">
+              <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                <h2 className="text-xl font-bold text-gray-800">Add Manual Journal Entry</h2>
+                <button onClick={() => setIsJournalModalOpen(false)} className="text-gray-500 hover:bg-gray-200 p-2 rounded-full">
+                  <Plus className="w-6 h-6 rotate-45" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateJournalEntry} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Description *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Bank fee adjustment or Petty cash top-up"
+                    value={journalForm.description}
+                    onChange={(e) => setJournalForm({ ...journalForm, description: e.target.value })}
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Debit (Dr) Account</label>
+                    <select
+                      value={journalForm.debitAccount}
+                      onChange={(e) => setJournalForm({ ...journalForm, debitAccount: e.target.value })}
+                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+                    >
+                      <option value="Expenses">Expenses</option>
+                      <option value="Assets">Assets (Cash / Bank)</option>
+                      <option value="Assets (Inventory)">Assets (Inventory)</option>
+                      <option value="Liabilities">Liabilities</option>
+                      <option value="Equity">Owner Equity</option>
+                      <option value="Revenue">Revenue</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Credit (Cr) Account</label>
+                    <select
+                      value={journalForm.creditAccount}
+                      onChange={(e) => setJournalForm({ ...journalForm, creditAccount: e.target.value })}
+                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+                    >
+                      <option value="Assets">Assets (Cash / Bank)</option>
+                      <option value="Revenue">Revenue</option>
+                      <option value="Liabilities">Liabilities</option>
+                      <option value="Expenses">Expenses</option>
+                      <option value="Equity">Owner Equity</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Amount (KES) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    placeholder="0.00"
+                    value={journalForm.amount}
+                    onChange={(e) => setJournalForm({ ...journalForm, amount: e.target.value })}
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-bold"
+                  />
+                </div>
+
+                <div className="pt-4 border-t flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsJournalModalOpen(false)}
+                    className="px-5 py-2.5 font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors text-sm shadow-sm"
+                  >
+                    Post Journal Entry
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>

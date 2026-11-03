@@ -81,7 +81,7 @@ router.get('/', async (req, res) => {
                 targetOutletId = terminal.outletId;
             }
         }
-        const [allProducts, allUsers, categories, customers, suppliers, business, locations, mpesaConfig] = await Promise.all([
+        const [allProducts, allUsers, categories, customers, suppliers, business, locations, mpesaConfig, savedDocuments, clients] = await Promise.all([
             db.selectFrom('Product').selectAll().where('businessId', '=', businessId).execute(),
             db.selectFrom('User').selectAll().where('businessId', '=', businessId).execute(),
             db.selectFrom('Category').selectAll().where('businessId', '=', businessId).execute(),
@@ -89,7 +89,9 @@ router.get('/', async (req, res) => {
             db.selectFrom('Supplier').selectAll().where('businessId', '=', businessId).execute(),
             db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst(),
             db.selectFrom('StoreLocation').selectAll().where('businessId', '=', businessId).execute(),
-            db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst()
+            db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst(),
+            db.selectFrom('SavedDocument').selectAll().where('businessId', '=', businessId).execute().catch(() => []),
+            db.selectFrom('Client').selectAll().where('businessId', '=', businessId).execute().catch(() => [])
         ]);
         let targetOutlet = null;
         if (targetOutletId) {
@@ -162,6 +164,42 @@ router.get('/', async (req, res) => {
             suppliers,
             expenses: [],
             salaries: [],
+            clients: clients || [],
+            savedDocuments: savedDocuments || [],
+            documents: (savedDocuments || []).map((d) => {
+                let meta = {};
+                try {
+                    meta = typeof d.metadata === 'string' ? JSON.parse(d.metadata) : (d.metadata || {});
+                }
+                catch (e) { }
+                let items = [];
+                try {
+                    items = typeof d.items === 'string' ? JSON.parse(d.items) : (d.items || []);
+                }
+                catch (e) { }
+                return {
+                    id: d.id,
+                    type: d.type,
+                    title: meta.docNumber || d.customerName || `${d.type} - ${d.id}`,
+                    data: {
+                        docNumber: meta.docNumber || d.id,
+                        date: d.date ? d.date.split('T')[0] : '',
+                        dueDate: d.dueDate ? d.dueDate.split('T')[0] : '',
+                        clientName: d.customerName,
+                        clientEmail: d.customerEmail,
+                        clientPhone: d.customerPhone,
+                        clientAddress: d.customerAddress,
+                        items,
+                        subtotal: d.subtotal,
+                        taxAmount: d.tax,
+                        total: d.total,
+                        notes: d.notes,
+                        status: d.status,
+                        ...meta
+                    },
+                    createdAt: d.createdAt
+                };
+            }),
             businessSetup: business ? (() => {
                 let bSettings = {};
                 try {
@@ -705,6 +743,72 @@ router.post('/', async (req, res) => {
                 else if (op.type === 'update-business-setup') {
                     if (op.data) {
                         await db.updateTable('Business').set({ settings: JSON.stringify(op.data), updatedAt: new Date().toISOString() }).where('id', '=', businessId).execute();
+                        processedCount++;
+                    }
+                }
+                else if (op.type === 'save-document' || op.type === 'add-document' || op.type === 'document') {
+                    const doc = op.data;
+                    if (doc && (doc.id || doc.docNumber)) {
+                        const docId = String(doc.id || randomUUID());
+                        const d = doc.data || doc;
+                        const itemsStr = typeof d.items === 'string' ? d.items : JSON.stringify(d.items || []);
+                        const metadataStr = typeof d.metadata === 'string' ? d.metadata : JSON.stringify({
+                            docNumber: d.docNumber || doc.title,
+                            subject: d.subject,
+                            bodyText: d.bodyText,
+                            partialAmount: d.partialAmount,
+                            settlementDate: d.settlementDate,
+                            daysNotice: d.daysNotice,
+                            paymentMode: d.paymentMode
+                        });
+                        const existing = await db.selectFrom('SavedDocument').selectAll().where('businessId', '=', businessId).where('id', '=', docId).executeTakeFirst();
+                        if (existing) {
+                            await db.updateTable('SavedDocument').set({
+                                type: doc.type || d.type || 'INVOICE',
+                                date: (d.date ? new Date(d.date) : new Date()).toISOString(),
+                                dueDate: d.dueDate ? new Date(d.dueDate).toISOString() : null,
+                                customerName: String(d.clientCompany || d.clientName || d.customerName || 'Walk-in'),
+                                customerEmail: d.clientEmail || d.customerEmail || null,
+                                customerPhone: d.clientPhone || d.customerPhone || null,
+                                customerAddress: d.clientAddress || d.customerAddress || null,
+                                items: itemsStr,
+                                subtotal: Number(d.subtotal) || 0,
+                                tax: Number(d.taxAmount || d.tax) || 0,
+                                total: Number(d.total) || 0,
+                                notes: d.notes || null,
+                                status: d.status || 'SAVED',
+                                metadata: metadataStr,
+                                updatedAt: new Date().toISOString()
+                            }).where('id', '=', existing.id).execute();
+                        }
+                        else {
+                            await db.insertInto('SavedDocument').values({
+                                id: docId,
+                                businessId,
+                                type: doc.type || d.type || 'INVOICE',
+                                date: (d.date ? new Date(d.date) : new Date()).toISOString(),
+                                dueDate: d.dueDate ? new Date(d.dueDate).toISOString() : null,
+                                customerName: String(d.clientCompany || d.clientName || d.customerName || 'Walk-in'),
+                                customerEmail: d.clientEmail || d.customerEmail || null,
+                                customerPhone: d.clientPhone || d.customerPhone || null,
+                                customerAddress: d.clientAddress || d.customerAddress || null,
+                                items: itemsStr,
+                                subtotal: Number(d.subtotal) || 0,
+                                tax: Number(d.taxAmount || d.tax) || 0,
+                                total: Number(d.total) || 0,
+                                notes: d.notes || null,
+                                status: d.status || 'SAVED',
+                                metadata: metadataStr,
+                                createdAt: (doc.createdAt ? new Date(doc.createdAt) : new Date()).toISOString(),
+                                updatedAt: new Date().toISOString()
+                            }).execute();
+                        }
+                        processedCount++;
+                    }
+                }
+                else if (op.type === 'delete-document') {
+                    if (op.data?.id) {
+                        await db.deleteFrom('SavedDocument').where('businessId', '=', businessId).where('id', '=', String(op.data.id)).execute();
                         processedCount++;
                     }
                 }

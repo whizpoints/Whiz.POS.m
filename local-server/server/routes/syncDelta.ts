@@ -145,7 +145,7 @@ router.get('/', async (req: any, res: any) => {
     if (locationId) stockQuery = stockQuery.where('locationId', '=', String(locationId));
     if (outletId) stockQuery = stockQuery.where((eb) => eb.or([ eb('outletId', '=', String(outletId)), eb('outletId', 'is', null) ]));
 
-    const [ users, products, categories, rawInventory, stockMovements, customers, suppliers, businessData, outlets, rawOutlets ] = await Promise.all([
+    const [ users, products, categories, rawInventory, stockMovements, customers, suppliers, businessData, outlets, rawOutlets, clients, savedDocuments ] = await Promise.all([
       usersQuery.execute(),
       productsQuery.execute(),
       db.selectFrom('Category').selectAll().where('businessId', '=', businessId).where('updatedAt', '>', sinceDate.toISOString()).execute(),
@@ -155,7 +155,9 @@ router.get('/', async (req: any, res: any) => {
       db.selectFrom('Supplier').selectAll().where('businessId', '=', businessId).where('updatedAt', '>', sinceDate.toISOString()).execute(),
       db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst(),
       db.selectFrom('Outlet').selectAll().where('businessId', '=', businessId).where('updatedAt', '>', sinceDate.toISOString()).execute(),
-      db.selectFrom('Outlet').select('id').where('businessId', '=', businessId).execute()
+      db.selectFrom('Outlet').select('id').where('businessId', '=', businessId).execute(),
+      db.selectFrom('Client').selectAll().where('businessId', '=', businessId).where('updatedAt', '>', sinceDate.toISOString()).execute().catch(() => []),
+      db.selectFrom('SavedDocument').selectAll().where('businessId', '=', businessId).where('updatedAt', '>', sinceDate.toISOString()).execute().catch(() => [])
     ]);
 
     const productIdsForInv = rawInventory.map((i) => i.productId);
@@ -203,6 +205,8 @@ router.get('/', async (req: any, res: any) => {
         transactions: [], // Intentionally empty: fresh terminals do not download historical ledgers
         outlets,
         terminals,
+        clients,
+        savedDocuments,
         businessSetup: businessData && new Date(businessData.updatedAt) > sinceDate ? (() => {
           let bSettings: any = {};
           try { bSettings = typeof businessData.settings === 'string' ? JSON.parse(businessData.settings) : (businessData.settings || {}); } catch(e) {}
@@ -253,7 +257,7 @@ router.get('/', async (req: any, res: any) => {
 router.post('/', async (req: any, res: any) => {
   try {
     const { businessId } = req.user;
-    const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, outlets, terminals, businessSetup, documents, mpesaConfigs, isFromCloud } = req.body;
+    const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, outlets, terminals, businessSetup, documents, savedDocuments, clients, mpesaConfigs, isFromCloud } = req.body;
 
     let targetLocationId: string | null = null;
     let targetOutletId: string | null = null;
@@ -312,6 +316,8 @@ router.post('/', async (req: any, res: any) => {
       users: 0,
       products: 0,
       customers: 0,
+      clients: 0,
+      savedDocuments: 0,
       suppliers: 0,
       transactions: 0,
       inventory: 0,
@@ -704,8 +710,9 @@ router.post('/', async (req: any, res: any) => {
 
     
     // 5. Saved Documents
-    if (documents && Array.isArray(documents)) {
-       for (const d of documents) {
+    const docsToSync = savedDocuments || documents;
+    if (docsToSync && Array.isArray(docsToSync)) {
+       for (const d of docsToSync) {
           if (!d.id) continue;
           const existing = await db.selectFrom('SavedDocument').selectAll().where('businessId', '=', businessId).where('id', '=', String(d.id)).executeTakeFirst();
           if (resolveConflict(d, existing)) {
@@ -720,13 +727,13 @@ router.post('/', async (req: any, res: any) => {
                       customerEmail: d.customerEmail || d.clientEmail || null,
                       customerPhone: d.customerPhone || null,
                       customerAddress: d.customerAddress || d.clientAddress || null,
-                      items: JSON.stringify(d.items || []),
+                      items: typeof d.items === 'string' ? d.items : JSON.stringify(d.items || []),
                       subtotal: Number(d.subtotal) || 0,
-                      tax: Number(d.taxAmount) || 0,
+                      tax: Number(d.tax || d.taxAmount) || 0,
                       total: Number(d.total) || 0,
                       notes: d.notes || null,
                       status: d.status || 'DRAFT',
-                      metadata: JSON.stringify({
+                      metadata: typeof d.metadata === 'string' ? d.metadata : JSON.stringify({
                         docNumber: d.docNumber,
                         subject: d.subject,
                         bodyText: d.bodyText,
@@ -750,13 +757,13 @@ router.post('/', async (req: any, res: any) => {
                       customerEmail: d.customerEmail || d.clientEmail || null,
                       customerPhone: d.customerPhone || null,
                       customerAddress: d.customerAddress || d.clientAddress || null,
-                      items: JSON.stringify(d.items || []),
+                      items: typeof d.items === 'string' ? d.items : JSON.stringify(d.items || []),
                       subtotal: Number(d.subtotal) || 0,
-                      tax: Number(d.taxAmount) || 0,
+                      tax: Number(d.tax || d.taxAmount) || 0,
                       total: Number(d.total) || 0,
                       notes: d.notes || null,
                       status: d.status || 'DRAFT',
-                      metadata: JSON.stringify({
+                      metadata: typeof d.metadata === 'string' ? d.metadata : JSON.stringify({
                         docNumber: d.docNumber,
                         subject: d.subject,
                         bodyText: d.bodyText,
@@ -765,12 +772,52 @@ router.post('/', async (req: any, res: any) => {
                         daysNotice: d.daysNotice,
                         paymentMode: d.paymentMode
                       }),
-                      createdAt: (d.date ? new Date(d.date) : new Date()).toISOString(),
+                      createdAt: (d.createdAt || d.date ? new Date(d.createdAt || d.date) : new Date()).toISOString(),
                       updatedAt: (d.updatedAt ? new Date(d.updatedAt) : new Date()).toISOString()
                   }).execute();
               }
+              results.savedDocuments++;
           }
        }
+    }
+
+    // 5.1 Clients
+    if (clients && Array.isArray(clients)) {
+      for (const cl of clients) {
+        if (!cl.name) continue;
+        const clId = cl.id ? String(cl.id) : randomUUID();
+        const existing = await db.selectFrom('Client').selectAll().where('businessId', '=', businessId).where('id', '=', clId).executeTakeFirst();
+        if (resolveConflict(cl, existing)) {
+          if (existing) {
+            await db.updateTable('Client')
+// @ts-ignore
+              .set({
+                name: String(cl.name),
+                phone: cl.phone ? String(cl.phone) : null,
+                email: cl.email ? String(cl.email) : null,
+                address: cl.address ? String(cl.address) : null,
+                updatedAt: (cl.updatedAt ? new Date(cl.updatedAt) : new Date()).toISOString()
+              })
+              .where('id', '=', existing.id)
+              .execute();
+          } else {
+            await db.insertInto('Client')
+// @ts-ignore
+              .values({
+                id: clId,
+                businessId,
+                name: String(cl.name),
+                phone: cl.phone ? String(cl.phone) : null,
+                email: cl.email ? String(cl.email) : null,
+                address: cl.address ? String(cl.address) : null,
+                createdAt: (cl.createdAt ? new Date(cl.createdAt) : new Date()).toISOString(),
+                updatedAt: (cl.updatedAt ? new Date(cl.updatedAt) : new Date()).toISOString()
+              })
+              .execute();
+          }
+          results.clients++;
+        }
+      }
     }
 
     // 6. Customers

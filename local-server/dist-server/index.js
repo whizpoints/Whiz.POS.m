@@ -35,6 +35,8 @@ import outletsRoutes from './routes/outlets.js';
 import ledgerRoutes from './routes/ledger.js';
 import setupRoutes from './routes/setup.js';
 import documentsRoutes from './routes/documents.js';
+import clientsRoutes from './routes/clients.js';
+import savedDocsRoutes from './routes/saved-documents.js';
 import staffRoutes from './routes/staff.js';
 import backupRoutes, { executeLocalServerBackup } from './routes/backup.js';
 import kraRoutes from './routes/kra.js';
@@ -194,6 +196,8 @@ app.use('/api/outlets', outletsRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/setup', setupRoutes);
 app.use('/api/documents', documentsRoutes);
+app.use('/api/clients', clientsRoutes);
+app.use('/api/saved-documents', savedDocsRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/users', staffRoutes);
 app.use('/api/backup', backupRoutes);
@@ -274,7 +278,7 @@ setInterval(async () => {
                 .orderBy('createdAt', 'desc')
                 .executeTakeFirst();
             const pushSinceStr = lastPushLog ? new Date(lastPushLog.createdAt).toISOString() : "1970-01-01T00:00:00.000Z";
-            const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements, rawReceipts, localOutlets, localTerminals] = await Promise.all([
+            const [localUsers, localProducts, localCustomers, localSuppliers, localStockMovements, rawReceipts, localOutlets, localTerminals, localClients, localSavedDocuments] = await Promise.all([
                 db.selectFrom('User').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
                 db.selectFrom('Product').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
                 db.selectFrom('Customer').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
@@ -283,14 +287,16 @@ setInterval(async () => {
                 db.selectFrom('Receipt').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
                 db.selectFrom('Outlet').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
                 db.selectFrom('Terminal').selectAll().where('updatedAt', '>', pushSinceStr).execute(),
+                db.selectFrom('Client').selectAll().where('updatedAt', '>', pushSinceStr).execute().catch(() => []),
+                db.selectFrom('SavedDocument').selectAll().where('updatedAt', '>', pushSinceStr).execute().catch(() => []),
             ]);
             const localTransactions = [];
             for (const r of rawReceipts) {
                 const items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', '=', r.id).execute();
                 localTransactions.push({ ...r, items });
             }
-            if (localUsers.length > 0 || localProducts.length > 0 || localCustomers.length > 0 || localStockMovements.length > 0 || localTransactions.length > 0 || pushSinceStr === "1970-01-01T00:00:00.000Z") {
-                console.log(`[Sync Engine] Pushing ${localProducts.length} products, ${localUsers.length} users, ${localStockMovements.length} inventory logs, ${localTransactions.length} transactions to Cloud`);
+            if (localUsers.length > 0 || localProducts.length > 0 || localCustomers.length > 0 || localStockMovements.length > 0 || localTransactions.length > 0 || (localClients && localClients.length > 0) || (localSavedDocuments && localSavedDocuments.length > 0) || pushSinceStr === "1970-01-01T00:00:00.000Z") {
+                console.log(`[Sync Engine] Pushing ${localProducts.length} products, ${localUsers.length} users, ${localStockMovements.length} inventory logs, ${localTransactions.length} transactions, ${localClients?.length || 0} clients, ${localSavedDocuments?.length || 0} documents to Cloud`);
                 const businessSetup = business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {};
                 businessSetup.businessName = business.name;
                 businessSetup.locationId = businessSetup.cloudLocationId || location.id;
@@ -309,6 +315,9 @@ setInterval(async () => {
                         transactions: localTransactions,
                         outlets: localOutlets,
                         terminals: localTerminals,
+                        clients: localClients,
+                        savedDocuments: localSavedDocuments,
+                        documents: localSavedDocuments,
                         inventoryLogs: localStockMovements.map(sm => {
                             const mType = String(sm.type || '').toUpperCase();
                             const isDeduction = ['SALE', 'TRANSFER_OUT', 'ADJUSTMENT_DOWN', 'SUBTRACT', 'OUT'].includes(mType);

@@ -263,15 +263,50 @@ router.get('/reports', async (req: any, res: any) => {
       if (endDate) whereClause.createdAt.lte = new Date(endDate);
     }
 
-    const [aggregations, totalProducts, totalCustomers] = await Promise.all([
+    const [aggregations, totalProducts, totalCustomers, allProducts, dbReceipts] = await Promise.all([
       prisma.receipt.aggregate({
         where: whereClause,
         _sum: { totalAmount: true },
         _count: { id: true }
       }),
       prisma.product.count({ where: { businessId } }),
-      prisma.customer.count({ where: { businessId } })
+      prisma.customer.count({ where: { businessId } }),
+      prisma.product.findMany({
+        where: { businessId },
+        select: { id: true, name: true, costPrice: true, price: true }
+      }),
+      prisma.receipt.findMany({
+        where: whereClause,
+        include: { items: true },
+        orderBy: { createdAt: 'asc' }
+      })
     ]);
+
+    const productCostMap = new Map<string, number>();
+    allProducts.forEach(p => {
+      if (p.name) productCostMap.set(p.name.trim().toLowerCase(), p.costPrice || 0);
+    });
+
+    let totalProfit = 0;
+    const receiptProfitMap = new Map<string, number>();
+
+    dbReceipts.forEach(r => {
+      let rProfit = 0;
+      if (r.items && r.items.length > 0) {
+        r.items.forEach(item => {
+          const nameKey = (item.productName || '').trim().toLowerCase();
+          const cost = productCostMap.get(nameKey) ?? 0;
+          const qty = Number(item.quantity) || 1;
+          const itemRev = Number(item.totalPrice) || ((Number(item.unitPrice) || 0) * qty);
+          const pft = cost > 0 ? (itemRev - (cost * qty)) : (itemRev * 0.25);
+          rProfit += pft;
+        });
+      } else {
+        rProfit = (r.totalAmount || 0) * 0.25;
+      }
+      totalProfit += rProfit;
+      receiptProfitMap.set(r.id, rProfit);
+    });
 
     const totalRevenue = aggregations._sum.totalAmount || 0;
     const totalReceipts = aggregations._count.id || 0;
@@ -279,7 +314,7 @@ router.get('/reports', async (req: any, res: any) => {
     const stats = { 
       revenue: totalRevenue, 
       revenueDelta: 0, 
-      profit: totalRevenue * 0.3, 
+      profit: Math.round(totalProfit * 100) / 100, 
       profitDelta: 0, 
       transactions: totalReceipts,
       transactionsDelta: 0 
@@ -288,36 +323,34 @@ router.get('/reports', async (req: any, res: any) => {
     let chartData: any[] = [];
     
     if (!groupBy || groupBy === 'day') {
-      const dbReceipts = await prisma.receipt.findMany({
-         where: whereClause,
-         select: { totalAmount: true, createdAt: true },
-         orderBy: { createdAt: 'asc' }
-      });
-      
-      const salesByDay: Record<string, number> = {};
+      const salesByDay: Record<string, { sales: number; profit: number }> = {};
       dbReceipts.forEach(r => {
          const d = new Date(r.createdAt).toLocaleDateString('en-US', { weekday: 'short' });
-         salesByDay[d] = (salesByDay[d] || 0) + r.totalAmount;
+         if (!salesByDay[d]) salesByDay[d] = { sales: 0, profit: 0 };
+         salesByDay[d].sales += r.totalAmount || 0;
+         salesByDay[d].profit += receiptProfitMap.get(r.id) || ((r.totalAmount || 0) * 0.25);
       });
 
       chartData = Object.keys(salesByDay).map(day => ({
          name: day,
-         sales: salesByDay[day],
-         profit: salesByDay[day] * 0.3
+         sales: Math.round(salesByDay[day].sales * 100) / 100,
+         profit: Math.round(salesByDay[day].profit * 100) / 100
       }));
     } else if (groupBy === 'branch') {
-      const grouped = await prisma.receipt.groupBy({
-         by: ['locationId'],
-         where: whereClause,
-         _sum: { totalAmount: true }
+      const branchMap: Record<string, { sales: number; profit: number }> = {};
+      dbReceipts.forEach(r => {
+        const locId = r.locationId || 'unknown';
+        if (!branchMap[locId]) branchMap[locId] = { sales: 0, profit: 0 };
+        branchMap[locId].sales += r.totalAmount || 0;
+        branchMap[locId].profit += receiptProfitMap.get(r.id) || ((r.totalAmount || 0) * 0.25);
       });
       const locations = await prisma.storeLocation.findMany({ where: { businessId } });
-      chartData = grouped.map(g => {
-         const loc = locations.find(l => l.id === g.locationId);
+      chartData = Object.keys(branchMap).map(locId => {
+         const loc = locations.find(l => l.id === locId);
          return {
-            name: loc?.name || 'Unknown',
-            sales: g._sum.totalAmount || 0,
-            profit: (g._sum.totalAmount || 0) * 0.3
+            name: loc?.name || 'Central Store',
+            sales: Math.round(branchMap[locId].sales * 100) / 100,
+            profit: Math.round(branchMap[locId].profit * 100) / 100
          };
       });
     }

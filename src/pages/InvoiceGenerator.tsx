@@ -12,6 +12,7 @@ import { cn } from '../lib/utils';
 import { DocumentModal } from '../components/invoice/DocumentModal';
 import { DOCUMENT_TEMPLATES } from '../components/invoice/documentData';
 import { DocumentType } from '../components/invoice/DocumentPreview';
+import { NetworkClient } from '../lib/networkClient';
 import toast from 'react-hot-toast';
 
 // Types
@@ -131,6 +132,84 @@ export default function InvoiceGenerator() {
     }
   }, [documentSettings, currentDocId]);
 
+  // Fetch remote documents & clients from local server / cloud
+  useEffect(() => {
+    let isMounted = true;
+    const fetchRemoteDocsAndClients = async () => {
+      try {
+        const docRes = await NetworkClient.fetchApi('/api/saved-documents', { method: 'GET' });
+        if (docRes.ok && isMounted) {
+          const remoteDocs = await docRes.json();
+          if (Array.isArray(remoteDocs)) {
+            remoteDocs.forEach((d: any) => {
+              let items: any[] = [];
+              try { items = typeof d.items === 'string' ? JSON.parse(d.items) : (d.items || []); } catch(e) {}
+              let meta: any = {};
+              try { meta = typeof d.metadata === 'string' ? JSON.parse(d.metadata) : (d.metadata || {}); } catch(e) {}
+
+              const formattedDoc: SavedDocument = {
+                id: String(d.id),
+                type: d.type || 'INVOICE',
+                name: meta.docNumber || d.customerName || `${d.type} - ${d.id}`,
+                date: d.date ? d.date.split('T')[0] : new Date().toISOString().split('T')[0],
+                data: {
+                  docNumber: meta.docNumber || d.id,
+                  docTitle: meta.docNumber || d.customerName || `${d.type} - ${d.id}`,
+                  date: d.date ? d.date.split('T')[0] : new Date().toISOString().split('T')[0],
+                  dueDate: d.dueDate ? d.dueDate.split('T')[0] : '',
+                  clientName: d.customerName,
+                  clientEmail: d.customerEmail,
+                  clientPhone: d.customerPhone,
+                  clientAddress: d.customerAddress,
+                  items,
+                  subtotal: Number(d.subtotal) || 0,
+                  taxRate: businessSetup?.taxRate || 0,
+                  taxAmount: Number(d.tax) || 0,
+                  total: Number(d.total) || 0,
+                  notes: d.notes,
+                  status: d.status,
+                  ...meta
+                }
+              };
+              saveDocument(formattedDoc);
+            });
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const clientRes = await NetworkClient.fetchApi('/api/clients', { method: 'GET' });
+        if (clientRes.ok && isMounted) {
+          const remoteClients = await clientRes.json();
+          if (Array.isArray(remoteClients)) {
+            remoteClients.forEach((cl: any) => {
+              if (cl.name) {
+                saveCreditCustomer({
+                  id: String(cl.id),
+                  name: cl.name,
+                  company: cl.name,
+                  phone: cl.phone || '',
+                  email: cl.email || '',
+                  address: cl.address || '',
+                  taxId: cl.taxPin || '',
+                  totalCredit: 0,
+                  paidAmount: 0,
+                  balance: 0,
+                  transactions: [],
+                  createdAt: cl.createdAt || new Date().toISOString(),
+                  lastUpdated: cl.updatedAt || new Date().toISOString()
+                });
+              }
+            });
+          }
+        }
+      } catch (e) {}
+    };
+
+    fetchRemoteDocsAndClients();
+    return () => { isMounted = false; };
+  }, [businessSetup?.taxRate]);
+
   // Reset to brand new blank document
   const handleNewDocument = () => {
     const prefixMap: Record<string, string> = {
@@ -202,6 +281,34 @@ export default function InvoiceGenerator() {
     setCurrentDocId(docId);
     setDocTitle(titleToUse);
     toast.success(`Saved "${titleToUse}"`);
+
+    // Asynchronously push to local-server and cloud
+    NetworkClient.fetchApi('/api/saved-documents', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: docId,
+        type: docType,
+        date,
+        dueDate,
+        customerName: clientCompany || clientName || 'Walk-in',
+        customerEmail: clientEmail,
+        customerPhone: '',
+        customerAddress: clientAddress,
+        items,
+        subtotal,
+        taxAmount,
+        total,
+        notes,
+        status: 'SAVED',
+        docNumber,
+        subject,
+        bodyText: templateString,
+        partialAmount,
+        settlementDate,
+        daysNotice,
+        paymentMode
+      })
+    }).catch(() => {});
   };
 
   // Save As a new duplicate document
@@ -269,6 +376,34 @@ export default function InvoiceGenerator() {
     setIsSaveAsOpen(false);
     setSaveAsTitle('');
     toast.success(`Saved as new copy: "${newName}"`);
+
+    // Asynchronously push to local-server and cloud
+    NetworkClient.fetchApi('/api/saved-documents', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: newDocId,
+        type: docType,
+        date,
+        dueDate,
+        customerName: clientCompany || clientName || 'Walk-in',
+        customerEmail: clientEmail,
+        customerPhone: '',
+        customerAddress: clientAddress,
+        items,
+        subtotal,
+        taxAmount,
+        total,
+        notes,
+        status: 'SAVED',
+        docNumber: newDocNumber,
+        subject,
+        bodyText: templateString,
+        partialAmount,
+        settlementDate,
+        daysNotice,
+        paymentMode
+      })
+    }).catch(() => {});
   };
 
   const handleLoadDocument = (doc: SavedDocument) => {
@@ -312,6 +447,7 @@ export default function InvoiceGenerator() {
       if (currentDocId === id) {
         handleNewDocument();
       }
+      NetworkClient.fetchApi(`/api/saved-documents/${id}`, { method: 'DELETE' }).catch(() => {});
       toast.success('Document deleted');
     }
   };
@@ -362,6 +498,16 @@ export default function InvoiceGenerator() {
       lastUpdated: new Date().toISOString()
     };
     saveCreditCustomer(newCustomer);
+    NetworkClient.fetchApi('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: newCustomer.id,
+        name: newCustomer.name,
+        email: newCustomer.email,
+        phone: newCustomer.phone,
+        address: newCustomer.address
+      })
+    }).catch(() => {});
     toast.success('Client saved permanently to Address Book!');
   };
 

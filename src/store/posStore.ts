@@ -86,6 +86,7 @@ export interface OpenBill {
   tax: number;
   total: number;
   cashier: string;
+  createdBy?: string;
   createdAt: string;
   status: 'open' | 'settled' | 'cancelled';
   notes?: string;
@@ -134,6 +135,7 @@ export interface CreditCustomer {
   company?: string;
   email?: string;
   address?: string;
+  taxId?: string;
   balance: number;
   transactions: string[]; // Store transaction IDs
   createdAt: string;
@@ -234,6 +236,23 @@ export interface BusinessSetup {
   outletName?: string;
   businessName: string;
   businessId?: string;
+  cloudBusinessId?: string;
+  cloudLocationId?: string;
+  cloudOutletId?: string;
+  cloudApiKey?: string;
+  cloudUrl?: string;
+  webportalUrl?: string;
+  mpesaPushUrl?: string;
+  mpesaStatusUrl?: string;
+  mpesaSearchUrl?: string;
+  mpesaConsumeUrl?: string;
+  mpesaQrUrl?: string;
+  itaxInvoiceUrl?: string;
+  itaxPingUrl?: string;
+  itaxInitUrl?: string;
+  itaxSyncUrl?: string;
+  kraInvoiceUrl?: string;
+  kraPingUrl?: string;
   id?: string;
   terminalName?: string;
   outletId?: string;
@@ -1469,6 +1488,7 @@ export const usePosStore = create<PosState>()(
         set((state) => {
           const updatedDocs = [doc, ...state.documents.filter(d => d.id !== doc.id)];
           saveDataToFile('documents.json', updatedDocs);
+          state.addToSyncQueue({ type: 'save-document', data: doc });
           return { documents: updatedDocs };
         });
       },
@@ -1477,6 +1497,7 @@ export const usePosStore = create<PosState>()(
         set((state) => {
           const updatedDocs = state.documents.filter(d => d.id !== id);
           saveDataToFile('documents.json', updatedDocs);
+          state.addToSyncQueue({ type: 'delete-document', data: { id } });
           return { documents: updatedDocs };
         });
       },
@@ -1774,6 +1795,8 @@ export const usePosStore = create<PosState>()(
           const newCreditCustomers = sanitizeAndMerge(currentState.creditCustomers, serverData.creditCustomers || []);
           const newLoyaltyCustomers = sanitizeAndMerge(currentState.loyaltyCustomers, serverData.loyaltyCustomers || []);
           const newSuppliers = sanitizeAndMerge(currentState.suppliers, serverData.suppliers || []);
+          const incomingDocs = serverData.documents || serverData.savedDocuments;
+          const newDocuments = (incomingDocs && Array.isArray(incomingDocs)) ? sanitizeAndMerge(currentState.documents || [], incomingDocs) : (currentState.documents || []);
           
           let newCategories = currentState.categories;
           if (serverData.categories && Array.isArray(serverData.categories)) {
@@ -1844,6 +1867,7 @@ export const usePosStore = create<PosState>()(
             loyaltyCustomers: newLoyaltyCustomers as LoyaltyCustomer[],
             businessSetup: newBusinessSetup as BusinessSetup,
             suppliers: newSuppliers as Supplier[],
+            documents: newDocuments as SavedDocument[],
             categories: newCategories,
           });
 
@@ -1855,6 +1879,7 @@ export const usePosStore = create<PosState>()(
           saveDataToFile('loyalty-customers.json', newLoyaltyCustomers);
           saveDataToFile('business-setup.json', newBusinessSetup);
           saveDataToFile('suppliers.json', newSuppliers);
+          saveDataToFile('documents.json', newDocuments);
 
         } catch (error) {
           console.error('Failed to process sync data:', error);

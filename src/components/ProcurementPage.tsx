@@ -17,6 +17,34 @@ export default function ProcurementPage() {
   const [isPoModalOpen, setIsPoModalOpen] = useState(false);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   
+  // Supplier Form State
+  const [supplierForm, setSupplierForm] = useState({
+    name: '',
+    contact: '',
+    location: '',
+    notes: ''
+  });
+
+  const handleCreateSupplier = () => {
+    if (!supplierForm.name.trim()) {
+      toast.error('Supplier name is required');
+      return;
+    }
+    const newSupp: Supplier = {
+      id: Date.now().toString(),
+      name: supplierForm.name.trim(),
+      contact: supplierForm.contact.trim() || 'N/A',
+      location: supplierForm.location.trim() || 'N/A',
+      active: true,
+      notes: supplierForm.notes.trim(),
+      createdAt: new Date().toISOString()
+    };
+    addSupplier(newSupp);
+    setIsSupplierModalOpen(false);
+    setSupplierForm({ name: '', contact: '', location: '', notes: '' });
+    toast.success(`Supplier "${newSupp.name}" created successfully`);
+  };
+  
   // PO Form State
   const [poForm, setPoForm] = useState<{
     supplierId: string;
@@ -225,7 +253,7 @@ export default function ProcurementPage() {
            <div className="bg-white rounded-lg shadow-sm p-6">
              <div className="flex justify-between items-center mb-6">
                <h2 className="text-xl font-semibold text-gray-800">Supplier Directory</h2>
-               <button onClick={() => toast.success('Supplier modal coming soon')} className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+               <button onClick={() => setIsSupplierModalOpen(true)} className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
                  <Plus className="w-5 h-5 mr-2" /> Add Supplier
                </button>
              </div>
@@ -323,6 +351,81 @@ export default function ProcurementPage() {
             <div className="p-6 border-t bg-gray-50 rounded-b-2xl flex justify-end gap-3">
               <button onClick={() => setIsPoModalOpen(false)} className="px-6 py-3 font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors">Cancel</button>
               <button onClick={handleCreatePO} className="px-6 py-3 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">Create & Send PO</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supplier Modal */}
+      {isSupplierModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
+              <h2 className="text-xl font-bold text-gray-800">Add New Supplier</h2>
+              <button onClick={() => setIsSupplierModalOpen(false)} className="text-gray-500 hover:bg-gray-200 p-2 rounded-full">
+                <Plus className="w-6 h-6 rotate-45" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Supplier Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Acme Supplies Ltd"
+                  value={supplierForm.name}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Contact Phone / Email</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 0712345678 or orders@acme.com"
+                  value={supplierForm.contact}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, contact: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Physical Location / Warehouse</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Industrial Area, Nairobi"
+                  value={supplierForm.location}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, location: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Notes / Supply Categories</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Beverage vendor, Net-30 payment terms"
+                  value={supplierForm.notes}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, notes: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 rounded-b-2xl flex justify-end gap-3">
+              <button
+                onClick={() => setIsSupplierModalOpen(false)}
+                className="px-5 py-2.5 font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateSupplier}
+                className="px-5 py-2.5 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors text-sm shadow-sm"
+              >
+                Save Supplier
+              </button>
             </div>
           </div>
         </div>

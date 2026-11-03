@@ -191,9 +191,40 @@ export type User = {
     updatedAt: Generated<string>;
     outletId: string | null;
 };
+export type Client = {
+    id: string;
+    businessId: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    createdAt: Generated<string>;
+    updatedAt: Generated<string>;
+};
+export type SavedDocument = {
+    id: string;
+    businessId: string;
+    type: string;
+    date: string;
+    dueDate: string | null;
+    customerName: string;
+    customerEmail: string | null;
+    customerPhone: string | null;
+    customerAddress: string | null;
+    items: string;
+    subtotal: Generated<number>;
+    tax: Generated<number>;
+    total: Generated<number>;
+    notes: string | null;
+    status: Generated<string>;
+    metadata: string | null;
+    createdAt: Generated<string>;
+    updatedAt: Generated<string>;
+};
 export type DB = {
     Business: Business;
     Category: Category;
+    Client: Client;
     Customer: Customer;
     MpesaConfig: MpesaConfig;
     MpesaTransaction: MpesaTransaction;
@@ -202,6 +233,7 @@ export type DB = {
     ProductInventory: ProductInventory;
     Receipt: Receipt;
     ReceiptItem: ReceiptItem;
+    SavedDocument: SavedDocument;
     StockMovement: StockMovement;
     StoreLocation: StoreLocation;
     Supplier: Supplier;

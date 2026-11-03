@@ -238,34 +238,69 @@ router.get('/reports', async (req, res) => {
         let q1 = db.selectFrom('Receipt').select((eb) => eb.fn.count('id').as('count')).where('businessId', '=', businessId);
         if (locationId && locationId !== 'ALL')
             q1 = q1.where('locationId', '=', locationId);
-        const [totalReceiptsRes, totalProductsRes, totalCustomersRes, receipts] = await Promise.all([
+        const [totalReceiptsRes, totalProductsRes, totalCustomersRes, receipts, allProducts] = await Promise.all([
             q1.executeTakeFirst().catch(() => ({ count: 0 })),
             db.selectFrom('Product').select((eb) => eb.fn.count('id').as('count')).where('businessId', '=', businessId).executeTakeFirst().catch(() => ({ count: 0 })),
             db.selectFrom('Customer').select((eb) => eb.fn.count('id').as('count')).where('businessId', '=', businessId).executeTakeFirst().catch(() => ({ count: 0 })),
             (async () => {
-                let q4 = db.selectFrom('Receipt').select(['totalAmount', 'createdAt']).where('businessId', '=', businessId);
+                let q4 = db.selectFrom('Receipt').select(['id', 'totalAmount', 'createdAt']).where('businessId', '=', businessId);
                 if (locationId && locationId !== 'ALL')
                     q4 = q4.where('locationId', '=', locationId);
                 return await q4.execute().catch(() => []);
-            })()
+            })(),
+            db.selectFrom('Product').select(['id', 'name', 'costPrice', 'price']).where('businessId', '=', businessId).execute().catch(() => [])
         ]);
         const totalReceipts = Number(totalReceiptsRes?.count || 0);
         const totalRevenue = receipts.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0);
+        const productCostMap = new Map();
+        allProducts.forEach((p) => {
+            if (p.name)
+                productCostMap.set(p.name.trim().toLowerCase(), Number(p.costPrice) || 0);
+        });
+        const receiptIds = receipts.map((r) => r.id);
+        let items = [];
+        if (receiptIds.length > 0) {
+            items = await db.selectFrom('ReceiptItem').selectAll().where('receiptId', 'in', receiptIds).execute().catch(() => []);
+        }
+        let totalProfit = 0;
+        const receiptProfitMap = new Map();
+        items.forEach((item) => {
+            const nameKey = (item.productName || '').trim().toLowerCase();
+            const cost = productCostMap.get(nameKey) ?? 0;
+            const qty = Number(item.quantity) || 1;
+            const revenue = Number(item.totalPrice) || ((Number(item.unitPrice) || 0) * qty);
+            const profit = cost > 0 ? (revenue - (cost * qty)) : (revenue * 0.25);
+            totalProfit += profit;
+            receiptProfitMap.set(item.receiptId, (receiptProfitMap.get(item.receiptId) || 0) + profit);
+        });
+        if (items.length === 0 && totalRevenue > 0) {
+            totalProfit = totalRevenue * 0.25;
+        }
         const stats = {
             revenue: totalRevenue,
             revenueDelta: 0,
-            profit: totalRevenue * 0.3,
+            profit: Math.round(totalProfit * 100) / 100,
             profitDelta: 0,
             transactions: totalReceipts,
             transactionsDelta: 0
         };
-        const chartData = [
-            { name: 'Mon', sales: totalRevenue * 0.1, profit: totalRevenue * 0.1 * 0.3 },
-            { name: 'Tue', sales: totalRevenue * 0.2, profit: totalRevenue * 0.2 * 0.3 },
-            { name: 'Wed', sales: totalRevenue * 0.15, profit: totalRevenue * 0.15 * 0.3 },
-            { name: 'Thu', sales: totalRevenue * 0.25, profit: totalRevenue * 0.25 * 0.3 },
-            { name: 'Fri', sales: totalRevenue * 0.3, profit: totalRevenue * 0.3 * 0.3 }
-        ];
+        const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const salesByDay = {};
+        dayOrder.forEach(d => { salesByDay[d] = { sales: 0, profit: 0 }; });
+        receipts.forEach((r) => {
+            const d = new Date(r.createdAt).toLocaleDateString('en-US', { weekday: 'short' });
+            if (salesByDay[d]) {
+                const rev = Number(r.totalAmount) || 0;
+                const pft = receiptProfitMap.get(r.id) ?? (rev * 0.25);
+                salesByDay[d].sales += rev;
+                salesByDay[d].profit += pft;
+            }
+        });
+        const chartData = dayOrder.map(day => ({
+            name: day,
+            sales: Math.round(salesByDay[day].sales * 100) / 100,
+            profit: Math.round(salesByDay[day].profit * 100) / 100
+        }));
         res.json({ stats, chartData });
     }
     catch (error) {

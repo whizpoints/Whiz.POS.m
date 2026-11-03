@@ -6,7 +6,7 @@ import 'jspdf-autotable';
 import * as xlsx from 'xlsx';
 
 export default function ReportsPage() {
-  const { transactions, dailySummaries, expenses, getDailySales, getTransactionsByDateRange, setCurrentPage, businessSetup } = usePosStore();
+  const { transactions, dailySummaries, expenses, getDailySales, getTransactionsByDateRange, setCurrentPage, businessSetup, products, creditCustomers } = usePosStore();
 
   // Initialize range with today using local time.
   const [dateRange, setDateRange] = useState(() => {
@@ -49,20 +49,44 @@ export default function ReportsPage() {
   }, [expenses, dateRange]);
 
   const salesSummary = useMemo(() => {
+    const isMethod = (pm: any, target: string) => {
+      const s = String(pm || '').toLowerCase().trim();
+      return s.includes(target);
+    };
+
     let cash = filteredTransactions
-      .filter(t => t.paymentMethod === 'cash')
-      .reduce((sum, t) => sum + t.total, 0);
+      .filter(t => isMethod(t.paymentMethod, 'cash'))
+      .reduce((sum, t) => sum + (Number(t.total) || 0), 0);
 
     let mpesa = filteredTransactions
-      .filter(t => t.paymentMethod === 'mpesa')
-      .reduce((sum, t) => sum + t.total, 0);
+      .filter(t => isMethod(t.paymentMethod, 'mpesa'))
+      .reduce((sum, t) => sum + (Number(t.total) || 0), 0);
 
     let credit = filteredTransactions
-      .filter(t => t.paymentMethod === 'credit')
-      .reduce((sum, t) => sum + t.total, 0);
+      .filter(t => isMethod(t.paymentMethod, 'credit'))
+      .reduce((sum, t) => sum + (Number(t.total) || 0), 0);
 
     let transactionCount = filteredTransactions.length;
     let totalSales = cash + mpesa + credit;
+
+    // Build cost lookup map for real profit calculation
+    const costMap = new Map<string, number>();
+    (products || []).forEach(p => {
+      if (p.name) costMap.set(p.name.trim().toLowerCase(), Number((p as any).costPrice ?? (p as any).buyingPrice) || 0);
+    });
+
+    // Compute Cost of Goods Sold (COGS)
+    let totalCogs = 0;
+    filteredTransactions.forEach(t => {
+      if (Array.isArray(t.items)) {
+        t.items.forEach(item => {
+          const pName = (item.product?.name || (item as any).name || '').trim().toLowerCase();
+          const cost = Number((item.product as any)?.costPrice ?? (item.product as any)?.buyingPrice) || (costMap.get(pName) ?? 0);
+          const qty = Number(item.quantity) || 1;
+          totalCogs += cost * qty;
+        });
+      }
+    });
 
     // Add archived data
     if (dailySummaries) {
@@ -77,19 +101,24 @@ export default function ReportsPage() {
       });
     }
 
-    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const netProfit = totalSales - totalExpenses;
+    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const grossProfit = totalCogs > 0 ? (totalSales - totalCogs) : (totalSales * 0.25);
+    const netProfit = grossProfit - totalExpenses;
+    const profitMargin = totalSales > 0 ? (grossProfit / totalSales) * 100 : 0;
 
     return {
       cash,
       mpesa,
       credit,
       totalSales,
+      totalCogs,
+      grossProfit,
       totalExpenses,
       netProfit,
+      profitMargin,
       transactionCount
     };
-  }, [filteredTransactions, filteredExpenses, dailySummaries, dateRange]);
+  }, [filteredTransactions, filteredExpenses, dailySummaries, dateRange, products]);
 
   const topProducts = useMemo(() => {
     const productSales: { [key: string]: { quantity: number; revenue: number } } = {};
@@ -189,9 +218,21 @@ export default function ReportsPage() {
         headStyles: { fillColor: [192, 57, 43] },
       });
     } else if (reportType === 'credits') {
-      // Logic for Credit Report PDF if needed, but 'credits' reportType was just an option in select
-      // For now, reuse sales logic or implement credit specific table
-       doc.text("Credit Report implementation pending for PDF", 14, yPos);
+      doc.text("Customer Credit & Outstanding Ledger", 14, yPos);
+      yPos += 5;
+      (doc as any).autoTable({
+        startY: yPos,
+        head: [['Customer / Client', 'Phone', 'Total Credit', 'Paid', 'Outstanding Balance']],
+        body: (creditCustomers || []).map(c => [
+          c.name || 'Walk-in',
+          c.phone || 'N/A',
+          `KES ${(Number(c.totalCredit) || 0).toLocaleString()}`,
+          `KES ${(Number(c.paidAmount) || 0).toLocaleString()}`,
+          `KES ${(Number(c.balance) || 0).toLocaleString()}`
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [217, 119, 6] },
+      });
     }
 
     doc.save(fileName);
@@ -433,6 +474,14 @@ export default function ReportsPage() {
                     KES {salesSummary.totalSales.toFixed(2)}
                   </span>
                 </div>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Est. Cost of Goods (COGS)</span>
+                <span className="font-medium text-gray-700">KES {salesSummary.totalCogs.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Gross Profit (Margin {salesSummary.profitMargin.toFixed(1)}%)</span>
+                <span className="font-semibold text-emerald-600">KES {salesSummary.grossProfit.toFixed(2)}</span>
               </div>
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center">

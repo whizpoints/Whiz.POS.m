@@ -546,3 +546,58 @@ BEGIN UPDATE "Terminal" SET updatedAt = strftime('%Y-%m-%dT%H:%M:%f0Z', 'now') W
 CREATE TRIGGER SyncLog_after_insert AFTER INSERT ON "SyncLog"
 BEGIN UPDATE "SyncLog" SET updatedAt = strftime('%Y-%m-%dT%H:%M:%f0Z', 'now') WHERE id = new.id; END;
 
+
+
+-- CreateTable: Client
+CREATE TABLE IF NOT EXISTS "Client" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "businessId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "phone" TEXT,
+    "email" TEXT,
+    "address" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Client_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable: SavedDocument
+CREATE TABLE IF NOT EXISTS "SavedDocument" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "businessId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "date" DATETIME NOT NULL,
+    "dueDate" DATETIME,
+    "customerName" TEXT NOT NULL,
+    "customerEmail" TEXT,
+    "customerPhone" TEXT,
+    "customerAddress" TEXT,
+    "items" TEXT NOT NULL,
+    "subtotal" REAL NOT NULL DEFAULT 0,
+    "tax" REAL NOT NULL DEFAULT 0,
+    "total" REAL NOT NULL DEFAULT 0,
+    "notes" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "metadata" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "SavedDocument_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "Client_businessId_idx" ON "Client"("businessId");
+CREATE INDEX IF NOT EXISTS "Client_name_idx" ON "Client"("name");
+CREATE INDEX IF NOT EXISTS "Client_updatedAt_idx" ON "Client"("updatedAt");
+
+CREATE INDEX IF NOT EXISTS "SavedDocument_businessId_idx" ON "SavedDocument"("businessId");
+CREATE INDEX IF NOT EXISTS "SavedDocument_updatedAt_idx" ON "SavedDocument"("updatedAt");
+CREATE INDEX IF NOT EXISTS "SavedDocument_status_idx" ON "SavedDocument"("status");
+
+CREATE TRIGGER IF NOT EXISTS Client_after_insert AFTER INSERT ON "Client"
+BEGIN UPDATE "Client" SET updatedAt = strftime('%Y-%m-%dT%H:%M:%f0Z', 'now') WHERE id = new.id; END;
+CREATE TRIGGER IF NOT EXISTS Client_after_update AFTER UPDATE ON "Client"
+BEGIN UPDATE "Client" SET updatedAt = strftime('%Y-%m-%dT%H:%M:%f0Z', 'now') WHERE id = new.id; END;
+
+CREATE TRIGGER IF NOT EXISTS SavedDocument_after_insert AFTER INSERT ON "SavedDocument"
+BEGIN UPDATE "SavedDocument" SET updatedAt = strftime('%Y-%m-%dT%H:%M:%f0Z', 'now') WHERE id = new.id; END;
+CREATE TRIGGER IF NOT EXISTS SavedDocument_after_update AFTER UPDATE ON "SavedDocument"
+BEGIN UPDATE "SavedDocument" SET updatedAt = strftime('%Y-%m-%dT%H:%M:%f0Z', 'now') WHERE id = new.id; END;

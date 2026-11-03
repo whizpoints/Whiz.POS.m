@@ -94,7 +94,9 @@ router.get('/', async (req: any, res: any) => {
       business,
       mpesaConfigs,
       stockMovements,
-      outlets
+      outlets,
+      clients,
+      savedDocuments
     ] = await Promise.all([
       prisma.user.findMany({ where: userWhere }),
       prisma.product.findMany({ 
@@ -128,7 +130,9 @@ router.get('/', async (req: any, res: any) => {
       prisma.business.findUnique({ where: { id: businessId } }),
       prisma.mpesaConfig.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
       prisma.stockMovement.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
-      prisma.outlet.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } })
+      prisma.outlet.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
+      prisma.client.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } }),
+      prisma.savedDocument.findMany({ where: { businessId, updatedAt: { gt: sinceDate } } })
     ]);
 
     res.json({
@@ -144,6 +148,8 @@ router.get('/', async (req: any, res: any) => {
         suppliers,
         transactions,
         mpesaConfigs,
+        clients,
+        savedDocuments,
         businessSetup: business && business.updatedAt > sinceDate ? {
           ...(typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings),
           businessName: business.name
@@ -170,7 +176,10 @@ router.post('/', async (req: any, res: any) => {
       stockMovements,
       outlets,
       terminals,
-      businessSetup
+      businessSetup,
+      clients,
+      savedDocuments,
+      documents
     } = req.body;
 
     let targetLocationId = undefined;
@@ -527,6 +536,85 @@ router.post('/', async (req: any, res: any) => {
               results.skipped++;
           }
        }
+    }
+
+    // 5. Clients
+    if (clients && Array.isArray(clients)) {
+      for (const c of clients) {
+        if (!c.id || !c.name) continue;
+        const existing = await prisma.client.findFirst({ where: { id: String(c.id), businessId } });
+        if (existing) {
+          if (!existing.updatedAt || new Date(c.updatedAt || 0) > new Date(existing.updatedAt)) {
+            await prisma.client.update({
+              where: { id: existing.id },
+              data: {
+                name: String(c.name),
+                phone: c.phone ? String(c.phone) : null,
+                email: c.email ? String(c.email) : null,
+                address: c.address ? String(c.address) : null,
+                updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date()
+              }
+            });
+          }
+        } else {
+          await prisma.client.create({
+            data: {
+              id: String(c.id),
+              businessId,
+              name: String(c.name),
+              phone: c.phone ? String(c.phone) : null,
+              email: c.email ? String(c.email) : null,
+              address: c.address ? String(c.address) : null,
+              createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
+              updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date()
+            }
+          });
+        }
+      }
+    }
+
+    // 6. Saved Documents
+    const docsToSync = savedDocuments || documents;
+    if (docsToSync && Array.isArray(docsToSync)) {
+      for (const d of docsToSync) {
+        if (!d.id || !d.type) continue;
+        const existing = await prisma.savedDocument.findFirst({ where: { id: String(d.id), businessId } });
+        const docPayload = {
+          businessId,
+          type: String(d.type),
+          date: d.date ? new Date(d.date) : new Date(),
+          dueDate: d.dueDate ? new Date(d.dueDate) : null,
+          customerName: String(d.customerName || d.clientCompany || d.clientName || 'Unknown'),
+          customerEmail: d.customerEmail ? String(d.customerEmail) : null,
+          customerPhone: d.customerPhone ? String(d.customerPhone) : null,
+          customerAddress: d.customerAddress ? String(d.customerAddress) : null,
+          items: typeof d.items === 'string' ? d.items : JSON.stringify(d.items || []),
+          subtotal: Number(d.subtotal) || 0,
+          tax: Number(d.tax) || Number(d.taxAmount) || 0,
+          total: Number(d.total) || 0,
+          notes: d.notes ? String(d.notes) : null,
+          status: String(d.status || 'DRAFT'),
+          metadata: typeof d.metadata === 'string' ? d.metadata : JSON.stringify(d.metadata || d.data || {}),
+          updatedAt: d.updatedAt ? new Date(d.updatedAt) : new Date()
+        };
+
+        if (existing) {
+          if (!existing.updatedAt || new Date(d.updatedAt || 0) > new Date(existing.updatedAt)) {
+            await prisma.savedDocument.update({
+              where: { id: existing.id },
+              data: docPayload
+            });
+          }
+        } else {
+          await prisma.savedDocument.create({
+            data: {
+              id: String(d.id),
+              ...docPayload,
+              createdAt: d.createdAt ? new Date(d.createdAt) : new Date()
+            }
+          });
+        }
+      }
     }
     
     // Update business settings safely by merging

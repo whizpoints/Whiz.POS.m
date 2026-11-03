@@ -204,6 +204,12 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
                       <span className="font-bold text-slate-900">{data.dueDate}</span>
                     </div>
                   )}
+                  {verificationCode && (
+                    <div className="flex justify-between gap-4 text-xs pt-1.5 mt-1 border-t border-slate-200">
+                      <span className="text-emerald-600 uppercase tracking-wider font-bold">Verified:</span>
+                      <span className="font-mono text-[10px] font-bold text-emerald-700">{verificationCode}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -355,9 +361,17 @@ export const DocumentPreview = React.forwardRef<HTMLDivElement, DocumentPreviewP
              </div>
           </div>
 
-          {/* Branding Footer */}
-          <div className="bg-slate-100 p-3 text-center text-[10px] text-slate-400">
-             {branding.businessName} • {branding.phone}
+          {/* Branding & Verification Footer */}
+          <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-500">
+             <div>
+                <span className="font-bold text-slate-700">{branding.businessName}</span> • {branding.phone} • {branding.email}
+             </div>
+             {(verificationCode || data.docNumber) && (
+               <div className="flex items-center gap-2 font-mono text-[9px] bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-xs">
+                  <span className="text-slate-400 font-sans uppercase font-bold tracking-wider">Verified Doc:</span>
+                  <span className="font-bold text-sky-900">{verificationCode || data.docNumber}</span>
+               </div>
+             )}
           </div>
 
         </div>
