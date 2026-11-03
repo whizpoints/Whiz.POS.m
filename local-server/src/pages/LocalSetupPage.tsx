@@ -242,42 +242,98 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col md:flex-row bg-slate-950 overflow-hidden items-stretch">
-      {/* Full Landscape Background Image (dimmed & responsive across all screens) */}
+    <div data-theme="dark" className="min-h-screen relative flex flex-col md:flex-row bg-slate-950 overflow-hidden items-stretch select-none text-white">
+      {/* Full Landscape Background Image (clear & vibrant) */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <img
           src={authBgImage}
+          onError={(e) => { (e.target as HTMLImageElement).src = '/auth-bg.jpg'; }}
           alt="Retail Checkout Background"
-          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+          className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
         />
-        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-slate-950/30 backdrop-blur-[0.5px]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/25 to-slate-950/55 pointer-events-none" />
       </div>
 
-      {/* Split Screen - Left Side */}
-      <div className="hidden md:flex md:w-5/12 p-12 flex-col justify-center items-start text-white relative z-10 overflow-hidden border-r border-white/10" style={{ background: 'linear-gradient(135deg, rgba(7, 24, 63, 0.88) 0%, rgba(21, 27, 85, 0.82) 50%, rgba(10, 158, 245, 0.78) 100%)', backdropFilter: 'blur(8px)' }}>
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+      {/* Split Screen - Left Side: Deep, informative, high-contrast branding panel */}
+      <div className="hidden md:flex md:w-5/12 lg:w-5/12 p-8 lg:p-12 flex-col justify-between text-white relative z-10 overflow-hidden border-r border-white/15 bg-slate-950/75 backdrop-blur-xl">
+        <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-400 via-transparent to-transparent pointer-events-none"></div>
+        
+        {/* Top Branding */}
         <div className="relative z-10 w-full">
-          <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mb-8 backdrop-blur-sm border border-white/20">
-             <img src="/logo.png" alt="Whiz POS" className="w-10 h-10 brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg border border-white/20">
+               <img src="/logo.png" alt="Whiz POS" className="w-8 h-8 brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            </div>
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Local Server Node
+              </span>
+              <p className="text-xs text-slate-300 font-mono mt-0.5">Hybrid Offline-First Architecture</p>
+            </div>
           </div>
-          <h1 className="text-4xl font-bold mb-4 tracking-tight leading-tight">
+
+          <h1 className="text-3xl lg:text-4xl font-black mb-3 tracking-tight leading-tight !text-white drop-shadow-md" style={{ color: '#ffffff' }}>
             {businessData?.name ? businessData.name : 'Whiz POS Local Server'}
           </h1>
-          <p className="text-blue-100 text-lg max-w-md leading-relaxed">
+          <p className="text-slate-200 text-sm lg:text-base leading-relaxed mb-8" style={{ color: '#e2e8f0' }}>
             {businessData?.name 
               ? 'Log in to manage your local operations, sync data, and configure your POS terminals.' 
-              : 'Initialize your local server environment to securely bridge your cloud data with your physical store.'}
+              : 'Dedicated local database and communication engine bridging your cloud data with your physical store registers.'}
           </p>
+
+          {/* Substantial Feature List (Left panel not shallow) */}
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex items-start gap-3.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 shrink-0 mt-0.5 font-bold">
+                ⚡
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white tracking-wide">Instant Checkout Execution</h4>
+                <p className="text-[11px] text-slate-300 leading-normal mt-0.5">Direct SQLite read/write eliminates internet lag for your point-of-sale registers.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex items-start gap-3.5">
+              <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 shrink-0 mt-0.5 font-bold">
+                🔄
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white tracking-wide">Autonomous LAN & Cloud Sync</h4>
+                <p className="text-[11px] text-slate-300 leading-normal mt-0.5">Seamless bi-directional sync pushes transactions to back office and refreshes stock.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex items-start gap-3.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shrink-0 mt-0.5 font-bold">
+                🛡️
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white tracking-wide">Zero Downtime Resilience</h4>
+                <p className="text-[11px] text-slate-300 leading-normal mt-0.5">Physical store operations and receipt printing continue running uninterrupted during internet outages.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Footer Info */}
+        <div className="pt-6 border-t border-white/10 text-xs text-slate-400 flex items-center justify-between">
+          <span>WhizPOS Core Server v2.4</span>
+          <span className="text-emerald-400 font-medium flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            Production Ready
+          </span>
         </div>
       </div>
 
-      {/* Split Screen - Right Side */}
+      {/* Split Screen - Right Side: Modern High-Contrast Card */}
       <div className="w-full md:w-7/12 flex items-center justify-center p-4 sm:p-8 sm:py-12 relative z-10">
         <div className="w-full max-w-[500px] relative z-10 transition-all duration-500">
           
           {/* Mobile Header (Hidden on Desktop) */}
           <div className="md:hidden flex flex-col items-center justify-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm bg-white/10 backdrop-blur-md border border-white/20">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm bg-slate-900/80 backdrop-blur-md border border-white/20">
                <img src="/logo.png" alt="Whiz POS" className="w-10 h-10 brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-center text-white">
@@ -290,26 +346,39 @@ export default function AuthPage() {
 
         {/* Main Auth Card */}
         {!isBackendReady ? (
-          <div className="glass-strong rounded-3xl p-12 shadow-2xl flex flex-col items-center justify-center relative overflow-hidden transition-all text-center" style={{ border: '1px solid var(--border-glass)' }}>
-            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Starting Services...</h2>
-            <p className="text-gray-500">Please wait while the local server initializes.</p>
+          <div className="bg-slate-900/85 backdrop-blur-2xl rounded-3xl p-10 shadow-2xl border border-white/20 flex flex-col items-center justify-center text-center relative overflow-hidden transition-all text-white animate-in fade-in duration-500">
+            <div className="relative mb-5">
+              <div className="w-16 h-16 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400 shadow-inner">
+                <div className="w-8 h-8 border-3 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
+              </div>
+            </div>
+            <h2 className="text-2xl font-black !text-white mb-2 tracking-tight" style={{ color: '#ffffff' }}>Starting Services...</h2>
+            <p className="text-slate-300 text-sm mb-6 leading-relaxed">
+              Initializing SQLite local database, multi-terminal bridge, and M-Pesa hardware listener.
+            </p>
+            <div className="w-full bg-slate-800 rounded-full h-1.5 mb-5 overflow-hidden border border-white/10">
+              <div className="bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500 h-full w-3/4 rounded-full animate-pulse"></div>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
+              <span>Connecting to local backend service on port 5050...</span>
+            </div>
           </div>
         ) : (
-        <div className="glass-strong rounded-3xl p-8 shadow-2xl animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150 relative overflow-hidden transition-all" style={{ border: '1px solid var(--border-glass)' }}>
+        <div className="bg-slate-900/85 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl border border-white/20 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150 relative overflow-hidden transition-all text-white">
           
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-transparent"></div>
 
           {/* Mode switch */}
-          <div className="flex rounded-xl p-1 mb-8" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-glass)' }}>
+          <div className="flex rounded-xl p-1 mb-8 bg-slate-800/80 border border-white/10">
             <button
               type="button"
               onClick={() => setIsLogin(true)}
-              className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300"
+              className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 cursor-pointer"
               style={{
-                background: isLogin ? 'var(--bg-main)' : 'transparent',
-                color: isLogin ? 'var(--text-main)' : 'var(--text-muted)',
-                boxShadow: isLogin ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                background: isLogin ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : 'transparent',
+                color: isLogin ? '#ffffff' : '#94a3b8',
+                boxShadow: isLogin ? '0 4px 12px rgba(37,99,235,0.3)' : 'none',
               }}
             >
               Admin Login
@@ -317,11 +386,11 @@ export default function AuthPage() {
             <button
               type="button"
               onClick={() => setIsLogin(false)}
-              className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300"
+              className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 cursor-pointer"
               style={{
-                background: !isLogin ? 'var(--bg-main)' : 'transparent',
-                color: !isLogin ? 'var(--text-main)' : 'var(--text-muted)',
-                boxShadow: !isLogin ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                background: !isLogin ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : 'transparent',
+                color: !isLogin ? '#ffffff' : '#94a3b8',
+                boxShadow: !isLogin ? '0 4px 12px rgba(37,99,235,0.3)' : 'none',
               }}
             >
               Server Setup
@@ -332,9 +401,9 @@ export default function AuthPage() {
             /* ================= LOGIN MODE ================= */
             <form onSubmit={handleLogin} className="space-y-5 animate-in fade-in">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Admin Username</label>
+                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-slate-200">Admin Username</label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-400 transition-colors">
                     <User className="w-5 h-5" />
                   </div>
                   <input
@@ -342,16 +411,15 @@ export default function AuthPage() {
                     required
                     value={loginUsername}
                     onChange={(e) => setLoginUsername(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 rounded-xl outline-none transition-all duration-300"
-                    style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }}
+                    className="w-full pl-11 pr-4 py-3 rounded-xl outline-none transition-all duration-300 bg-slate-800/90 border border-white/20 text-white placeholder-slate-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
                     placeholder="admin"
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider ml-1" style={{ color: 'var(--text-muted)' }}>Password</label>
+                <label className="text-xs font-bold uppercase tracking-wider ml-1 text-slate-200">Password</label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-400 transition-colors">
                     <Lock className="w-5 h-5" />
                   </div>
                   <input
@@ -359,14 +427,13 @@ export default function AuthPage() {
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3 rounded-xl outline-none transition-all duration-300"
-                    style={{ background: 'var(--bg-tertiary)', color: 'var(--text-main)', border: '1px solid var(--border-glass)' }}
+                    className="w-full pl-11 pr-12 py-3 rounded-xl outline-none transition-all duration-300 bg-slate-800/90 border border-white/20 text-white placeholder-slate-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowLoginPw(!showLoginPw)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white transition-colors cursor-pointer"
                   >
                     {showLoginPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -375,8 +442,8 @@ export default function AuthPage() {
               <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full py-3.5 px-4 mt-6 rounded-xl font-bold text-white shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 hover:opacity-90 hover:-translate-y-0.5 transition-all duration-300"
-                style={{ background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)' }}
+                className="w-full py-3.5 px-4 mt-6 rounded-xl font-bold text-white shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 hover:opacity-90 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' }}
               >
                 {loading ? <span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin"></span> : <>Access Back Office <ArrowRight className="w-5 h-5" /></>}
               </button>

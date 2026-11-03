@@ -164,14 +164,15 @@ export default function BusinessRegistration() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden select-none">
-      {/* Full Landscape Background Image (dimmed & responsive across all screens) */}
+      {/* Full Landscape Background Image (clear & vibrant across all screens) */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img
           src={authBgImage}
+          onError={(e) => { (e.target as HTMLImageElement).src = '/auth-bg.jpg'; }}
           alt="Terminal Setup Background"
-          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+          className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
         />
-        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-slate-950/30 backdrop-blur-[1px]" />
       </div>
       
       <div className="relative z-10 w-full max-w-4xl bg-slate-900/80 border border-slate-700 shadow-2xl rounded-3xl overflow-hidden flex flex-col md:flex-row min-h-[600px]">

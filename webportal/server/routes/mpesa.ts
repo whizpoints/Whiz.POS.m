@@ -7,17 +7,24 @@ const router = Router();
 
 // Helper to get OAuth Token
 async function getOAuthToken(consumerKey: string, consumerSecret: string, environment: string) {
-  const url = environment === 'production' 
+  const isProduction = environment?.toLowerCase() === 'production' || environment?.toLowerCase() === 'live';
+  const url = isProduction 
     ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
     : 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
     
-  const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+  const key = (consumerKey || '').trim();
+  const secret = (consumerSecret || '').trim();
+  const auth = Buffer.from(`${key}:${secret}`).toString('base64');
   
   const response = await fetch(url, {
     headers: { 'Authorization': `Basic ${auth}` }
   });
   
-  if (!response.ok) throw new Error('Failed to fetch OAuth token');
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error(`[M-Pesa OAuth] Failed to fetch OAuth token (${response.status} ${response.statusText}):`, errorBody);
+    throw new Error(`Failed to fetch OAuth token (${response.status}): ${errorBody}`);
+  }
   const data: any = await response.json();
   return data.access_token;
 }
@@ -167,7 +174,7 @@ router.post('/stkpush', async (req: any, res: any) => {
 // 2. Register C2B URL
 router.post('/c2b/v1/registerurl', async (req: any, res: any) => {
   try {
-    const { businessId } = req.body;
+    const { businessId, shortcode: customShortcode } = req.body;
     const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
     if (!config) return res.status(400).json({ error: 'Config not found' });
 
@@ -177,12 +184,16 @@ router.post('/c2b/v1/registerurl', async (req: any, res: any) => {
       ? 'https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl'
       : 'https://sandbox.safaricom.co.ke/mpesa/c2b/v2/registerurl';
 
+    const codeToRegister = customShortcode || (config.merchantType === 'BUY_GOODS' ? (config.tillNumber || config.shortcode) : (config.paybillNumber || config.shortcode));
+
     const payload = {
-      ShortCode: config.shortcode,
+      ShortCode: String(codeToRegister).trim(),
       ResponseType: "Completed",
       ConfirmationURL: MpesaCallbackUrlService.getC2bConfirmationUrl(businessId),
       ValidationURL: MpesaCallbackUrlService.getC2bValidationUrl(businessId)
     };
+
+    console.log(`[Daraja C2B Register] Registering ShortCode ${payload.ShortCode} with Confirmation=${payload.ConfirmationURL}`);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -194,8 +205,10 @@ router.post('/c2b/v1/registerurl', async (req: any, res: any) => {
     });
 
     const data: any = await response.json();
+    console.log(`[Daraja C2B Register] Response:`, data);
     res.json(data);
   } catch (err: any) {
+    console.error('[Daraja C2B Register] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -295,117 +308,203 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
 });
 
 // 4. C2B Validation (Webhook)
-router.post('/callback/c2b/validation/:businessId', async (req: any, res: any) => {
-  console.log(`[M-Pesa Webhook] C2B Validation received for business ${req.params.businessId}:`, JSON.stringify(req.body, null, 2));
+const handleC2bValidation = async (req: any, res: any) => {
+  console.log(`[M-Pesa Webhook] C2B Validation received for business ${req.params?.businessId || 'auto'}:`, JSON.stringify(req.body, null, 2));
   try {
-    const { businessId } = req.params;
+    const rawBusinessId = req.params?.businessId;
     const {
-      TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode
+      TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode, TransTime
     } = req.body;
     
-    const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
-    if (!config || config.shortcode !== BusinessShortCode) {
-      return res.json({ "ResultCode": 1, "ResultDesc": "Rejected: Invalid ShortCode mapping" });
+    // Loosely resolve business config
+    let config = rawBusinessId ? await prisma.mpesaConfig.findFirst({ where: { businessId: rawBusinessId } }) : null;
+    if (!config && BusinessShortCode) {
+      const bsc = String(BusinessShortCode).trim();
+      config = await prisma.mpesaConfig.findFirst({
+        where: {
+          OR: [
+            { shortcode: bsc },
+            { tillNumber: bsc },
+            { paybillNumber: bsc }
+          ]
+        }
+      });
     }
-    
+
+    const resolvedBusinessId = config?.businessId || rawBusinessId;
+    const cleanTransId = String(TransID || req.body.transID || '').trim();
+    const cleanAmount = parseFloat(TransAmount || req.body.Amount || '0');
+    let rawPhone = String(MSISDN || req.body.PhoneNumber || req.body.phone || '').trim();
+    if (rawPhone.startsWith('+')) rawPhone = rawPhone.slice(1);
+
     const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || 'M-Pesa Customer';
 
-    if (TransID && TransAmount) {
+    // Parse timestamp if available
+    let timestamp = new Date();
+    if (TransTime && String(TransTime).length >= 14) {
+      const tt = String(TransTime);
+      const yr = parseInt(tt.substring(0, 4), 10);
+      const mo = parseInt(tt.substring(4, 6), 10) - 1;
+      const dy = parseInt(tt.substring(6, 8), 10);
+      const hr = parseInt(tt.substring(8, 10), 10);
+      const mn = parseInt(tt.substring(10, 12), 10);
+      const sc = parseInt(tt.substring(12, 14), 10);
+      const d = new Date(Date.UTC(yr, mo, dy, hr, mn, sc));
+      if (!isNaN(d.getTime())) timestamp = d;
+    }
+
+    if (resolvedBusinessId && cleanTransId && cleanAmount > 0) {
       await prisma.mpesaTransaction.upsert({
-        where: { transactionId: TransID },
+        where: { transactionId: cleanTransId },
         create: {
-          businessId,
-          transactionId: TransID,
-          amount: parseFloat(TransAmount),
-          phoneNumber: MSISDN || '',
+          businessId: resolvedBusinessId,
+          locationId: config?.locationId || null,
+          transactionId: cleanTransId,
+          amount: cleanAmount,
+          phoneNumber: rawPhone,
           customerName,
           status: 'UNLINKED',
-          isEnriched: true
+          isEnriched: true,
+          timestamp
         },
         update: {
           customerName,
-          phoneNumber: MSISDN || undefined,
-          amount: parseFloat(TransAmount) || undefined
+          phoneNumber: rawPhone || undefined,
+          amount: cleanAmount || undefined
         }
       });
 
       const io = req.app.get('io');
       if (io) {
-        io.to(`business_${businessId}`).emit('mpesa_payment_received', {
-          transactionId: TransID,
-          amount: parseFloat(TransAmount),
-          phoneNumber: MSISDN || '',
+        const payload = {
+          transactionId: cleanTransId,
+          amount: cleanAmount,
+          phoneNumber: rawPhone,
           customerName,
           isEnriched: true,
-          businessId
-        });
-        console.log(`[M-Pesa Webhook] C2B Validation emitted to business_${businessId}: ${TransID} for ${customerName}`);
+          timestamp: timestamp.toISOString(),
+          businessId: resolvedBusinessId
+        };
+        io.to(`business_${resolvedBusinessId}`).emit('mpesa_payment_received', payload);
+        io.emit('mpesa_payment_received', payload);
+        console.log(`[M-Pesa Webhook] C2B Validation recorded & emitted: ${cleanTransId} for KSh ${cleanAmount} (${customerName})`);
       }
     }
 
+    // Always accept validation so customer payment goes through
     res.json({ "ResultCode": 0, "ResultDesc": "Accepted" });
-  } catch (err) {
-    res.json({ "ResultCode": 1, "ResultDesc": "Error" });
+  } catch (err: any) {
+    console.error('[M-Pesa Webhook] C2B Validation error:', err);
+    res.json({ "ResultCode": 0, "ResultDesc": "Accepted" });
   }
-});
+};
+
+router.post('/callback/c2b/validation/:businessId', handleC2bValidation);
+router.post('/callback/c2b/validation', handleC2bValidation);
 
 // 5. C2B Confirmation Webhook
-router.post('/callback/c2b/confirmation/:businessId', async (req: any, res: any) => {
+const handleC2bConfirmation = async (req: any, res: any) => {
+  console.log(`[M-Pesa Webhook] C2B Confirmation received for business ${req.params?.businessId || 'auto'}:`, JSON.stringify(req.body, null, 2));
   try {
-    const { businessId } = req.params;
+    const rawBusinessId = req.params?.businessId;
     const {
-      TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode
+      TransID, TransAmount, MSISDN, FirstName, MiddleName, LastName, BusinessShortCode, TransTime
     } = req.body;
     
-    const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
-    if (!config || config.shortcode !== BusinessShortCode) {
-      // Reject spoofed callbacks
-      return res.json({ "ResultCode": 1, "ResultDesc": "Rejected" });
-    }
-
-    const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || 'M-Pesa Customer';
-    
-    await prisma.mpesaTransaction.upsert({
-      where: { transactionId: TransID },
-      create: {
-        businessId,
-        transactionId: TransID,
-        amount: parseFloat(TransAmount),
-        phoneNumber: MSISDN,
-        customerName,
-        status: 'UNLINKED',
-        isEnriched: true
-      },
-      update: {
-        customerName,
-        phoneNumber: MSISDN,
-        amount: parseFloat(TransAmount)
-      }
-    });
-
-    const io = req.app.get('io');
-    if (io) {
-      io.to(`business_${businessId}`).emit('mpesa_payment_received', {
-        transactionId: TransID,
-        amount: parseFloat(TransAmount),
-        phoneNumber: MSISDN,
-        customerName,
-        isEnriched: true,
-        businessId
+    // Loosely resolve business config
+    let config = rawBusinessId ? await prisma.mpesaConfig.findFirst({ where: { businessId: rawBusinessId } }) : null;
+    if (!config && BusinessShortCode) {
+      const bsc = String(BusinessShortCode).trim();
+      config = await prisma.mpesaConfig.findFirst({
+        where: {
+          OR: [
+            { shortcode: bsc },
+            { tillNumber: bsc },
+            { paybillNumber: bsc }
+          ]
+        }
       });
-      console.log(`[M-Pesa Webhook] C2B Confirmation emitted to business_${businessId}: ${TransID} for ${customerName}`);
     }
 
-    // Trigger Transaction Status Background Job if needed for additional metadata
-    if (config.initiatorName && config.initiatorPassword) {
-      triggerTransactionStatus(config, TransID, businessId);
+    const resolvedBusinessId = config?.businessId || rawBusinessId;
+    if (!resolvedBusinessId) {
+      console.warn(`[M-Pesa Webhook] C2B Confirmation could not map business for ShortCode ${BusinessShortCode}`);
+      return res.json({ "ResultCode": 0, "ResultDesc": "Success" });
+    }
+
+    const cleanTransId = String(TransID || req.body.transID || req.body.ReceiptNo || '').trim();
+    const cleanAmount = parseFloat(TransAmount || req.body.Amount || '0');
+    let rawPhone = String(MSISDN || req.body.PhoneNumber || req.body.phone || '').trim();
+    if (rawPhone.startsWith('+')) rawPhone = rawPhone.slice(1);
+
+    const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || req.body.CustomerName || 'M-Pesa Customer';
+
+    // Parse timestamp if available
+    let timestamp = new Date();
+    if (TransTime && String(TransTime).length >= 14) {
+      const tt = String(TransTime);
+      const yr = parseInt(tt.substring(0, 4), 10);
+      const mo = parseInt(tt.substring(4, 6), 10) - 1;
+      const dy = parseInt(tt.substring(6, 8), 10);
+      const hr = parseInt(tt.substring(8, 10), 10);
+      const mn = parseInt(tt.substring(10, 12), 10);
+      const sc = parseInt(tt.substring(12, 14), 10);
+      const d = new Date(Date.UTC(yr, mo, dy, hr, mn, sc));
+      if (!isNaN(d.getTime())) timestamp = d;
+    }
+    
+    if (cleanTransId) {
+      await prisma.mpesaTransaction.upsert({
+        where: { transactionId: cleanTransId },
+        create: {
+          businessId: resolvedBusinessId,
+          locationId: config?.locationId || null,
+          transactionId: cleanTransId,
+          amount: cleanAmount,
+          phoneNumber: rawPhone,
+          customerName,
+          status: 'UNLINKED',
+          isEnriched: true,
+          timestamp
+        },
+        update: {
+          customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
+          phoneNumber: rawPhone || undefined,
+          amount: cleanAmount || undefined
+        }
+      });
+
+      const io = req.app.get('io');
+      if (io) {
+        const payload = {
+          transactionId: cleanTransId,
+          amount: cleanAmount,
+          phoneNumber: rawPhone,
+          customerName,
+          isEnriched: true,
+          timestamp: timestamp.toISOString(),
+          businessId: resolvedBusinessId
+        };
+        io.to(`business_${resolvedBusinessId}`).emit('mpesa_payment_received', payload);
+        io.emit('mpesa_payment_received', payload);
+        console.log(`[M-Pesa Webhook] C2B Confirmation saved & emitted: ${cleanTransId} for KSh ${cleanAmount} (${customerName})`);
+      }
+
+      // Trigger Transaction Status Background Job if needed for additional metadata
+      if (config?.initiatorName && config?.initiatorPassword) {
+        triggerTransactionStatus(config, cleanTransId, resolvedBusinessId);
+      }
     }
 
     res.json({ "ResultCode": 0, "ResultDesc": "Success" });
-  } catch (error) {
-    res.json({ "ResultCode": 1, "ResultDesc": "Internal error" });
+  } catch (error: any) {
+    console.error('[M-Pesa Webhook] C2B Confirmation error:', error);
+    res.json({ "ResultCode": 0, "ResultDesc": "Success" });
   }
-});
+};
+
+router.post('/callback/c2b/confirmation/:businessId', handleC2bConfirmation);
+router.post('/callback/c2b/confirmation', handleC2bConfirmation);
 
 // 6. Transaction Status Webhook
 router.post('/callback/transaction-status/:businessId', async (req: any, res: any) => {
@@ -477,32 +576,139 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
   // 7. Payment Search / Polling for POS
   router.get('/payments/search', async (req: any, res: any) => {
     try {
-      const businessId = req.query.businessId as string;
-      const q = req.query.q as string;
+      const rawBiz = req.query.businessId;
+      const businessId = Array.isArray(rawBiz) ? String(rawBiz[0]) : (rawBiz ? String(rawBiz) : '');
+      const rawQ = req.query.q;
+      const q = Array.isArray(rawQ) ? String(rawQ[0]) : (rawQ ? String(rawQ) : '');
+      const cleanQ = q.trim();
       
       if (!businessId) return res.status(400).json({ error: 'Missing businessId' });
-      
-      const txns = await prisma.mpesaTransaction.findMany({
+
+      const orConditions: any[] = [];
+      if (cleanQ) {
+        // Case-insensitive substring matching for M-Pesa Receipt Code (e.g. first 3 or last 3 chars like 'SK9', '9X2')
+        orConditions.push({ transactionId: { contains: cleanQ, mode: 'insensitive' } });
+        // Case-insensitive customer name matching
+        orConditions.push({ customerName: { contains: cleanQ, mode: 'insensitive' } });
+        // Phone number matching
+        orConditions.push({ phoneNumber: { contains: cleanQ, mode: 'insensitive' } });
+
+        // If digits provided (e.g. phone number digits), also search phone suffix
+        const digits = cleanQ.replace(/\D/g, '');
+        if (digits.length >= 3) {
+          orConditions.push({ phoneNumber: { contains: digits } });
+        }
+        if (digits.length >= 9) {
+          orConditions.push({ phoneNumber: { contains: digits.slice(-9) } });
+        }
+      }
+
+      // First query unlinked transactions
+      let txns = await prisma.mpesaTransaction.findMany({
         where: { 
           businessId,
           status: 'UNLINKED',
-          // NOTE: isEnriched filter removed intentionally — we show ALL unlinked transactions.
-          // The POS UI shows a "Verifying..." badge for unenriched ones.
-          // Enrichment (phone/name from Transaction Status API) happens async in background.
-          ...(q ? {
-            OR: [
-              { transactionId: { contains: q } },
-              { customerName: { contains: q } },
-              { phoneNumber: { contains: q } }
-            ]
-          } : {})
+          ...(orConditions.length > 0 ? { OR: orConditions } : {})
         },
         orderBy: { timestamp: 'desc' },
-        take: 20
+        take: 50
       });
+
+      // If user searched explicitly for something and 0 unlinked were found, also check if it was already claimed
+      if (cleanQ && txns.length === 0) {
+        const claimedTxns = await prisma.mpesaTransaction.findMany({
+          where: {
+            businessId,
+            OR: orConditions
+          },
+          orderBy: { timestamp: 'desc' },
+          take: 10
+        });
+
+        if (claimedTxns.length > 0) {
+          txns = claimedTxns.map((t: any) => ({
+            ...t,
+            isAlreadyClaimed: t.status === 'LINKED'
+          }));
+        }
+      }
+
       res.json(txns);
-    } catch (err) {
+    } catch (err: any) {
+      console.error('M-Pesa payment search error:', err);
       res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // 7b. Business M-Pesa Statement (All Money-In / Till Transactions)
+  router.get('/statement', async (req: any, res: any) => {
+    try {
+      const rawBiz = req.query.businessId;
+      const businessId = Array.isArray(rawBiz) ? String(rawBiz[0]) : (rawBiz ? String(rawBiz) : '');
+      if (!businessId) return res.status(400).json({ error: 'Missing businessId' });
+
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const statusFilter = (req.query.status as string || '').toUpperCase();
+      const limit = parseInt(req.query.limit as string) || 1000;
+
+      const whereClause: any = { businessId };
+      if (statusFilter && ['LINKED', 'UNLINKED'].includes(statusFilter)) {
+        whereClause.status = statusFilter;
+      }
+
+      if (startDate || endDate) {
+        whereClause.timestamp = {};
+        if (startDate) whereClause.timestamp.gte = new Date(startDate);
+        if (endDate) whereClause.timestamp.lte = new Date(endDate);
+      }
+
+      const txns = await prisma.mpesaTransaction.findMany({
+        where: whereClause,
+        orderBy: { timestamp: 'desc' },
+        take: limit
+      });
+
+      // Query linked receipts for extra details
+      const mpesaCodes = txns.map((t: any) => t.transactionId).filter(Boolean);
+      let receiptMap = new Map<string, string>();
+      if (mpesaCodes.length > 0) {
+        try {
+          const receipts = await prisma.receipt.findMany({
+            where: {
+              businessId,
+              mpesaCode: { in: mpesaCodes }
+            },
+            select: { mpesaCode: true, receiptNumber: true }
+          });
+          receipts.forEach((r: any) => {
+            if (r.mpesaCode) receiptMap.set(r.mpesaCode, r.receiptNumber);
+          });
+        } catch (e) {}
+      }
+
+      const enrichedList = txns.map((t: any) => ({
+        ...t,
+        posReceiptNumber: receiptMap.get(t.transactionId) || null
+      }));
+
+      const totalMoneyIn = enrichedList.reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+      const claimedCount = enrichedList.filter((t: any) => t.status === 'LINKED').length;
+      const unclaimedCount = enrichedList.filter((t: any) => t.status === 'UNLINKED').length;
+
+      res.json({
+        success: true,
+        summary: {
+          totalTransactions: enrichedList.length,
+          totalMoneyIn,
+          claimedCount,
+          unclaimedCount
+        },
+        transactions: enrichedList
+      });
+    } catch (err: any) {
+      console.error('M-Pesa Statement Error:', err);
+      res.status(500).json({ error: 'Failed to fetch M-Pesa statement' });
     }
   });
 
@@ -612,16 +818,24 @@ router.post('/certificate', async (req: any, res: any) => {
       return res.status(400).json({ error: 'Missing businessId or certificatePem' });
     }
 
-    const config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
+    const cleanCert = certificatePem.trim();
+    let config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
     if (!config) {
-      return res.status(404).json({ error: 'M-Pesa config not found for this business' });
+      // Upsert: Create config with the certificate if user uploads before saving details
+      config = await prisma.mpesaConfig.create({
+        data: {
+          businessId,
+          merchantType: 'paybill',
+          environment: 'production',
+          certificateBase64: cleanCert
+        }
+      });
+    } else {
+      await prisma.mpesaConfig.update({
+        where: { id: config.id },
+        data: { certificateBase64: cleanCert }
+      });
     }
-
-    // Store raw (could be PEM or base64 DER — crypto.ts normalizes it on use)
-    await prisma.mpesaConfig.update({
-      where: { id: config.id },
-      data: { certificateBase64: certificatePem.trim() }
-    });
 
     console.log(`[M-Pesa] Certificate uploaded for business ${businessId}`);
     res.json({ success: true, message: 'Certificate saved successfully' });

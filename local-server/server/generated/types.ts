@@ -54,6 +54,7 @@ export type MpesaConfig = {
     initiatorPassword: string | null;
     stkEnabled: Generated<number>;
     c2bEnabled: Generated<number>;
+    certificateBase64?: string | null;
     createdAt: Generated<string>;
     updatedAt: string;
     outletId: string | null;

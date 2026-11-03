@@ -41,6 +41,17 @@ try {
             }
         }
     }
+    // Ensure MpesaConfig has certificateBase64 column for existing local databases
+    try {
+        const mpesaCols = sqliteDb.prepare(`PRAGMA table_info("MpesaConfig")`).all();
+        if (mpesaCols.length > 0 && !mpesaCols.some(c => c.name === 'certificateBase64')) {
+            sqliteDb.exec(`ALTER TABLE "MpesaConfig" ADD COLUMN "certificateBase64" TEXT;`);
+            console.log('[DB Migration] Added certificateBase64 column to MpesaConfig');
+        }
+    }
+    catch (migErr) {
+        console.warn('[DB Migration] Notice regarding MpesaConfig column check:', migErr);
+    }
 }
 catch (err) {
     console.error('Failed to initialize database schema:', err);

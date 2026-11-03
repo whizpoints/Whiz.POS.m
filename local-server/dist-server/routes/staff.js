@@ -68,6 +68,17 @@ router.get('/', async (req, res) => {
             .execute().catch(() => []);
         // Simulate include: { outlet: true }
         const outlets = await db.selectFrom('Outlet').selectAll().execute().catch(() => []);
+        // Self-healing check: repair any Admin accounts corrupted to CASHIER
+        for (const s of staffRows) {
+            const lowerName = String(s.name || '').trim().toLowerCase();
+            const lowerEmail = String(s.email || '').trim().toLowerCase();
+            const currentRole = String(s.role || '').trim().toUpperCase();
+            if ((lowerName === 'admin' || lowerEmail.includes('admin@')) && currentRole === 'CASHIER') {
+                console.log(`[Staff Self-Healing] Restoring Admin role for user ${s.id} (${s.name})`);
+                s.role = 'ADMIN';
+                await db.updateTable('User').set({ role: 'ADMIN', updatedAt: new Date().toISOString() }).where('id', '=', s.id).execute().catch(() => { });
+            }
+        }
         const safeStaff = staffRows.map((s) => {
             const { password, ...rest } = s;
             return {

@@ -147,17 +147,18 @@ async function generateReceipt(transaction, businessSetup, isReprint = false, is
     }
     template = template.replace('{{mpesaDetails}}', mpesaDetailsHtml);
 
-    // KRA Details Logic
-    const kra = transaction.kraDetails || (transaction.kraInvoiceNo ? {
+    // KRA Details Logic - ONLY print if KRA eTIMS is explicitly enabled
+    const isKraActive = Boolean(businessSetup?.kraEnabled === true || businessSetup?.etimsEnabled === true);
+    const kra = (isKraActive && (transaction.kraDetails || (transaction.kraInvoiceNo ? {
         invoiceNumber: transaction.kraInvoiceNo,
         receiptNumber: transaction.kraInvoiceNo,
         qrCode: transaction.kraQrCode,
         controlCode: transaction.kraSignature,
         date: transaction.date ? new Date(transaction.date).toLocaleString() : new Date().toLocaleString()
-    } : null);
+    } : null))) || null;
 
     let kraDetailsHtml = '';
-    if (kra) {
+    if (kra && isKraActive) {
         let qrCodeHtml = '';
         try {
             const rawQr = kra.qrCode || kra.url || kra.controlCode || kra.receiptNumber || '';

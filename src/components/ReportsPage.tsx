@@ -238,35 +238,109 @@ export default function ReportsPage() {
     doc.save(fileName);
   };
 
-  const downloadMpesaReconCSV = () => {
-    const past48hrs = new Date(Date.now() - 48 * 60 * 60 * 1000);
-    const mpesaSales = transactions.filter(t => 
-      t.paymentMethod?.toLowerCase() === 'mpesa' && 
-      new Date(t.timestamp) >= past48hrs
-    );
+  const downloadMpesaReconCSV = async () => {
+    try {
+      const businessId = businessSetup?.cloudBusinessId || businessSetup?.businessId || (businessSetup as any)?.id;
+      const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+      const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
 
-    const headers = ['Receipt No.', 'Completion Time', 'Details', 'Transaction Status', 'Paid In', 'Withdrawn', 'Balance'];
-    const rows = mpesaSales.map(t => [
-      t.mpesaCode || `***${t.id.slice(-6).toUpperCase()}`,
-      new Date(t.timestamp).toLocaleString(),
-      `${t.customerName || 'Walk-in'} - ${t.phoneNumber || '0700000000'}`,
-      'Completed',
-      t.total.toString(),
-      '0',
-      '0'
-    ]);
+      let dbTxns: any[] = [];
+      let fetchedFromDb = false;
 
-    const csvContent = [headers, ...rows];
-    const ws = xlsx.utils.aoa_to_sheet(csvContent);
-    const wb = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(wb, ws, "Statement");
+      // 1. Attempt to fetch all recorded Money-In from the server DB
+      if (businessId) {
+        try {
+          const res = await fetch(`${webportalBase}/api/mpesa/statement?businessId=${encodeURIComponent(businessId)}`, {
+            signal: AbortSignal.timeout(4000)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.transactions && Array.isArray(data.transactions)) {
+              dbTxns = data.transactions;
+              fetchedFromDb = true;
+            }
+          }
+        } catch (cloudErr) {
+          if (localServerBase) {
+            try {
+              const localRes = await fetch(`${localServerBase}/api/mpesa/statement?businessId=${encodeURIComponent(businessId)}`, {
+                signal: AbortSignal.timeout(2500)
+              });
+              if (localRes.ok) {
+                const data = await localRes.json();
+                if (data.transactions && Array.isArray(data.transactions)) {
+                  dbTxns = data.transactions;
+                  fetchedFromDb = true;
+                }
+              }
+            } catch (localErr) {}
+          }
+        }
+      }
 
-    const excelBuffer = xlsx.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `Safaricom_Recon_Format_${new Date().toISOString().split('T')[0]}.xlsx`;
-    link.click();
+      const rows: any[] = [];
+      const headers = ['Receipt No.', 'Completion Time', 'Details (Customer & Phone)', 'Transaction Status', 'Paid In (KES)', 'Withdrawn (KES)', 'POS Receipt / Sale'];
+
+      if (fetchedFromDb && dbTxns.length > 0) {
+        // Build statement rows from every single Money-In detected in the DB
+        dbTxns.forEach((t: any) => {
+          const timeStr = t.timestamp ? new Date(t.timestamp).toLocaleString() : 'N/A';
+          const detailsStr = `${t.customerName || 'M-Pesa Customer'} - ${t.phoneNumber || 'N/A'}`;
+          const statusStr = t.status === 'LINKED' ? 'Claimed in POS' : 'Unclaimed Till Payment';
+          const posRefStr = t.posReceiptNumber || (t.status === 'LINKED' ? 'POS Sale Completed' : 'Unclaimed');
+
+          rows.push([
+            t.transactionId,
+            timeStr,
+            detailsStr,
+            statusStr,
+            Number(t.amount || 0).toFixed(2),
+            '0.00',
+            posRefStr
+          ]);
+        });
+      } else {
+        // Fallback: local POS transactions
+        const past48hrs = new Date(Date.now() - 48 * 60 * 60 * 1000);
+        const mpesaSales = transactions.filter(t => 
+          t.paymentMethod?.toLowerCase() === 'mpesa' && 
+          new Date(t.timestamp) >= past48hrs
+        );
+
+        mpesaSales.forEach(t => {
+          rows.push([
+            t.mpesaCode || `***${t.id.slice(-6).toUpperCase()}`,
+            new Date(t.timestamp).toLocaleString(),
+            `${t.customerName || 'Walk-in'} - ${t.phoneNumber || 'N/A'}`,
+            'Completed',
+            Number(t.total || 0).toFixed(2),
+            '0.00',
+            t.id
+          ]);
+        });
+      }
+
+      // Add a summary row
+      const totalAmountPaidIn = rows.reduce((sum, r) => sum + (parseFloat(r[4]) || 0), 0);
+      rows.push([]);
+      rows.push(['TOTAL MONEY IN', '', `Count: ${rows.length - 1} transactions`, '', totalAmountPaidIn.toFixed(2), '0.00', '']);
+
+      const csvContent = [headers, ...rows];
+      const ws = xlsx.utils.aoa_to_sheet(csvContent);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, "M-Pesa Statement");
+
+      const excelBuffer = xlsx.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      const bizNameClean = (businessSetup?.businessName || 'Till').replace(/[^a-zA-Z0-9]/g, '_');
+      link.download = `Mpesa_Statement_${bizNameClean}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.click();
+    } catch (err) {
+      console.error('Error generating M-Pesa statement:', err);
+      alert('Could not generate M-Pesa statement file.');
+    }
   };
 
   return (
@@ -287,10 +361,11 @@ export default function ReportsPage() {
             <div className="flex items-center space-x-2">
               <button
                 onClick={downloadMpesaReconCSV}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-xs font-semibold text-sm"
+                title="Download complete M-Pesa till transactions statement from database"
               >
                 <Download className="w-4 h-4" />
-                <span>Export M-Pesa XLSX (48h)</span>
+                <span>Download M-Pesa Statement (Till Money In)</span>
               </button>
               <button
                 onClick={downloadReport}

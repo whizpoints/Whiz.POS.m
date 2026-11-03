@@ -173,24 +173,26 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen w-full flex relative font-sans selection:bg-[#0A9EF5]/30 selection:text-white overflow-hidden bg-slate-950">
       
-      {/* Full Landscape Background Image (dimmed & responsive across all mobile, tablet, desktop) */}
+      {/* Full Landscape Background Image (vibrant & visible across mobile, tablet, and desktop) */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <img
           src={authBgImage}
+          onError={(e) => { (e.target as HTMLImageElement).src = '/auth-bg.jpg'; }}
           alt="Retail Checkout Background"
-          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+          className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
         />
-        <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />
+        {/* Soft gradient overlay allowing rich background visibility while keeping text crisp */}
+        <div className="absolute inset-0 bg-slate-950/25 backdrop-blur-[0.5px]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/20 to-slate-950/45 pointer-events-none" />
       </div>
 
       {/* ========================================================= */}
       {/* LEFT PANEL - PREMIUM SAAS BRANDING (DESKTOP) */}
       {/* ========================================================= */}
-      <div className="hidden lg:flex lg:w-[45%] relative z-10 overflow-hidden flex-col justify-between p-12 xl:p-16 border-r border-white/10" 
-           style={{ background: 'linear-gradient(135deg, rgba(7, 24, 63, 0.88) 0%, rgba(21, 27, 85, 0.82) 50%, rgba(10, 158, 245, 0.78) 100%)', backdropFilter: 'blur(8px)' }}>
+      <div className="hidden lg:flex lg:w-[45%] relative z-10 overflow-hidden flex-col justify-between p-12 xl:p-16 border-r border-white/15 bg-slate-950/75 backdrop-blur-xl">
         
         {/* Animated Glowing Orbs */}
-        <div className="absolute inset-0 z-0 overflow-hidden opacity-60">
+        <div className="absolute inset-0 z-0 overflow-hidden opacity-50">
           <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full mix-blend-screen filter blur-[100px] animate-pulse" 
                style={{ background: `radial-gradient(circle, ${colors.purpleAccent} 0%, transparent 70%)`, animationDuration: '8s' }} />
           <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] rounded-full mix-blend-screen filter blur-[120px] animate-pulse" 
@@ -203,7 +205,7 @@ export default function AuthPage() {
 
         {/* Brand Header */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-xl">
+          <div className="w-12 h-12 bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-xl">
             <img src="/logo.png" alt="WhizPOS" className="w-8 h-8 brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">Whiz<span style={{ color: colors.cyan }}>POS</span></h1>
@@ -215,7 +217,7 @@ export default function AuthPage() {
             Your business.<br />
             <span style={{ color: colors.cyan }}>Smarter every day.</span>
           </h2>
-          <p className="text-blue-100/80 text-lg xl:text-xl font-medium max-w-md mb-12 leading-relaxed">
+          <p className="text-blue-100/90 text-lg xl:text-xl font-medium max-w-md mb-12 leading-relaxed">
             Run sales, inventory, payments and invoicing from one intelligent workspace.
           </p>
 
@@ -252,7 +254,7 @@ export default function AuthPage() {
           </div>
         </div>
 
-        <div className="relative z-10 flex items-center gap-4 text-white/50 text-sm font-medium">
+        <div className="relative z-10 flex items-center gap-4 text-white/60 text-sm font-medium">
           <span>© {new Date().getFullYear()} WhizPoint</span>
           <span className="w-1 h-1 bg-white/30 rounded-full"></span>
           <span>Enterprise Grade Security</span>
@@ -266,13 +268,14 @@ export default function AuthPage() {
         
         {/* Mobile Header Logo */}
         <div className="absolute top-6 left-6 lg:hidden flex items-center gap-2 z-20">
-          <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-[12px] flex items-center justify-center border border-white/20 shadow-md">
+          <div className="w-10 h-10 bg-slate-900/80 backdrop-blur-md rounded-[12px] flex items-center justify-center border border-white/20 shadow-md">
              <img src="/logo.png" alt="WhizPOS" className="w-6 h-6 brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           </div>
           <h1 className="text-xl font-black text-white tracking-tight">Whiz<span style={{ color: colors.cyan }}>POS</span></h1>
         </div>
 
-        <div className="w-full max-w-[460px] mx-auto pt-16 lg:pt-0 pb-8 bg-white/95 backdrop-blur-xl border border-white/40 shadow-2xl rounded-3xl p-6 sm:p-8 my-auto">
+        {/* Translucent Frosted Glass Card for Mobile & Desktop */}
+        <div className="w-full max-w-[480px] mx-auto pt-14 lg:pt-0 pb-8 bg-white/80 sm:bg-white/85 backdrop-blur-2xl border border-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.35)] rounded-3xl p-6 sm:p-9 my-auto transition-all relative">
           
           {isSuspended && (
             <div className="mb-6 p-4 bg-[#FF2A55]/10 border border-[#FF2A55]/20 rounded-[16px] flex items-start gap-3 animate-in fade-in slide-in-from-top-4">
@@ -303,7 +306,7 @@ export default function AuthPage() {
                {/* Session Cards */}
                <div className="space-y-3 mb-8">
                   {/* User Card */}
-                  <div className="bg-white border border-[#E5EAF2] rounded-[16px] p-4 flex items-center gap-4 shadow-sm relative overflow-hidden">
+                  <div className="bg-white/90 border border-slate-200/90 rounded-[16px] p-4 flex items-center gap-4 shadow-sm relative overflow-hidden">
                      <div className="w-12 h-12 bg-[#F7F9FC] rounded-full flex items-center justify-center text-[#10182B] font-bold text-lg border border-[#E5EAF2]">
                         {activeSession.name ? activeSession.name.substring(0, 2).toUpperCase() : 'U'}
                      </div>
@@ -319,7 +322,7 @@ export default function AuthPage() {
 
                   {/* Business Card */}
                   {activeSession.role && (
-                    <div className="bg-white border border-[#0A9EF5]/30 rounded-[16px] p-4 flex items-center gap-4 shadow-[0_4px_12px_rgba(10,158,245,0.08)] relative">
+                    <div className="bg-white/90 border border-[#0A9EF5]/30 rounded-[16px] p-4 flex items-center gap-4 shadow-[0_4px_12px_rgba(10,158,245,0.08)] relative">
                        <div className="w-12 h-12 bg-[#0A9EF5]/10 text-[#0A9EF5] rounded-[12px] flex items-center justify-center">
                           <Building2 className="w-6 h-6" />
                        </div>
@@ -392,7 +395,7 @@ export default function AuthPage() {
               </div>
 
               {/* Ultra Modern Mode Switcher */}
-              <div className="flex p-1 bg-[#E5EAF2]/40 rounded-[16px] mb-8 relative">
+              <div className="flex p-1 bg-slate-200/70 border border-slate-300/60 rounded-[16px] mb-8 relative backdrop-blur-md">
                 <div 
                   className="absolute inset-y-1 bg-white rounded-[12px] shadow-sm transition-all duration-300 ease-out" 
                   style={{ width: 'calc(50% - 4px)', left: isLogin ? '4px' : 'calc(50%)' }} 
@@ -400,14 +403,14 @@ export default function AuthPage() {
                 <button
                   type="button"
                   onClick={() => { setIsLogin(true); setFormData({...formData, businessName: ''}); }}
-                  className={`flex-1 py-3 text-[14px] font-bold rounded-[12px] transition-colors relative z-10 ${isLogin ? 'text-[#10182B]' : 'text-[#64748B] hover:text-[#10182B]'}`}
+                  className={`flex-1 py-3 text-[14px] font-extrabold rounded-[12px] transition-colors relative z-10 ${isLogin ? 'text-[#10182B]' : 'text-slate-600 hover:text-slate-900'}`}
                 >
                   Sign In
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsLogin(false)}
-                  className={`flex-1 py-3 text-[14px] font-bold rounded-[12px] transition-colors relative z-10 ${!isLogin ? 'text-[#10182B]' : 'text-[#64748B] hover:text-[#10182B]'}`}
+                  className={`flex-1 py-3 text-[14px] font-extrabold rounded-[12px] transition-colors relative z-10 ${!isLogin ? 'text-[#10182B]' : 'text-slate-600 hover:text-slate-900'}`}
                 >
                   Create Account
                 </button>
@@ -418,15 +421,15 @@ export default function AuthPage() {
                 {/* Business Name Field (Signup Only) */}
                 {!isLogin && (
                   <div className="space-y-1.5 animate-in fade-in zoom-in-95 duration-300">
-                    <label className="text-[13px] font-bold text-[#10182B] ml-1">Business Name</label>
+                    <label className="text-[13px] font-extrabold text-slate-800 ml-1">Business Name</label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Building2 className="h-5 w-5 text-[#64748B] group-focus-within:text-[#0A9EF5] transition-colors" />
+                        <Building2 className="h-5 w-5 text-slate-500 group-focus-within:text-[#0A9EF5] transition-colors" />
                       </div>
                       <input
                         type="text"
                         required
-                        className="w-full pl-11 pr-4 py-0 h-[54px] bg-white border border-[#E5EAF2] rounded-[16px] text-[15px] font-medium text-[#10182B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0A9EF5] focus:ring-1 focus:ring-[#0A9EF5] transition-all"
+                        className="w-full pl-11 pr-4 py-0 h-[54px] bg-white/90 focus:bg-white border border-slate-300/90 rounded-[16px] text-[15px] font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0A9EF5] focus:ring-2 focus:ring-[#0A9EF5]/20 shadow-xs transition-all"
                         placeholder="e.g. Aden Cafe"
                         value={formData.businessName}
                         onChange={(e) => setFormData({...formData, businessName: e.target.value})}
@@ -437,15 +440,15 @@ export default function AuthPage() {
 
                 {/* Email Field */}
                 <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#10182B] ml-1">Work Email</label>
+                  <label className="text-[13px] font-extrabold text-slate-800 ml-1">Work Email</label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-[#64748B] group-focus-within:text-[#0A9EF5] transition-colors" />
+                      <Mail className="h-5 w-5 text-slate-500 group-focus-within:text-[#0A9EF5] transition-colors" />
                     </div>
                     <input
                       type="email"
                       required
-                      className="w-full pl-11 pr-4 py-0 h-[54px] bg-white border border-[#E5EAF2] rounded-[16px] text-[15px] font-medium text-[#10182B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0A9EF5] focus:ring-1 focus:ring-[#0A9EF5] transition-all"
+                      className="w-full pl-11 pr-4 py-0 h-[54px] bg-white/90 focus:bg-white border border-slate-300/90 rounded-[16px] text-[15px] font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0A9EF5] focus:ring-2 focus:ring-[#0A9EF5]/20 shadow-xs transition-all"
                       placeholder="you@business.com"
                       value={formData.email}
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -456,7 +459,7 @@ export default function AuthPage() {
                 {/* Password Field */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center ml-1">
-                    <label className="text-[13px] font-bold text-[#10182B]">Password</label>
+                    <label className="text-[13px] font-extrabold text-slate-800">Password</label>
                     {isLogin && (
                       <a href="#" className="text-[13px] font-bold text-[#0A9EF5] hover:text-[#159FF5] transition-colors">
                         Forgot password?
@@ -465,13 +468,13 @@ export default function AuthPage() {
                   </div>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-[#64748B] group-focus-within:text-[#0A9EF5] transition-colors" />
+                      <Lock className="h-5 w-5 text-slate-500 group-focus-within:text-[#0A9EF5] transition-colors" />
                     </div>
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
                       minLength={8}
-                      className="w-full pl-11 pr-12 py-0 h-[54px] bg-white border border-[#E5EAF2] rounded-[16px] text-[15px] font-medium text-[#10182B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0A9EF5] focus:ring-1 focus:ring-[#0A9EF5] transition-all"
+                      className="w-full pl-11 pr-12 py-0 h-[54px] bg-white/90 focus:bg-white border border-slate-300/90 rounded-[16px] text-[15px] font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0A9EF5] focus:ring-2 focus:ring-[#0A9EF5]/20 shadow-xs transition-all"
                       placeholder={isLogin ? '••••••••••••' : 'Create a strong password'}
                       value={formData.password}
                       onChange={(e) => setFormData({...formData, password: e.target.value})}
@@ -479,7 +482,7 @@ export default function AuthPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#64748B] hover:text-[#10182B] transition-colors"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-slate-900 transition-colors"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -495,7 +498,7 @@ export default function AuthPage() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full text-white font-semibold text-[15px] h-[54px] rounded-[14px] transition-all flex justify-center items-center gap-2 mt-6 shadow-[0_8px_16px_rgba(10,158,245,0.2)] hover:shadow-[0_12px_24px_rgba(10,158,245,0.3)] hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-70 disabled:pointer-events-none disabled:transform-none"
+                  className="w-full text-white font-extrabold text-[15px] h-[54px] rounded-[16px] transition-all flex justify-center items-center gap-2 mt-6 shadow-[0_8px_20px_rgba(10,158,245,0.3)] hover:shadow-[0_12px_24px_rgba(10,158,245,0.4)] hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-70 disabled:pointer-events-none disabled:transform-none cursor-pointer"
                   style={{ backgroundColor: colors.primaryBlue }}
                 >
                   {isLoading ? (
@@ -513,10 +516,10 @@ export default function AuthPage() {
                     {/* Social Login Separator */}
                     <div className="relative py-4 mt-2">
                       <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-[#E5EAF2]"></div>
+                        <div className="w-full border-t border-slate-300/80"></div>
                       </div>
-                      <div className="relative flex justify-center text-[13px]">
-                        <span className="bg-[#F7F9FC] lg:bg-white px-4 text-[#64748B] font-medium">Or continue with</span>
+                      <div className="relative flex justify-center text-[12px]">
+                        <span className="bg-white/90 border border-slate-200/80 rounded-full px-3.5 py-0.5 text-slate-500 font-extrabold uppercase tracking-wider">Or continue with</span>
                       </div>
                     </div>
 
@@ -525,7 +528,7 @@ export default function AuthPage() {
                       <button
                         type="button"
                         onClick={handleGoogleLogin}
-                        className="flex items-center justify-center gap-2 bg-white border border-[#E5EAF2] hover:bg-[#F7F9FC] text-[#10182B] font-semibold text-[14px] h-[52px] rounded-[14px] transition-all active:scale-[0.98]"
+                        className="flex items-center justify-center gap-2 bg-white/90 hover:bg-white border border-slate-300/90 text-slate-900 font-bold text-[14px] h-[52px] rounded-[14px] shadow-xs transition-all active:scale-[0.98] cursor-pointer"
                       >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
                           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -538,7 +541,7 @@ export default function AuthPage() {
                       <button
                         type="button"
                         onClick={() => toast('Microsoft login coming soon!', { icon: '💻' })}
-                        className="flex items-center justify-center gap-2 bg-white border border-[#E5EAF2] hover:bg-[#F7F9FC] text-[#10182B] font-semibold text-[14px] h-[52px] rounded-[14px] transition-all active:scale-[0.98]"
+                        className="flex items-center justify-center gap-2 bg-white/90 hover:bg-white border border-slate-300/90 text-slate-900 font-bold text-[14px] h-[52px] rounded-[14px] shadow-xs transition-all active:scale-[0.98] cursor-pointer"
                       >
                         <svg className="w-5 h-5" viewBox="0 0 21 21">
                           <path fill="#f25022" d="M1 1h9v9H1z" />
@@ -554,11 +557,11 @@ export default function AuthPage() {
               </form>
               
               {/* Bottom Navigation Toggle */}
-              <div className="mt-8 text-center text-[14px] font-medium text-[#64748B]">
+              <div className="mt-8 text-center text-[14px] font-medium text-slate-600">
                 {isLogin ? (
-                  <>Don't have an account? <button type="button" onClick={() => setIsLogin(false)} className="text-[#0A9EF5] font-bold hover:text-[#159FF5] transition-colors ml-1">Create your workspace &rarr;</button></>
+                  <>Don't have an account? <button type="button" onClick={() => setIsLogin(false)} className="text-[#0A9EF5] font-extrabold hover:text-[#159FF5] transition-colors ml-1 cursor-pointer">Create your workspace &rarr;</button></>
                 ) : (
-                  <>Already have an account? <button type="button" onClick={() => setIsLogin(true)} className="text-[#0A9EF5] font-bold hover:text-[#159FF5] transition-colors ml-1">Sign in &rarr;</button></>
+                  <>Already have an account? <button type="button" onClick={() => setIsLogin(true)} className="text-[#0A9EF5] font-extrabold hover:text-[#159FF5] transition-colors ml-1 cursor-pointer">Sign in &rarr;</button></>
                 )}
               </div>
 

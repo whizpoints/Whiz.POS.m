@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { usePosStore } from '../../../store/posStore';
-import { Loader2, CheckCircle2, AlertTriangle, RefreshCw, WifiOff, FileEdit, Users, Edit3, Check } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, RefreshCw, WifiOff, FileEdit, Users, Edit3, Check, Search, X, ArrowRight, ShieldCheck, Clock } from 'lucide-react';
 import { useToast } from '../../ui/use-toast';
 
 interface Props {
@@ -11,55 +11,147 @@ export default function TillMonitor({ totalAmount }: Props) {
   const [isPolling, setIsPolling] = useState(true);
   const [detectedPayment, setDetectedPayment] = useState<any>(null);
   const [candidatePayments, setCandidatePayments] = useState<any[]>([]);
+  const [recentTillPayments, setRecentTillPayments] = useState<any[]>([]);
   const [isManualOffline, setIsManualOffline] = useState(false);
   const [offlinePhone, setOfflinePhone] = useState('');
   const [offlineCode, setOfflineCode] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [customCustomerName, setCustomCustomerName] = useState('');
+  
+  // Real-time search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
+
   const { completeTransaction } = usePosStore();
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Poll the backend every 4 seconds for new M-Pesa transactions
-    let timeout: NodeJS.Timeout;
-    
-    // Look for payments arriving up to 30 mins early or while modal is open
-    const componentMountTime = new Date().getTime() - (30 * 60 * 1000);
+  const enrichCustomerName = (matchingTxn: any) => {
+    let resolvedName = matchingTxn.customerName || '';
+    if (!resolvedName || resolvedName === 'Customer' || resolvedName === 'Unknown') {
+      const state = usePosStore.getState();
+      if (matchingTxn.phoneNumber) {
+        const phoneSuffix = String(matchingTxn.phoneNumber).slice(-9);
+        const cCust = state.creditCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
+        const lCust = state.loyaltyCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
+        if (cCust) resolvedName = cCust.name;
+        else if (lCust) resolvedName = lCust.name;
+      }
+    }
+    return resolvedName || 'M-Pesa Customer';
+  };
 
-    const enrichCustomerName = (matchingTxn: any) => {
-      let resolvedName = matchingTxn.customerName || '';
-      if (!resolvedName || resolvedName === 'Customer' || resolvedName === 'Unknown') {
-        const state = usePosStore.getState();
-        if (matchingTxn.phoneNumber) {
-          const phoneSuffix = String(matchingTxn.phoneNumber).slice(-9);
-          const cCust = state.creditCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
-          const lCust = state.loyaltyCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
-          if (cCust) resolvedName = cCust.name;
-          else if (lCust) resolvedName = lCust.name;
+  const onPaymentDetected = (matchingTxn: any) => {
+    const finalName = enrichCustomerName(matchingTxn);
+    setDetectedPayment({
+      transactionId: matchingTxn.transactionId,
+      amount: Number(matchingTxn.amount),
+      phoneNumber: matchingTxn.phoneNumber,
+      customerName: finalName,
+      timestamp: matchingTxn.timestamp || matchingTxn.createdAt || new Date().toISOString()
+    });
+    setCustomCustomerName(finalName);
+    setIsPolling(false);
+  };
+
+  const selectCandidate = (cand: any) => {
+    const finalName = enrichCustomerName(cand);
+    setDetectedPayment({
+      transactionId: cand.transactionId,
+      amount: Number(cand.amount),
+      phoneNumber: cand.phoneNumber,
+      customerName: finalName,
+      timestamp: cand.timestamp || cand.createdAt || new Date().toISOString()
+    });
+    setCustomCustomerName(finalName);
+    setIsPolling(false);
+  };
+
+  // Fetch recent payments and auto-detect
+  const fetchPayments = async (queryText = '') => {
+    try {
+      const businessSetup = usePosStore.getState().businessSetup;
+      const businessId = businessSetup?.cloudBusinessId || businessSetup?.businessId || (businessSetup as any)?.id;
+      if (!businessId) return;
+
+      const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+      const queryParam = queryText.trim() ? `&q=${encodeURIComponent(queryText.trim())}` : '';
+      let webportalUrl = `${webportalBase}/api/mpesa/payments/search?businessId=${encodeURIComponent(businessId)}${queryParam}`;
+      
+      const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
+      const localServerUrl = localServerBase ? `${localServerBase}/api/mpesa/payments/search?businessId=${businessId}${queryParam}` : null;
+
+      let res: Response | null = null;
+      try {
+        res = await fetch(webportalUrl, { signal: AbortSignal.timeout(3500) });
+      } catch (cloudErr) {
+        if (localServerUrl) {
+          try {
+            res = await fetch(localServerUrl, { signal: AbortSignal.timeout(2000) });
+          } catch (localErr) {}
         }
       }
-      return resolvedName || 'M-Pesa Customer';
-    };
 
-    const onPaymentDetected = (matchingTxn: any) => {
-      const finalName = enrichCustomerName(matchingTxn);
-      setDetectedPayment({
-        transactionId: matchingTxn.transactionId,
-        amount: Number(matchingTxn.amount),
-        phoneNumber: matchingTxn.phoneNumber,
-        customerName: finalName,
-        timestamp: matchingTxn.timestamp || new Date().toISOString()
-      });
-      setCustomCustomerName(finalName);
-      setIsPolling(false);
-    };
+      if (res && res.ok) {
+        const txns = await res.json();
+        const localUsedCodes = usePosStore.getState().transactions.map((t: any) => (t as any).mpesaCode).filter(Boolean);
 
-    // Real-time socket event listener
+        if (Array.isArray(txns)) {
+          // If this was a search query, set search results
+          if (queryText.trim()) {
+            setSearchResults(txns);
+            if (txns.length === 0) {
+              setSearchFeedback(`No payment found matching "${queryText.trim()}". Try customer phone digits or receipt code.`);
+            } else {
+              setSearchFeedback(null);
+            }
+            return;
+          }
+
+          // Normal polling / refresh of recent unclaimed till payments
+          const unlinkedOnly = txns.filter((t: any) => !localUsedCodes.includes(t.transactionId) && t.status !== 'LINKED');
+          setRecentTillPayments(unlinkedOnly);
+
+          // Auto-detect matches for the exact totalAmount
+          const matches = unlinkedOnly.filter((t: any) => Math.abs(Number(t.amount) - Number(totalAmount)) < 0.01);
+
+          if (matches.length > 1) {
+            setCandidatePayments(matches);
+            if (!detectedPayment) {
+              setIsPolling(false);
+            }
+          } else if (matches.length === 1) {
+            setCandidatePayments(matches);
+            if (!detectedPayment) {
+              onPaymentDetected(matches[0]);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[TillMonitor] Polling/Search error:', err);
+    }
+  };
+
+  // Real-time socket event listener
+  useEffect(() => {
     const handleMpesaSocketEvent = (e: any) => {
       const data = e.detail;
       if (!data || !data.transactionId) return;
       const amt = Number(data.amount);
-      const localUsedCodes = usePosStore.getState().transactions.map((t: any) => t.mpesaCode).filter(Boolean);
+      const localUsedCodes = usePosStore.getState().transactions.map((t: any) => (t as any).mpesaCode).filter(Boolean);
+      
+      // Update recent payments list immediately
+      setRecentTillPayments(prev => {
+        const exists = prev.some(p => p.transactionId === data.transactionId);
+        if (!exists && !localUsedCodes.includes(data.transactionId)) {
+          return [data, ...prev];
+        }
+        return prev;
+      });
+
+      // If amount matches sale total, auto-select or prompt
       if (Math.abs(amt - Number(totalAmount)) < 0.01 && !localUsedCodes.includes(data.transactionId)) {
         setCandidatePayments(prev => {
           const exists = prev.some(p => p.transactionId === data.transactionId);
@@ -71,119 +163,50 @@ export default function TillMonitor({ totalAmount }: Props) {
         }
       }
     };
+
     window.addEventListener('mpesa_payment_received', handleMpesaSocketEvent);
+    return () => window.removeEventListener('mpesa_payment_received', handleMpesaSocketEvent);
+  }, [totalAmount, detectedPayment]);
 
+  // Periodic polling
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
     const poll = async () => {
-      try {
-        if (!isPolling || isManualOffline) return;
-        
-        const businessSetup = usePosStore.getState().businessSetup;
-        const businessId = businessSetup?.cloudBusinessId || businessSetup?.businessId || (businessSetup as any)?.id;
-        if (!businessId) return;
-
-        // Direct Web Portal query for real-time M-Pesa callbacks even when local server is off
-        const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
-        const webportalUrl = businessSetup?.mpesaSearchUrl 
-          ? (businessSetup.mpesaSearchUrl.includes('?') ? `${businessSetup.mpesaSearchUrl}&businessId=${businessId}` : `${businessSetup.mpesaSearchUrl}?businessId=${businessId}`)
-          : `${webportalBase}/api/mpesa/payments/search?businessId=${businessId}`;
-
-        const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
-        const localServerUrl = localServerBase ? `${localServerBase}/api/mpesa/payments/search?businessId=${businessId}` : null;
-
-        let res: Response | null = null;
-        try {
-          res = await fetch(webportalUrl, {
-            signal: AbortSignal.timeout(3500)
-          });
-        } catch (fetchErr) {
-          // If webportal is unreachable (e.g. internet down), try local server if configured
-          if (localServerUrl) {
-            try {
-              res = await fetch(localServerUrl, {
-                signal: AbortSignal.timeout(2000)
-              });
-            } catch (localErr) {
-              // Both failed, ignore for this poll interval
-            }
-          }
-          // Also trigger server discovery if local server had connection error
-          if (window.electron && typeof window.electron.discoverLocalServer === 'function') {
-            window.electron.discoverLocalServer().then((discovered: any) => {
-              const foundUrl = Array.isArray(discovered) ? discovered[0]?.url : (discovered?.url || (typeof discovered === 'string' ? discovered : null));
-              if (foundUrl && foundUrl !== localServerBase) {
-                usePosStore.getState().updateServerUrl(foundUrl);
-              }
-            }).catch(() => {});
-          }
-        }
-
-        if (res && res.ok) {
-          const txns = await res.json();
-          const localUsedCodes = usePosStore.getState().transactions.map((t: any) => t.mpesaCode).filter(Boolean);
-          
-          // Match unconsumed transactions with amount equal to total
-          const matches = Array.isArray(txns) ? txns.filter((t: any) => {
-            const rawTime = t.timestamp || t.createdAt || Date.now();
-            const txnTime = new Date(rawTime).getTime();
-            const amtMatches = Math.abs(Number(t.amount) - Number(totalAmount)) < 0.01;
-            const notUsed = !localUsedCodes.includes(t.transactionId);
-            return txnTime >= (componentMountTime - 60000) && amtMatches && notUsed;
-          }) : [];
-          
-          if (matches.length > 1) {
-            setCandidatePayments(matches);
-            // If nothing is explicitly picked yet, don't auto-pick arbitrary one, prompt cashier
-            if (!detectedPayment) {
-              setIsPolling(false);
-              return;
-            }
-          } else if (matches.length === 1) {
-            setCandidatePayments(matches);
-            if (!detectedPayment) {
-              onPaymentDetected(matches[0]);
-              return;
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Polling error', err);
-      }
-      
-      if (isPolling && !isManualOffline) {
+      if (!isPolling || isManualOffline || detectedPayment) return;
+      await fetchPayments();
+      if (isPolling && !isManualOffline && !detectedPayment) {
         timeout = setTimeout(poll, 4000);
       }
     };
-    
-    poll();
-    
-    return () => {
-      clearTimeout(timeout);
-      window.removeEventListener('mpesa_payment_received', handleMpesaSocketEvent);
-    };
-  }, [isPolling, totalAmount, isManualOffline, detectedPayment]);
 
-  const selectCandidate = (cand: any) => {
-    let resolvedName = cand.customerName || '';
-    if (!resolvedName || resolvedName === 'Customer' || resolvedName === 'Unknown') {
-      const state = usePosStore.getState();
-      if (cand.phoneNumber) {
-        const phoneSuffix = String(cand.phoneNumber).slice(-9);
-        const cCust = state.creditCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
-        const lCust = state.loyaltyCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
-        if (cCust) resolvedName = cCust.name;
-        else if (lCust) resolvedName = lCust.name;
-      }
+    poll();
+    return () => clearTimeout(timeout);
+  }, [isPolling, isManualOffline, detectedPayment, totalAmount]);
+
+  // Handle Search Input Change & Debounce
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setSearchFeedback(null);
+
+    if (!val.trim()) {
+      setSearchResults(null);
+      return;
     }
-    const finalName = resolvedName || 'M-Pesa Customer';
-    setDetectedPayment({
-      transactionId: cand.transactionId,
-      amount: Number(cand.amount),
-      phoneNumber: cand.phoneNumber,
-      customerName: finalName,
-      timestamp: cand.timestamp || new Date().toISOString()
-    });
-    setCustomCustomerName(finalName);
-    setIsPolling(false);
+
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      await fetchPayments(val);
+      setIsSearching(false);
+    }, 400);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults(null);
+    setSearchFeedback(null);
+    fetchPayments();
   };
 
   const handleConfirm = async () => {
@@ -237,7 +260,7 @@ export default function TillMonitor({ totalAmount }: Props) {
       console.error('[TillMonitor] Failed to consume payment:', err);
     }
     
-    // Complete the transaction atomically with customer name recorded
+    // Complete transaction atomically with customer name and mpesa code recorded
     completeTransaction('mpesa', undefined, { 
       mpesaCode: detectedPayment.transactionId,
       phoneNumber: detectedPayment.phoneNumber,
@@ -249,7 +272,7 @@ export default function TillMonitor({ totalAmount }: Props) {
 
   const handleOfflineConfirm = () => {
     if (offlinePhone.length !== 3 || offlineCode.length !== 3) {
-      toast('Please enter exactly 3 digits for both fields.', 'error');
+      toast('Please enter exactly 3 digits/characters for both fields.', 'error');
       return;
     }
 
@@ -260,21 +283,22 @@ export default function TillMonitor({ totalAmount }: Props) {
     });
   };
 
+  // Render Manual Offline Fallback Form
   if (isManualOffline) {
     const isValid = offlinePhone.length === 3 && offlineCode.length === 3;
     return (
-      <div className="flex flex-col h-full bg-orange-50/50 p-4 rounded-xl border border-orange-200">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+      <div className="flex flex-col h-full bg-orange-50/60 p-4 rounded-xl border border-orange-200">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 shadow-sm">
             <WifiOff className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-900">Offline Verification</h3>
-            <p className="text-xs text-gray-500">Manual entry for offline reconciliation</p>
+            <h3 className="text-base font-bold text-gray-900">Manual Offline Reconciliation</h3>
+            <p className="text-xs text-gray-500">Record customer code suffix when server/internet is unreachable</p>
           </div>
         </div>
 
-        <div className="space-y-4 mb-6">
+        <div className="space-y-3 mb-4">
           <div>
             <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
               Last 3 digits of Customer Phone
@@ -285,7 +309,7 @@ export default function TillMonitor({ totalAmount }: Props) {
               value={offlinePhone}
               onChange={(e) => setOfflinePhone(e.target.value.replace(/\D/g, ''))}
               placeholder="e.g. 456"
-              className="w-full text-center text-2xl font-mono tracking-[0.5em] p-3 border-2 border-orange-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 outline-none transition-all"
+              className="w-full text-center text-xl font-mono tracking-[0.5em] p-2.5 border-2 border-orange-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 outline-none transition-all bg-white font-bold"
             />
           </div>
           <div>
@@ -298,7 +322,7 @@ export default function TillMonitor({ totalAmount }: Props) {
               value={offlineCode}
               onChange={(e) => setOfflineCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
               placeholder="e.g. 9X2"
-              className="w-full text-center text-2xl font-mono tracking-[0.5em] p-3 border-2 border-orange-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 outline-none transition-all uppercase"
+              className="w-full text-center text-xl font-mono tracking-[0.5em] p-2.5 border-2 border-orange-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 outline-none transition-all uppercase bg-white font-bold"
             />
           </div>
         </div>
@@ -306,170 +330,116 @@ export default function TillMonitor({ totalAmount }: Props) {
         <button 
           onClick={handleOfflineConfirm}
           disabled={!isValid}
-          className="mt-auto w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-200"
+          className="mt-auto w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-orange-200 text-sm"
         >
-          <FileEdit className="w-5 h-5" />
+          <FileEdit className="w-4 h-4" />
           RECORD OFFLINE SALE
         </button>
         <button 
           onClick={() => setIsManualOffline(false)}
-          className="mt-2 w-full py-2 text-sm text-gray-500 hover:text-gray-700 font-medium"
+          className="mt-2 w-full py-1.5 text-xs text-gray-500 hover:text-gray-700 font-medium"
         >
-          Cancel & Return to Auto-Detect
+          ← Cancel & Return to Live Till Monitor
         </button>
       </div>
     );
   }
 
-  // If multiple payments match the amount and none selected yet: Cashier picks who is paying!
-  if (!detectedPayment && candidatePayments.length > 1) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">
-              Multiple Payments Found ({candidatePayments.length})
-            </h3>
-            <p className="text-xs text-gray-500">Select the customer standing at your counter:</p>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-2 mb-4 pr-1">
-          {candidatePayments.map((cand, idx) => (
-            <div 
-              key={idx}
-              onClick={() => selectCandidate(cand)}
-              className="p-3.5 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50/50 cursor-pointer transition-all flex items-center justify-between shadow-sm bg-white"
-            >
-              <div>
-                <p className="font-bold text-gray-900 text-base flex items-center gap-2">
-                  {cand.customerName || 'M-Pesa Customer'}
-                </p>
-                <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-                  <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-700 font-bold">{cand.phoneNumber || 'No phone'}</span>
-                  <span className="font-mono">{cand.transactionId}</span>
-                  <span>{new Date(cand.timestamp || Date.now()).toLocaleTimeString()}</span>
-                </div>
-              </div>
-              <button 
-                type="button"
-                className="px-3 py-1.5 bg-green-600 text-white font-bold text-xs rounded-lg shadow hover:bg-green-700"
-              >
-                SELECT
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <button 
-          onClick={() => { setCandidatePayments([]); setIsPolling(true); }}
-          className="py-2 text-xs text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1 font-semibold"
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> Re-scan for new payments
-        </button>
-      </div>
-    );
-  }
-
+  // Render Detected Payment Confirmation Card
   if (detectedPayment) {
     const isAmountMatch = Math.abs(detectedPayment.amount - totalAmount) < 0.01;
     
     return (
-      <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-              <CheckCircle2 className="w-6 h-6" />
+      <div className="flex flex-col h-full animate-in fade-in duration-200">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <h3 className="text-base font-bold text-gray-900 leading-tight">
                 PAYMENT DETECTED
               </h3>
-              <p className="text-xs text-gray-500">Verify customer details and confirm</p>
+              <p className="text-[11px] text-gray-500">Verified from M-Pesa Till callback</p>
             </div>
           </div>
-          {candidatePayments.length > 1 && (
-            <button 
-              type="button"
-              onClick={() => setDetectedPayment(null)}
-              className="text-xs text-blue-600 font-bold hover:underline"
-            >
-              Choose different customer ({candidatePayments.length})
-            </button>
-          )}
+          <button 
+            type="button"
+            onClick={() => { setDetectedPayment(null); setIsPolling(true); }}
+            className="text-xs text-blue-600 font-bold hover:underline"
+          >
+            Change / Search other
+          </button>
         </div>
         
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 mb-4 shadow-sm">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 bg-green-50/70 p-3 rounded-lg border border-green-200">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold text-green-800 uppercase">Customer Name</p>
+        <div className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-3 mb-3 shadow-xs">
+          <div className="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-200">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Customer Name</p>
+              <button 
+                type="button" 
+                onClick={() => setIsEditingName(!isEditingName)} 
+                className="text-[11px] text-emerald-700 flex items-center gap-1 font-bold hover:underline"
+              >
+                <Edit3 className="w-3 h-3" /> {isEditingName ? 'Cancel' : 'Edit'}
+              </button>
+            </div>
+            {isEditingName ? (
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <input 
+                  type="text" 
+                  value={customCustomerName} 
+                  onChange={e => setCustomCustomerName(e.target.value)}
+                  placeholder="Enter customer name..."
+                  className="flex-1 px-2.5 py-1 text-xs bg-white border border-emerald-300 rounded-lg font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
                 <button 
                   type="button" 
-                  onClick={() => setIsEditingName(!isEditingName)} 
-                  className="text-xs text-green-700 flex items-center gap-1 font-bold hover:underline"
+                  onClick={() => setIsEditingName(false)}
+                  className="p-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
                 >
-                  <Edit3 className="w-3 h-3" /> {isEditingName ? 'Cancel' : 'Edit Name'}
+                  <Check className="w-3.5 h-3.5" />
                 </button>
               </div>
-              {isEditingName ? (
-                <div className="mt-2 flex items-center gap-2">
-                  <input 
-                    type="text" 
-                    value={customCustomerName} 
-                    onChange={e => setCustomCustomerName(e.target.value)}
-                    placeholder="Enter customer name..."
-                    className="flex-1 px-3 py-1.5 text-sm bg-white border border-green-300 rounded-lg font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => setIsEditingName(false)}
-                    className="p-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    <Check className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <p className="text-lg font-black text-gray-900 mt-0.5">
-                  {customCustomerName || detectedPayment.customerName || 'M-Pesa Customer'}
-                </p>
-              )}
-            </div>
+            ) : (
+              <p className="text-base font-black text-gray-900 mt-0.5">
+                {customCustomerName || detectedPayment.customerName || 'M-Pesa Customer'}
+              </p>
+            )}
+          </div>
 
+          <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase">Phone Number</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase">Customer Phone</p>
               <p className="font-mono font-bold text-gray-900">{detectedPayment.phoneNumber || 'Not provided'}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase">Transaction ID</p>
-              <p className="font-mono font-bold text-gray-900">{detectedPayment.transactionId}</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase">M-Pesa Receipt Code</p>
+              <p className="font-mono font-black text-gray-900 tracking-wide">{detectedPayment.transactionId}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase">Time</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase">Time Received</p>
               <p className="font-medium text-gray-700">{new Date(detectedPayment.timestamp).toLocaleTimeString()}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase">Verification Status</p>
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                <CheckCircle2 className="w-3 h-3" /> Validated
+              <p className="text-[10px] font-semibold text-gray-400 uppercase">Verification</p>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                <ShieldCheck className="w-3 h-3" /> Safaricom Verified
               </span>
             </div>
           </div>
           
-          <div className={`p-4 rounded-lg flex items-center justify-between border ${isAmountMatch ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+          <div className={`p-3 rounded-lg flex items-center justify-between border ${isAmountMatch ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
             <div>
-              <p className="text-xs font-semibold uppercase mb-1">Amount Paid</p>
-              <p className={`text-xl font-bold ${isAmountMatch ? 'text-green-700' : 'text-red-700'}`}>
-                KSh {detectedPayment.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              <p className="text-[10px] font-semibold uppercase mb-0.5">Amount Paid</p>
+              <p className={`text-lg font-black font-mono ${isAmountMatch ? 'text-emerald-700' : 'text-rose-700'}`}>
+                KSh {Number(detectedPayment.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </p>
             </div>
             {!isAmountMatch && (
-              <div className="flex items-center gap-2 text-red-600 bg-white px-3 py-1.5 rounded-full text-sm font-bold shadow-sm">
-                <AlertTriangle className="w-4 h-4" />
-                MISMATCH (Expected: {totalAmount.toLocaleString()})
+              <div className="flex items-center gap-1.5 text-rose-700 bg-white px-2.5 py-1 rounded-full text-xs font-bold shadow-xs">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                MISMATCH (Expected: KSh {totalAmount.toLocaleString()})
               </div>
             )}
           </div>
@@ -478,47 +448,163 @@ export default function TillMonitor({ totalAmount }: Props) {
         <button 
           onClick={handleConfirm}
           disabled={!isAmountMatch}
-          className="mt-auto w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-200"
+          className="mt-auto w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-emerald-200 text-sm"
         >
-          <CheckCircle2 className="w-5 h-5" />
+          <CheckCircle2 className="w-4 h-4" />
           CONFIRM & COMPLETE SALE
         </button>
       </div>
     );
   }
 
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-center p-4">
-      <div className="relative">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-green-500 mb-6 relative z-10">
-          <Smartphone className="w-8 h-8" />
-        </div>
-        <div className="absolute inset-0 rounded-full border-4 border-green-500 border-t-transparent animate-spin z-20"></div>
-      </div>
-      
-      <h3 className="text-lg font-bold text-gray-900 mb-2">Waiting for payment...</h3>
-      <p className="text-gray-500 text-sm max-w-[250px] mx-auto">
-        Listening for incoming transactions on your M-Pesa Till. 
-      </p>
-      
-      <div className="mt-6 flex flex-col gap-3 w-full">
-        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-gray-400 bg-gray-200/50 px-4 py-2 rounded-full mx-auto">
-          <Loader2 className="w-3 h-3 animate-spin" />
-          AUTO-DETECT ACTIVE
-        </div>
+  // Active view: Search Bar + Live Till Monitor + Recent Payments List
+  const displayedPayments = searchResults !== null ? searchResults : recentTillPayments;
 
+  return (
+    <div className="flex flex-col h-full">
+      
+      {/* 1. Universal Search Bar (Code prefix/suffix, Phone digits, or Name) */}
+      <div className="relative mb-2.5">
+        <div className="relative flex items-center">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
+          <input 
+            type="text"
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="Search code (e.g. SK9...), phone (e.g. 712...), or name..."
+            className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all shadow-2xs font-medium"
+          />
+          {searchQuery && (
+            <button 
+              type="button" 
+              onClick={handleClearSearch}
+              className="absolute right-2.5 text-gray-400 hover:text-gray-600 p-0.5"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Status Banner / Searching Feedback */}
+      {isSearching ? (
+        <div className="flex items-center justify-center gap-2 py-3 text-xs text-gray-500">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+          Searching M-Pesa payments in database...
+        </div>
+      ) : searchFeedback ? (
+        <div className="p-2.5 mb-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between">
+          <span>{searchFeedback}</span>
+          <button onClick={handleClearSearch} className="text-amber-900 font-bold underline ml-2">Clear</button>
+        </div>
+      ) : null}
+
+      {/* 3. List of Payments (Searched or Live Unclaimed) */}
+      <div className="flex-1 overflow-y-auto space-y-2 mb-2 pr-0.5 min-h-[110px]">
+        {displayedPayments.length > 0 ? (
+          <div>
+            <div className="flex items-center justify-between mb-1.5 px-0.5">
+              <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                {searchResults !== null ? `Search Results (${displayedPayments.length})` : `Recent Till Payments (${displayedPayments.length})`}
+              </span>
+              <button
+                type="button"
+                onClick={() => fetchPayments(searchQuery)}
+                className="text-[11px] text-gray-400 hover:text-gray-600 flex items-center gap-1 font-semibold"
+              >
+                <RefreshCw className="w-3 h-3" /> Refresh
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              {displayedPayments.map((cand, idx) => {
+                const amt = Number(cand.amount);
+                const isMatch = Math.abs(amt - totalAmount) < 0.01;
+                const isClaimed = !!cand.isAlreadyClaimed || cand.status === 'LINKED';
+
+                return (
+                  <div 
+                    key={cand.transactionId || idx}
+                    onClick={() => !isClaimed && selectCandidate(cand)}
+                    className={`p-2.5 rounded-xl border transition-all flex items-center justify-between shadow-2xs ${
+                      isClaimed 
+                        ? 'bg-gray-100 border-gray-200 opacity-60 cursor-not-allowed'
+                        : isMatch 
+                          ? 'border-emerald-300 bg-emerald-50/60 hover:bg-emerald-100/70 cursor-pointer ring-1 ring-emerald-400/50' 
+                          : 'border-gray-200 hover:border-emerald-300 hover:bg-gray-50/80 cursor-pointer bg-white'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1 pr-2">
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-gray-900 text-xs truncate">
+                          {cand.customerName || 'M-Pesa Customer'}
+                        </p>
+                        {isMatch && !isClaimed && (
+                          <span className="text-[9px] font-black text-emerald-800 bg-emerald-200/80 px-1.5 py-0.2 rounded uppercase">
+                            Exact Match
+                          </span>
+                        )}
+                        {isClaimed && (
+                          <span className="text-[9px] font-bold text-gray-600 bg-gray-200 px-1.5 py-0.2 rounded uppercase">
+                            Claimed
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5 font-mono">
+                        <span className="font-bold text-gray-700">{cand.phoneNumber || 'No phone'}</span>
+                        <span>•</span>
+                        <span className="font-black text-gray-900">{cand.transactionId}</span>
+                        <span>•</span>
+                        <span className="text-gray-400">{new Date(cand.timestamp || cand.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0 flex items-center gap-2">
+                      <span className={`text-xs font-black font-mono ${isMatch ? 'text-emerald-700' : 'text-gray-900'}`}>
+                        KSh {amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                      {!isClaimed && (
+                        <button 
+                          type="button"
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg shadow-xs"
+                        >
+                          SELECT
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-5 text-center px-4 bg-gray-50/70 rounded-xl border border-dashed border-gray-200">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mb-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </div>
+            <p className="text-xs font-bold text-gray-800">Listening for incoming Till payments...</p>
+            <p className="text-[11px] text-gray-500 max-w-[240px] mt-0.5">
+              Customer can scan QR code above or send money directly to Till. Payments appear here automatically.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* 4. Footer controls & Offline entry option */}
+      <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1.5 text-gray-400 text-[11px]">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+          <span>Live M-Pesa Hook Active</span>
+        </div>
         <button 
           onClick={() => setIsManualOffline(true)}
-          className="text-xs text-orange-600 hover:text-orange-800 font-semibold underline underline-offset-2 flex items-center justify-center gap-1 mt-2"
+          className="text-[11px] text-orange-600 hover:text-orange-800 font-semibold underline underline-offset-2 flex items-center gap-1"
         >
           <WifiOff className="w-3 h-3" /> System Offline? Enter Manually
         </button>
       </div>
+
     </div>
   );
 }
-
-// Temporary inline icon since lucide might not be imported above
-const Smartphone = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-);

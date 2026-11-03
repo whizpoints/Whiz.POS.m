@@ -185,6 +185,7 @@ app.use('/api/business', businessRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/mpesa', mpesaRoutes);
+app.use('/api/mobilemoney', mpesaRoutes);
 app.use('/api/callbacks/payments', mpesaRoutes); // Daraja complains about 'mpesa' in callback URLs
 app.use('/api/terminal', terminalRoutes);
 app.use('/api/terminals', terminalsRoutes);
@@ -300,6 +301,7 @@ setInterval(async () => {
                 const businessSetup = business.settings ? (typeof business.settings === 'string' ? JSON.parse(business.settings) : business.settings) : {};
                 businessSetup.businessName = business.name;
                 businessSetup.locationId = businessSetup.cloudLocationId || location.id;
+                const localDeletedOutletIds = Array.isArray(businessSetup.deletedOutletIds) ? businessSetup.deletedOutletIds : [];
                 const pushRes = await fetch(`${CLOUD_API}/api/sync/delta`, {
                     method: 'POST',
                     headers: {
@@ -314,6 +316,7 @@ setInterval(async () => {
                         suppliers: localSuppliers,
                         transactions: localTransactions,
                         outlets: localOutlets,
+                        deletedOutletIds: localDeletedOutletIds,
                         terminals: localTerminals,
                         clients: localClients,
                         savedDocuments: localSavedDocuments,
@@ -368,6 +371,14 @@ setInterval(async () => {
             if (pullRes.ok) {
                 const pullData = await pullRes.json();
                 if (pullData.success && pullData.data) {
+                    // Delete any outlets deleted remotely on the cloud
+                    if (pullData.data.deletedOutletIds && Array.isArray(pullData.data.deletedOutletIds) && pullData.data.deletedOutletIds.length > 0) {
+                        await db.deleteFrom('Outlet').where('id', 'in', pullData.data.deletedOutletIds).execute().catch(() => { });
+                        const currentDel = Array.isArray(bSettings.deletedOutletIds) ? bSettings.deletedOutletIds : [];
+                        const mergedDel = Array.from(new Set([...currentDel, ...pullData.data.deletedOutletIds]));
+                        bSettings.deletedOutletIds = mergedDel;
+                        await db.updateTable('Business').set({ settings: JSON.stringify(bSettings), updatedAt: new Date().toISOString() }).where('id', '=', business.id).execute().catch(() => { });
+                    }
                     const payload = { ...pullData.data, isFromCloud: true };
                     if (payload.businessSetup) {
                         delete payload.businessSetup.lanAdminIp;

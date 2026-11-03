@@ -135,6 +135,17 @@ class KRAETimsService {
             settings = businessSetup;
         }
 
+        // Strictly verify that KRA integration is enabled before proceeding
+        const isKraActive = Boolean(
+            settings.kraEnabled === true || 
+            settings.etimsEnabled === true || 
+            businessSetup?.kraEnabled === true || 
+            businessSetup?.etimsEnabled === true
+        );
+        if (!isKraActive) {
+            return { success: false, disabled: true, message: 'KRA eTIMS is disabled in settings' };
+        }
+
         // Support both local-server naming (kraPin/kraToken) and webportal naming (etimsPin/etimsToken)
         let kraPin = settings.etimsPin || settings.kraPin || businessSetup?.kraPin || businessSetup?.etimsPin || this.pin || '';
         let kraToken = settings.etimsToken || settings.kraToken || businessSetup?.kraToken || businessSetup?.etimsToken || this.cmcKey || '';

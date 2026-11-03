@@ -43,6 +43,7 @@ CREATE TABLE "MpesaConfig" (
     "initiatorPassword" TEXT,
     "stkEnabled" BOOLEAN NOT NULL DEFAULT true,
     "c2bEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "certificateBase64" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "outletId" TEXT,
@@ -601,3 +602,4 @@ CREATE TRIGGER IF NOT EXISTS SavedDocument_after_insert AFTER INSERT ON "SavedDo
 BEGIN UPDATE "SavedDocument" SET updatedAt = strftime('%Y-%m-%dT%H:%M:%f0Z', 'now') WHERE id = new.id; END;
 CREATE TRIGGER IF NOT EXISTS SavedDocument_after_update AFTER UPDATE ON "SavedDocument"
 BEGIN UPDATE "SavedDocument" SET updatedAt = strftime('%Y-%m-%dT%H:%M:%f0Z', 'now') WHERE id = new.id; END;
+

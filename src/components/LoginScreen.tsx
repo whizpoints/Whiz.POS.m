@@ -136,50 +136,51 @@ const LoginScreen = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center relative overflow-hidden font-sans select-none">
 
-      {/* Full Landscape Background Image (dimmed & responsive across all screen sizes) */}
+      {/* Full Landscape Background Image (clear & vibrant across all screen sizes) */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img
           src={authBgImage}
+          onError={(e) => { (e.target as HTMLImageElement).src = '/auth-bg.jpg'; }}
           alt="Retail Checkout Background"
-          className="w-full h-full object-cover object-center filter brightness-[0.38] contrast-[1.05]"
+          className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
         />
-        <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-slate-950/70" />
+        <div className="absolute inset-0 bg-slate-950/30 backdrop-blur-[0.5px]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/20 to-slate-950/50 pointer-events-none" />
       </div>
 
       {/* Main Container */}
       <div className="z-10 w-full max-w-5xl px-6 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
 
         {/* Left Side: Branding & PIN Display */}
-        <div className="flex flex-col items-center lg:items-start text-center lg:text-left space-y-8 animate-in fade-in slide-in-from-left-8 duration-700">
+        <div className="flex flex-col items-center lg:items-start text-center lg:text-left space-y-6 animate-in fade-in slide-in-from-left-8 duration-700 bg-slate-900/70 backdrop-blur-xl p-8 rounded-3xl border border-white/20 shadow-2xl">
           <div className="relative">
-             <div className="w-24 h-24 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl flex items-center justify-center shadow-2xl transform -rotate-6 border border-white/20">
-                <Shield className="w-12 h-12 text-white" />
+             <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl flex items-center justify-center shadow-2xl transform -rotate-6 border border-white/20">
+                <Shield className="w-10 h-10 text-white" />
              </div>
-             <div className="absolute -top-2 -right-2 w-10 h-10 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center">
-                <Fingerprint className="w-5 h-5 text-cyan-300" />
+             <div className="absolute -top-2 -right-2 w-9 h-9 bg-white/15 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center">
+                <Fingerprint className="w-4 h-4 text-cyan-300" />
              </div>
           </div>
 
-          <div className="space-y-2">
-            <h1 className="text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-lg">
-              {businessSetup?.businessName?.toUpperCase() || 'WHIZ POS'}
+          <div className="space-y-1.5">
+            <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight drop-shadow-md">
+              {businessSetup?.businessName?.toUpperCase() || 'WHIZPOINT SOLUTIONS'}
             </h1>
-            <p className="text-cyan-100/70 text-lg font-medium tracking-wide">
+            <p className="text-cyan-200/90 text-base font-semibold tracking-wide">
               Your Daily Dose, Secured
             </p>
           </div>
 
           {/* PIN Display Dots */}
-          <div className="flex gap-5 py-4">
+          <div className="flex gap-4 py-2">
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
                 className={cn(
                   "w-5 h-5 rounded-full transition-all duration-300 border-2",
                   pin.length > i
-                    ? "bg-white border-white scale-125 shadow-[0_0_15px_rgba(255,255,255,0.8)]"
-                    : "bg-transparent border-white/30"
+                    ? "bg-white border-white scale-125 shadow-[0_0_15px_rgba(255,255,255,0.9)]"
+                    : "bg-white/10 border-white/40"
                 )}
               />
             ))}
@@ -188,54 +189,94 @@ const LoginScreen = () => {
           <button
             onClick={() => handleLogin()}
             disabled={pin.length < 4 || isLoading}
-            className="group relative px-8 py-4 bg-white text-slate-900 rounded-2xl font-black text-lg hover:bg-cyan-50 transition-all shadow-2xl active:scale-95 disabled:opacity-50 flex items-center gap-3 overflow-hidden"
+            className="group relative px-8 py-3.5 bg-white text-slate-900 rounded-2xl font-black text-base hover:bg-cyan-50 transition-all shadow-2xl active:scale-95 disabled:opacity-50 flex items-center gap-3 overflow-hidden cursor-pointer"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
             {isLoading ? 'VERIFYING...' : 'VERIFY ACCESS'}
-            <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
 
           {error && (
-            <div className="bg-red-500/20 border border-red-500/50 text-red-200 px-6 py-3 rounded-2xl text-sm font-bold flex items-center gap-3 animate-bounce">
+            <div className="bg-red-500/25 border border-red-500/50 text-red-200 px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 animate-bounce">
               <X className="w-4 h-4" /> {error}
             </div>
           )}
         </div>
 
-        {/* Right Side: Glass Keypad */}
+        {/* Right Side: Larger, Translucent & Ultra-Modern Glass Keypad */}
         <div className="flex justify-center lg:justify-end animate-in fade-in slide-in-from-right-8 duration-700">
-          <div className="bg-white/10 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/20 shadow-2xl w-full max-w-[400px]">
-            <div className="grid grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+          <div className="bg-slate-900/40 backdrop-blur-3xl p-7 md:p-8 rounded-[2.5rem] border border-white/20 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] w-full max-w-[430px]">
+            <div className="grid grid-cols-3 gap-3.5 md:gap-4">
+              {[
+                { num: '1', sub: '' },
+                { num: '2', sub: 'ABC' },
+                { num: '3', sub: 'DEF' },
+                { num: '4', sub: 'GHI' },
+                { num: '5', sub: 'JKL' },
+                { num: '6', sub: 'MNO' },
+                { num: '7', sub: 'PQRS' },
+                { num: '8', sub: 'TUV' },
+                { num: '9', sub: 'WXYZ' },
+              ].map(({ num, sub }) => (
                 <button
                   key={num}
-                  onClick={() => handleKeyPress(num.toString())}
+                  onClick={() => handleKeyPress(num)}
                   disabled={isLoading}
-                  className="aspect-square rounded-2xl text-3xl font-bold text-white bg-white/5 hover:bg-white/20 transition-all active:scale-90 border border-white/10 flex items-center justify-center"
+                  className="relative group h-20 md:h-22 rounded-2xl md:rounded-3xl bg-white/[0.08] hover:bg-white/[0.18] active:bg-white/[0.28] transition-all duration-150 active:scale-95 border border-white/15 hover:border-white/35 flex flex-col items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.15)] cursor-pointer overflow-hidden backdrop-blur-md"
                 >
-                  {num}
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
+                  <span className="text-3xl md:text-4xl font-black text-white tracking-tight leading-none group-hover:scale-105 transition-transform drop-shadow-sm">
+                    {num}
+                  </span>
+                  {sub && (
+                    <span className="text-[9px] font-bold text-cyan-200/60 tracking-[0.2em] mt-1 uppercase leading-none">
+                      {sub}
+                    </span>
+                  )}
                 </button>
               ))}
+
+              {/* Clear Button */}
               <button
                 onClick={() => handleKeyPress('clear')}
                 disabled={isLoading}
-                className="aspect-square rounded-2xl flex items-center justify-center bg-red-500/20 hover:bg-red-500/40 text-red-200 transition-all border border-red-500/30 active:scale-90"
+                className="relative h-20 md:h-22 rounded-2xl md:rounded-3xl flex flex-col items-center justify-center bg-rose-500/20 hover:bg-rose-500/35 text-rose-100 transition-all duration-150 border border-rose-500/30 hover:border-rose-500/50 active:scale-95 shadow-[0_4px_16px_rgba(244,63,94,0.15)] cursor-pointer backdrop-blur-md group"
+                title="Clear"
               >
-                <X className="w-8 h-8" />
+                <div className="absolute inset-0 bg-gradient-to-b from-rose-400/10 to-transparent pointer-events-none rounded-2xl md:rounded-3xl" />
+                <X className="w-7 h-7 group-hover:scale-110 transition-transform" />
+                <span className="text-[9px] font-bold text-rose-200/70 tracking-widest uppercase mt-1 leading-none">
+                  CLR
+                </span>
               </button>
+
+              {/* Zero Button */}
               <button
                 onClick={() => handleKeyPress('0')}
                 disabled={isLoading}
-                className="aspect-square rounded-2xl text-3xl font-bold text-white bg-white/5 hover:bg-white/20 transition-all active:scale-90 border border-white/10 flex items-center justify-center"
+                className="relative group h-20 md:h-22 rounded-2xl md:rounded-3xl bg-white/[0.08] hover:bg-white/[0.18] active:bg-white/[0.28] transition-all duration-150 active:scale-95 border border-white/15 hover:border-white/35 flex flex-col items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.15)] cursor-pointer overflow-hidden backdrop-blur-md"
               >
-                0
+                <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
+                <span className="text-3xl md:text-4xl font-black text-white tracking-tight leading-none group-hover:scale-105 transition-transform drop-shadow-sm">
+                  0
+                </span>
+                <span className="text-[9px] font-bold text-cyan-200/60 tracking-[0.2em] mt-1 uppercase leading-none">
+                  +
+                </span>
               </button>
+
+              {/* Backspace Button */}
               <button
                 onClick={() => handleKeyPress('delete')}
                 disabled={isLoading}
-                className="aspect-square rounded-2xl flex items-center justify-center bg-slate-500/20 hover:bg-slate-500/40 text-white transition-all border border-white/10 active:scale-90"
+                className="relative h-20 md:h-22 rounded-2xl md:rounded-3xl flex flex-col items-center justify-center bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-100 transition-all duration-150 border border-cyan-500/25 hover:border-cyan-500/45 active:scale-95 shadow-[0_4px_16px_rgba(6,182,212,0.15)] cursor-pointer backdrop-blur-md group"
+                title="Backspace"
               >
-                <Delete className="w-8 h-8" />
+                <div className="absolute inset-0 bg-gradient-to-b from-cyan-400/10 to-transparent pointer-events-none rounded-2xl md:rounded-3xl" />
+                <Delete className="w-7 h-7 group-hover:scale-110 transition-transform" />
+                <span className="text-[9px] font-bold text-cyan-200/70 tracking-widest uppercase mt-1 leading-none">
+                  DEL
+                </span>
               </button>
             </div>
           </div>

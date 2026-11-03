@@ -2,42 +2,74 @@ import path from "path";
 import fs from "fs";
 import crypto from 'crypto';
 
-let cachedCertificate: string | null = null;
+let cachedFileCertificate: string | null = null;
 
-export async function generateSecurityCredential(initiatorPassword: string): Promise<string> {
-        if (!cachedCertificate) {
-        try {
-            const certPath = path.join(process.cwd(), 'server', 'utils', 'ProductionCertificate.cer');
-            let certString = fs.readFileSync(certPath, 'utf8');
-            if (!certString.includes('BEGIN CERTIFICATE')) {
-                const buffer = fs.readFileSync(certPath);
-                certString = '\n-----BEGIN CERTIFICATE-----\n' + buffer.toString('base64').match(/.{1,64}/g)?.join('\n') + '\n-----END CERTIFICATE-----\n';
-            }
-            cachedCertificate = certString;
-        } catch (err) {
-            console.error('Error reading Safaricom certificate from disk:', err);
-        }
-    }
+function normalizePemCert(raw: string): string | null {
+  if (!raw) return null;
+  if (raw.includes('-----BEGIN CERTIFICATE-----')) return raw.trim();
+  try {
+    const cleaned = raw.replace(/\s+/g, '');
+    const wrapped = '-----BEGIN CERTIFICATE-----\n' + 
+      cleaned.match(/.{1,64}/g)?.join('\n') + 
+      '\n-----END CERTIFICATE-----';
+    return wrapped;
+  } catch {
+    return null;
+  }
+}
 
-    if (!cachedCertificate) {
-        console.warn('publicCertificate could not be loaded. STK Push Transaction Status checks may fail.');
-        return initiatorPassword;
+function loadFileCertificate(): string | null {
+  if (cachedFileCertificate) return cachedFileCertificate;
+  try {
+    const certPath = path.join(process.cwd(), 'server', 'utils', 'ProductionCertificate.cer');
+    if (!fs.existsSync(certPath)) return null;
+    const raw = fs.readFileSync(certPath, 'utf8');
+    const normalized = normalizePemCert(raw);
+    if (!normalized) {
+      const buffer = fs.readFileSync(certPath);
+      const b64 = buffer.toString('base64');
+      const pem = '-----BEGIN CERTIFICATE-----\n' + b64.match(/.{1,64}/g)?.join('\n') + '\n-----END CERTIFICATE-----';
+      cachedFileCertificate = pem;
+    } else {
+      cachedFileCertificate = normalized;
     }
+    return cachedFileCertificate;
+  } catch (err) {
+    console.error('[Crypto] Could not read ProductionCertificate.cer:', err);
+    return null;
+  }
+}
 
-    try {
-        const buffer = Buffer.from(initiatorPassword);
-        const encrypted = crypto.publicEncrypt(
-            {
-                key: cachedCertificate,
-                padding: crypto.constants.RSA_PKCS1_PADDING,
-            },
-            buffer
-        );
-        return encrypted.toString('base64');
-    } catch (err) {
-        console.error('Failed to generate Safaricom SecurityCredential:', err);
-        return initiatorPassword;
-    }
+export async function generateSecurityCredential(initiatorPassword: string, customCertBase64?: string | null): Promise<string> {
+  let certPem: string | null = null;
+
+  if (customCertBase64) {
+    certPem = normalizePemCert(customCertBase64);
+  }
+
+  if (!certPem) {
+    certPem = loadFileCertificate();
+  }
+
+  if (!certPem) {
+    console.warn('[Crypto] No valid Safaricom certificate found. STK Push Transaction Status checks may fail.');
+    return initiatorPassword;
+  }
+
+  try {
+    const buffer = Buffer.from(initiatorPassword);
+    const encrypted = crypto.publicEncrypt(
+      {
+        key: certPem,
+        padding: crypto.constants.RSA_PKCS1_PADDING,
+      },
+      buffer
+    );
+    return encrypted.toString('base64');
+  } catch (err) {
+    console.error('Failed to generate Safaricom SecurityCredential:', err);
+    return initiatorPassword;
+  }
 }
 
 const ALGORITHM = 'aes-256-cbc';

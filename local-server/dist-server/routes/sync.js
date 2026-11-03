@@ -914,18 +914,30 @@ router.post('/full', (req, res) => {
                     if (!u.name)
                         continue;
                     const fallbackEmail = u.email || `${u.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${u.id}@pos.local`;
-                    // Map POS roles to Cloud Roles
+                    // Robust role normalization (handles 'ADMIN', 'admin', 'SYSTEM_ADMIN', etc.)
+                    const rawUpper = String(u.role || '').trim().toUpperCase();
                     let role = 'CASHIER';
-                    if (u.role === 'SYSTEM_ADMIN' || u.role === 'Admin')
+                    if (['ADMIN', 'SYSTEM_ADMIN', 'ADMINISTRATOR', 'OWNER'].includes(rawUpper)) {
                         role = 'ADMIN';
-                    else if (u.role === 'STORE_MANAGER' || u.role === 'Manager')
+                    }
+                    else if (['MANAGER', 'STORE_MANAGER'].includes(rawUpper)) {
                         role = 'MANAGER';
+                    }
+                    else if (['SUPER_ADMIN', 'SUPERADMIN'].includes(rawUpper)) {
+                        role = 'SUPER_ADMIN';
+                    }
                     const existingUser = await db.selectFrom('User').selectAll().where('email', '=', fallbackEmail).executeTakeFirst();
                     if (existingUser) {
+                        // Never downgrade an existing Admin/Manager to Cashier on automatic terminal sync
+                        const existingRoleUpper = String(existingUser.role || '').trim().toUpperCase();
+                        if (role === 'CASHIER' && ['ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(existingRoleUpper)) {
+                            role = existingRoleUpper;
+                        }
                         await db.updateTable('User').set({
                             name: u.name,
                             role: role,
-                            locationId: targetLocationId
+                            locationId: targetLocationId,
+                            updatedAt: new Date().toISOString()
                         }).where('email', '=', fallbackEmail).execute();
                     }
                     else {
@@ -935,8 +947,9 @@ router.post('/full', (req, res) => {
                             email: fallbackEmail,
                             password: u.pin || 'pos1234',
                             name: u.name,
-                            role: role
-                        }).execute();
+                            role: role,
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString() }).execute();
                     }
                     syncedUsers++;
                 }
@@ -1055,57 +1068,86 @@ router.post('/full', (req, res) => {
                     }
                 }
             }
-            // Update settings if provided
+            // Update settings safely by merging (never raw overwrite or erase existing server settings)
             if (businessSetup) {
-                await db.updateTable('Business').set({ settings: JSON.stringify(businessSetup) }).where('id', '=', businessId).execute();
-                // Sync M-Pesa config from POS settings
-                if (businessSetup.mpesaConfig && businessSetup.mpesaConfig.consumerKey) {
-                    const mc = businessSetup.mpesaConfig;
-                    const existingConfig = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).where('locationId', '=', targetLocationId).executeTakeFirst();
-                    const configData = {
-                        businessId,
-                        locationId: targetLocationId,
-                        merchantType: mc.type === 'Paybill' ? 'PAYBILL' : 'BUY_GOODS',
-                        tillNumber: mc.type === 'Till' ? String(mc.partyB || mc.shortcode || '') : null,
-                        paybillNumber: mc.type === 'Paybill' ? String(mc.partyB || mc.shortcode || '') : null,
-                        accountReference: String(businessSetup.mpesaAccountNumber || ''),
-                        environment: mc.environment?.toLowerCase() === 'live' || mc.environment?.toLowerCase() === 'production' ? 'production' : 'sandbox',
-                        consumerKey: String(mc.consumerKey),
-                        consumerSecret: String(mc.consumerSecret),
-                        passkey: String(mc.passkey || ''),
-                        shortcode: String(mc.shortcode || mc.partyB || ''),
-                        initiatorName: mc.initiatorName ? String(mc.initiatorName) : null,
-                        initiatorPassword: mc.initiatorPassword ? String(mc.initiatorPassword) : null
-                    };
-                    if (existingConfig) {
-                        await db.updateTable('MpesaConfig').set(configData).where('id', '=', existingConfig.id).execute();
+                const b = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
+                if (b) {
+                    let currentSettings = {};
+                    try {
+                        currentSettings = typeof b.settings === 'string' ? JSON.parse(b.settings) : (b.settings || {});
                     }
-                    else {
-                        await db.insertInto('MpesaConfig').values({ id: randomUUID(), ...configData }).returningAll().executeTakeFirstOrThrow();
+                    catch (e) { }
+                    const incomingSetup = typeof businessSetup === 'string' ? JSON.parse(businessSetup) : { ...businessSetup };
+                    // Strip terminal-specific attributes so terminals don't poison the server
+                    delete incomingSetup.apiKey;
+                    delete incomingSetup.terminalName;
+                    delete incomingSetup.outletId;
+                    delete incomingSetup.deviceRole;
+                    delete incomingSetup.lanAdminIp;
+                    delete incomingSetup.apiUrl;
+                    delete incomingSetup.isLoggedIn;
+                    delete incomingSetup.isSetup;
+                    // Only merge non-empty, non-null values to avoid erasing valid configured server fields
+                    const cleanIncoming = {};
+                    for (const [k, v] of Object.entries(incomingSetup)) {
+                        if (v !== undefined && v !== null && v !== '') {
+                            cleanIncoming[k] = v;
+                        }
                     }
+                    const mergedSettings = { ...currentSettings, ...cleanIncoming };
+                    await db.updateTable('Business').set({
+                        settings: JSON.stringify(mergedSettings),
+                        updatedAt: new Date().toISOString()
+                    }).where('id', '=', businessId).execute();
                 }
-                else if (businessSetup.mpesaConsumerKey && businessSetup.mpesaConsumerSecret) {
-                    // Fallback for legacy POS versions
-                    const existingConfig = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).where('locationId', '=', targetLocationId).executeTakeFirst();
-                    const configData = {
-                        businessId,
-                        locationId: targetLocationId,
-                        merchantType: businessSetup.mpesaPaybill ? 'PAYBILL' : 'BUY_GOODS',
-                        tillNumber: String(businessSetup.mpesaTill || ''),
-                        paybillNumber: String(businessSetup.mpesaPaybill || ''),
-                        accountReference: String(businessSetup.mpesaAccountNumber || ''),
-                        environment: businessSetup.mpesaEnv === 'live' ? 'production' : 'sandbox',
-                        consumerKey: String(businessSetup.mpesaConsumerKey),
-                        consumerSecret: String(businessSetup.mpesaConsumerSecret),
-                        passkey: String(businessSetup.mpesaPasskey || ''),
-                        shortcode: String(businessSetup.mpesaTill || businessSetup.mpesaPaybill || '')
-                    };
-                    if (existingConfig) {
-                        await db.updateTable('MpesaConfig').set(configData).where('id', '=', existingConfig.id).execute();
-                    }
-                    else {
-                        await db.insertInto('MpesaConfig').values({ id: randomUUID(), ...configData }).returningAll().executeTakeFirstOrThrow();
-                    }
+            }
+            // Sync M-Pesa config from POS settings
+            if (businessSetup.mpesaConfig && businessSetup.mpesaConfig.consumerKey) {
+                const mc = businessSetup.mpesaConfig;
+                const existingConfig = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).where('locationId', '=', targetLocationId).executeTakeFirst();
+                const configData = {
+                    businessId,
+                    locationId: targetLocationId,
+                    merchantType: mc.type === 'Paybill' ? 'PAYBILL' : 'BUY_GOODS',
+                    tillNumber: mc.type === 'Till' ? String(mc.partyB || mc.shortcode || '') : null,
+                    paybillNumber: mc.type === 'Paybill' ? String(mc.partyB || mc.shortcode || '') : null,
+                    accountReference: String(businessSetup.mpesaAccountNumber || ''),
+                    environment: mc.environment?.toLowerCase() === 'live' || mc.environment?.toLowerCase() === 'production' ? 'production' : 'sandbox',
+                    consumerKey: String(mc.consumerKey),
+                    consumerSecret: String(mc.consumerSecret),
+                    passkey: String(mc.passkey || ''),
+                    shortcode: String(mc.shortcode || mc.partyB || ''),
+                    initiatorName: mc.initiatorName ? String(mc.initiatorName) : null,
+                    initiatorPassword: mc.initiatorPassword ? String(mc.initiatorPassword) : null
+                };
+                if (existingConfig) {
+                    await db.updateTable('MpesaConfig').set(configData).where('id', '=', existingConfig.id).execute();
+                }
+                else {
+                    await db.insertInto('MpesaConfig').values({ id: randomUUID(), ...configData }).returningAll().executeTakeFirstOrThrow();
+                }
+            }
+            else if (businessSetup.mpesaConsumerKey && businessSetup.mpesaConsumerSecret) {
+                // Fallback for legacy POS versions
+                const existingConfig = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).where('locationId', '=', targetLocationId).executeTakeFirst();
+                const configData = {
+                    businessId,
+                    locationId: targetLocationId,
+                    merchantType: businessSetup.mpesaPaybill ? 'PAYBILL' : 'BUY_GOODS',
+                    tillNumber: String(businessSetup.mpesaTill || ''),
+                    paybillNumber: String(businessSetup.mpesaPaybill || ''),
+                    accountReference: String(businessSetup.mpesaAccountNumber || ''),
+                    environment: businessSetup.mpesaEnv === 'live' ? 'production' : 'sandbox',
+                    consumerKey: String(businessSetup.mpesaConsumerKey),
+                    consumerSecret: String(businessSetup.mpesaConsumerSecret),
+                    passkey: String(businessSetup.mpesaPasskey || ''),
+                    shortcode: String(businessSetup.mpesaTill || businessSetup.mpesaPaybill || '')
+                };
+                if (existingConfig) {
+                    await db.updateTable('MpesaConfig').set(configData).where('id', '=', existingConfig.id).execute();
+                }
+                else {
+                    await db.insertInto('MpesaConfig').values({ id: randomUUID(), ...configData }).returningAll().executeTakeFirstOrThrow();
                 }
             }
             // Sync Customers

@@ -14,7 +14,13 @@ router.get('/mpesa', async (req, res) => {
         if (locationId)
             query = query.where('locationId', '=', locationId);
         const config = await query.executeTakeFirst();
-        res.json(config || null);
+        if (config) {
+            const { certificateBase64, ...rest } = config;
+            res.json({ ...rest, hasCertificate: Boolean(certificateBase64) });
+        }
+        else {
+            res.json(null);
+        }
     }
     catch (error) {
         console.error('Error fetching M-Pesa config:', error);

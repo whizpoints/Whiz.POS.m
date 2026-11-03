@@ -1181,7 +1181,6 @@ router.post('/full', (req: any, res: any) => {
              await db.insertInto('MpesaConfig').values({ id: randomUUID(), ...configData }).returningAll().executeTakeFirstOrThrow();
           }
        }
-    }
 
     // Sync Customers
     if (customers && Array.isArray(customers)) {

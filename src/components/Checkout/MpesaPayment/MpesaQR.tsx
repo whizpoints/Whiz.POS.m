@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePosStore } from '../../../store/posStore';
-import { QrCode, AlertCircle, Loader2 } from 'lucide-react';
+import { QrCode, AlertCircle, Loader2, RotateCw } from 'lucide-react';
 
 interface Props {
   totalAmount: number;
@@ -10,134 +10,174 @@ export default function MpesaQR({ totalAmount }: Props) {
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { businessSetup } = usePosStore();
 
-  useEffect(() => {
-    let isMounted = true;
-    
-    const fetchQRCode = async () => {
-      const activeBusinessId = (businessSetup as any)?.cloudBusinessId || (businessSetup as any)?.businessId || (businessSetup as any)?.id;
-      if (!businessSetup || !activeBusinessId || totalAmount <= 0) return;
-      
-      setIsLoading(true);
-      setError(null);
-      
+  // Extract primitive values from store to avoid unnecessary re-triggers
+  const activeBusinessId = usePosStore(s => (s.businessSetup as any)?.cloudBusinessId || (s.businessSetup as any)?.businessId || (s.businessSetup as any)?.id);
+  const locationId = usePosStore(s => (s.businessSetup as any)?.locationId || (s.businessSetup as any)?.cloudLocationId);
+  const backOfficeUrl = usePosStore(s => s.businessSetup?.backOfficeUrl || s.businessSetup?.cloudUrl);
+  const mpesaQrUrl = usePosStore(s => s.businessSetup?.mpesaQrUrl);
+  const apiUrl = usePosStore(s => s.businessSetup?.apiUrl);
+
+  // Stable invoice reference for this transaction session
+  const invoiceRef = useRef<string>('');
+  if (!invoiceRef.current) {
+    invoiceRef.current = `INV-${Date.now().toString().slice(-6)}`;
+  }
+
+  // Prevent repeated background polls from re-fetching if already fetched for this amount & business
+  const lastFetchedKey = useRef<string>('');
+
+  const fetchQRCode = async (forceRefresh = false) => {
+    if (!activeBusinessId || totalAmount <= 0) return;
+
+    const requestKey = `${activeBusinessId}-${locationId || ''}-${totalAmount}-${invoiceRef.current}`;
+    if (!forceRefresh && lastFetchedKey.current === requestKey && qrCodeData) {
+      return; // Already generated consistently for this sale
+    }
+
+    if (forceRefresh) {
+      invoiceRef.current = `INV-${Date.now().toString().slice(-6)}`;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const webportalBase = (backOfficeUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+      const qrUrl = mpesaQrUrl || `${webportalBase}/api/mpesa/qrcode`;
+
+      let res: Response | null = null;
       try {
-        const businessSetup = usePosStore.getState().businessSetup;
-        const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
-        const qrUrl = businessSetup?.mpesaQrUrl || `${webportalBase}/api/mpesa/qrcode`;
-
-        let res: Response | null = null;
-        try {
-          res = await fetch(qrUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              businessId: activeBusinessId,
-              locationId: (businessSetup as any)?.locationId || (businessSetup as any)?.cloudLocationId,
-              amount: totalAmount,
-              refNo: `INV-${Date.now().toString().slice(-5)}`
-            }),
-            signal: AbortSignal.timeout(5000)
-          });
-        } catch (cloudErr) {
-          const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
-          if (localServerBase) {
-            try {
-              res = await fetch(`${localServerBase}/api/mpesa/qrcode`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  businessId: activeBusinessId,
-                  locationId: (businessSetup as any)?.locationId,
-                  amount: totalAmount,
-                  refNo: `INV-${Date.now().toString().slice(-5)}`
-                }),
-                signal: AbortSignal.timeout(3000)
-              });
-            } catch (e) {}
-          }
-        }
-        
-        if (!res || !res.ok) {
-          throw new Error('Failed to generate QR Code');
-        }
-        
-        const data = await res.json();
-        
-        if (isMounted) {
-          if (data.QRCode) {
-            setQrCodeData(data.QRCode);
-          } else {
-            throw new Error('QR Code data missing from response');
-          }
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error(err);
-          setError('Could not generate M-Pesa QR Code.');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
+        res = await fetch(qrUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            businessId: activeBusinessId,
+            locationId: locationId,
+            amount: totalAmount,
+            refNo: invoiceRef.current
+          }),
+          signal: AbortSignal.timeout(6000)
+        });
+      } catch (cloudErr) {
+        const localServerBase = (apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
+        if (localServerBase) {
+          try {
+            res = await fetch(`${localServerBase}/api/mpesa/qrcode`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                businessId: activeBusinessId,
+                locationId: locationId,
+                amount: totalAmount,
+                refNo: invoiceRef.current
+              }),
+              signal: AbortSignal.timeout(4000)
+            });
+          } catch (e) {}
         }
       }
-    };
-    
-    fetchQRCode();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [totalAmount, businessSetup]);
+
+      if (!res || !res.ok) {
+        throw new Error('Failed to generate QR Code');
+      }
+
+      const data = await res.json();
+      if (data.QRCode) {
+        setQrCodeData(data.QRCode);
+        lastFetchedKey.current = `${activeBusinessId}-${locationId || ''}-${totalAmount}-${invoiceRef.current}`;
+      } else {
+        throw new Error('QR Code data missing from response');
+      }
+    } catch (err: any) {
+      console.error('[MpesaQR] Error generating QR code:', err);
+      setError('Could not generate M-Pesa QR Code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQRCode(false);
+  }, [totalAmount, activeBusinessId, locationId]);
+
+  const businessSetup = usePosStore(s => s.businessSetup);
+  const tillOrShortcode = (businessSetup?.mpesaConfig?.partyB || businessSetup?.mpesaConfig?.shortcode || (businessSetup as any)?.tillNumber || (businessSetup as any)?.shortcode);
+  const isPaybill = businessSetup?.mpesaConfig?.type === 'paybill';
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center p-2">
-      <div className="mb-3">
-        <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Scan to Pay</h4>
-        <p className="text-xs text-gray-500 mt-1">Point your M-Pesa app camera here</p>
+      <div className="mb-2 flex items-center justify-between w-full max-w-[200px]">
+        <div className="text-left">
+          <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Scan or Send</h4>
+          <p className="text-[10px] text-gray-500">M-Pesa Camera / Direct Till</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => fetchQRCode(true)}
+          disabled={isLoading}
+          title="Regenerate QR Code"
+          className="p-1 rounded-md text-gray-400 hover:text-emerald-600 hover:bg-gray-100 transition-colors"
+        >
+          <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
-      <div className="bg-white p-2 rounded-xl border-2 border-gray-100 shadow-sm relative min-h-[140px] min-w-[140px] flex items-center justify-center">
-        {isLoading ? (
+      <div className="bg-white p-2.5 rounded-xl border-2 border-gray-100 shadow-sm relative min-h-[148px] min-w-[148px] flex items-center justify-center">
+        {isLoading && !qrCodeData ? (
           <div className="flex flex-col items-center gap-2 text-gray-400">
-            <Loader2 className="w-8 h-8 animate-spin" />
-            <span className="text-xs">Generating...</span>
+            <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+            <span className="text-xs font-medium">Generating QR...</span>
           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center gap-2 text-red-400">
-            <AlertCircle className="w-8 h-8" />
-            <span className="text-xs text-center px-4">{error}</span>
+        ) : error && !qrCodeData ? (
+          <div className="flex flex-col items-center gap-2 text-red-500 p-2">
+            <AlertCircle className="w-7 h-7 text-red-400" />
+            <span className="text-[11px] leading-tight">{error}</span>
+            <button
+              onClick={() => fetchQRCode(true)}
+              className="text-[11px] font-bold text-emerald-600 hover:underline mt-1"
+            >
+              Retry
+            </button>
           </div>
         ) : qrCodeData ? (
-          <div className="relative">
+          <div className="relative group">
             <img 
               src={`data:image/png;base64,${qrCodeData}`} 
               alt="M-Pesa QR Code" 
               className="w-32 h-32 md:w-36 md:h-36 object-contain rounded-lg"
             />
-            {/* Optional M-Pesa Logo in center overlay */}
+            {/* M-Pesa Center Logo */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="bg-white p-1 rounded-full shadow-sm">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="w-6 h-6 object-contain" />
+              <div className="bg-white p-1 rounded-full shadow-md border border-gray-100">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="w-5 h-5 object-contain" />
               </div>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 text-gray-400">
-            <QrCode className="w-8 h-8 opacity-50" />
+            <QrCode className="w-8 h-8 opacity-40" />
             <span className="text-xs">No QR Code available</span>
           </div>
         )}
       </div>
       
-      {qrCodeData && !isLoading && !error && (
-        <p className="text-[10px] text-gray-400 mt-3 max-w-[200px] leading-tight">
-          This QR Code is unique to this transaction and includes the exact amount.
+      {tillOrShortcode ? (
+        <div className="mt-2 text-center">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+            {isPaybill ? `Paybill: ${tillOrShortcode}` : `Till No: ${tillOrShortcode}`}
+          </span>
+          <p className="text-[10px] text-gray-400 mt-0.5 font-mono">
+            Ref: {invoiceRef.current}
+          </p>
+        </div>
+      ) : qrCodeData ? (
+        <p className="text-[10px] text-gray-400 mt-2 max-w-[200px] leading-tight font-mono">
+          Ref: {invoiceRef.current} • Consistent for this sale
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

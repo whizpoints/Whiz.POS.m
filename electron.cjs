@@ -592,12 +592,12 @@ ipcMain.handle('check-mpesa-payment', async (event, { amount, expectedName }) =>
     const txns = await res.json();
     if (!Array.isArray(txns)) return null;
     
-    // Find a transaction matching the exact amount within the last 5 minutes
-    const fiveMinsAgo = new Date(Date.now() - 5 * 60000);
+    // Find a transaction matching the exact amount within the last 15 minutes
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60000);
     const match = txns.find(t => 
       Math.abs(Number(t.amount) - Number(amount)) < 0.01 && 
-      new Date(t.timestamp) > fiveMinsAgo &&
-      t.status === 'COMPLETED'
+      new Date(t.timestamp) > fifteenMinsAgo &&
+      (t.status === 'UNLINKED' || t.status === 'COMPLETED' || !t.status)
     );
 
     return match || null;
@@ -1856,13 +1856,14 @@ app.whenReady().then(async () => {
   ipcMain.on('print-receipt', async (event, transaction, businessSetup, isReprint = false) => {
       let finalTransaction = { ...transaction };
 
-      // Core KRA eTIMS feature: intercept new sales if not already signed with real KRA receipt
+      // Core KRA eTIMS feature: intercept new sales ONLY if KRA is enabled and not already signed
+      const isKraActive = Boolean(businessSetup?.kraEnabled === true || businessSetup?.etimsEnabled === true);
       const alreadyHasRealKra = finalTransaction.kraDetails &&
                                 finalTransaction.kraDetails.receiptNumber &&
                                 !finalTransaction.kraDetails.receiptNumber.includes('OFFLINE') &&
                                 !finalTransaction.kraDetails.receiptNumber.includes('SBX');
 
-      if (!isReprint && !alreadyHasRealKra && !finalTransaction.kraInvoiceNo) {
+      if (isKraActive && !isReprint && !alreadyHasRealKra && !finalTransaction.kraInvoiceNo) {
           try {
               const products = await readJsonFileFallback('products.json');
               const kraResult = await kraService.submitInvoice(finalTransaction, products, businessSetup);

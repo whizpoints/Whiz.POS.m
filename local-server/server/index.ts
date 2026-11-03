@@ -205,6 +205,7 @@ app.use('/api/business', businessRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/mpesa', mpesaRoutes);
+app.use('/api/mobilemoney', mpesaRoutes);
 app.use('/api/callbacks/payments', mpesaRoutes); // Daraja complains about 'mpesa' in callback URLs
 app.use('/api/terminal', terminalRoutes);
 app.use('/api/terminals', terminalsRoutes);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePosStore } from '../../store/posStore';
-import { Banknote, CheckCircle2, Delete } from 'lucide-react';
+import { Banknote, CheckCircle2, Delete, ArrowRight, CornerDownLeft } from 'lucide-react';
 import { useToast } from '../ui/use-toast';
 
 interface Props {
@@ -18,18 +18,34 @@ export default function CashPayment({ totalAmount, formattedTotal }: Props) {
       setTendered('');
     } else if (val === 'DEL') {
       setTendered(prev => prev.slice(0, -1));
+    } else if (val === '.') {
+      if (!tendered.includes('.')) {
+        setTendered(prev => (prev === '' ? '0.' : prev + '.'));
+      }
     } else {
-      setTendered(prev => prev + val);
+      // Prevent multiple leading zeroes
+      if (tendered === '0' && val !== '.') {
+        setTendered(val);
+      } else {
+        setTendered(prev => prev + val);
+      }
     }
   };
 
-  const handleQuickAmount = (val: number) => {
-    setTendered(val.toString());
+  const handleQuickAdd = (addVal: number) => {
+    const current = parseFloat(tendered) || 0;
+    const nextVal = current === 0 ? addVal : current + addVal;
+    setTendered(nextVal.toString());
+  };
+
+  const handleSetExact = () => {
+    setTendered(totalAmount.toString());
   };
 
   const tenderedNum = parseFloat(tendered) || 0;
-  const change = tenderedNum - totalAmount;
-  const isSufficient = tenderedNum >= totalAmount;
+  const change = Math.max(0, tenderedNum - totalAmount);
+  const remaining = Math.max(0, totalAmount - tenderedNum);
+  const isSufficient = tenderedNum >= totalAmount && totalAmount > 0;
 
   const handleComplete = () => {
     if (!isSufficient) {
@@ -37,20 +53,22 @@ export default function CashPayment({ totalAmount, formattedTotal }: Props) {
       return;
     }
     
-    // Call POS store completeTransaction for cash
     completeTransaction('cash', undefined, { amountTendered: tenderedNum, change });
   };
 
   // Keyboard support for typing amount directly
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if they are inside an input (though there are none here, good practice)
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       if (e.key >= '0' && e.key <= '9') {
         handleKeypadPress(e.key);
+      } else if (e.key === '.') {
+        handleKeypadPress('.');
       } else if (e.key === 'Backspace') {
         handleKeypadPress('DEL');
+      } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
+        handleKeypadPress('C');
       } else if (e.key === 'Enter') {
         if (tenderedNum >= totalAmount) {
           handleComplete();
@@ -62,67 +80,148 @@ export default function CashPayment({ totalAmount, formattedTotal }: Props) {
   }, [tenderedNum, totalAmount]);
 
   return (
-    <div className="flex flex-col h-full max-w-lg mx-auto mt-4">
-      <div className="bg-gray-50 rounded-xl p-4 mb-6 text-center border border-gray-100 shadow-inner flex flex-col items-center">
-        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Amount Received</p>
-        <div className="flex items-center justify-center text-5xl font-bold text-gray-900 tracking-tight mb-2">
-          <span className="text-3xl text-gray-400 mr-2">KSh</span>
-          <input 
-            type="number"
-            autoFocus
-            value={tendered}
-            onChange={(e) => setTendered(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && isSufficient) {
-                handleComplete();
-              }
-            }}
-            className="w-48 bg-transparent border-b-2 border-dashed border-gray-300 focus:border-emerald-500 text-center outline-none"
-            placeholder="0"
-          />
-        </div>
-        
-        {tenderedNum > 0 && (
-          <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${
-            isSufficient ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-          }`}>
-            Change: {isSufficient ? new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(change).replace('KES', 'KSh') : 'Insufficient'}
+    <div className="flex flex-col h-full w-full max-w-2xl mx-auto py-1 px-2 md:px-4 justify-between">
+      {/* Top Section: Amount Display & Calculation */}
+      <div className="w-full">
+        <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 md:p-5 mb-4 shadow-inner flex flex-col items-center justify-center relative">
+          <div className="flex items-center gap-2 mb-1">
+            <Banknote className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount Received</span>
           </div>
-        )}
-      </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <button onClick={() => handleQuickAmount(totalAmount)} className="col-span-1 py-6 text-lg bg-emerald-50 text-emerald-700 font-bold rounded-2xl border border-emerald-100 hover:bg-emerald-100 hover:border-emerald-200 transition-colors">EXACT</button>
-        <button onClick={() => handleQuickAmount(Math.ceil(totalAmount / 500) * 500)} className="col-span-1 py-6 text-lg bg-gray-50 text-gray-700 font-bold rounded-2xl border border-gray-200 hover:bg-gray-100 transition-colors">+{Math.ceil(totalAmount / 500) * 500}</button>
-        <button onClick={() => handleQuickAmount(Math.ceil(totalAmount / 1000) * 1000)} className="col-span-1 py-6 text-lg bg-gray-50 text-gray-700 font-bold rounded-2xl border border-gray-200 hover:bg-gray-100 transition-colors">+{Math.ceil(totalAmount / 1000) * 1000}</button>
-        <button onClick={() => handleQuickAmount(Math.ceil(totalAmount / 1000) * 1000 + 1000)} className="col-span-1 py-6 text-lg bg-gray-50 text-gray-700 font-bold rounded-2xl border border-gray-200 hover:bg-gray-100 transition-colors">+{Math.ceil(totalAmount / 1000) * 1000 + 1000}</button>
+          <div className="flex items-center justify-center text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 tracking-tight my-1">
+            <span className="text-2xl sm:text-3xl font-semibold text-slate-400 mr-2 select-none">KSh</span>
+            <input 
+              type="number"
+              step="any"
+              autoFocus
+              value={tendered}
+              onChange={(e) => setTendered(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && isSufficient) {
+                  handleComplete();
+                }
+              }}
+              className="w-56 sm:w-72 bg-transparent border-b-2 border-dashed border-slate-300 focus:border-emerald-500 text-center font-black outline-none tracking-tight text-slate-900"
+              placeholder="0"
+            />
+          </div>
 
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'DEL'].map((key) => (
-          <button
-            key={key}
-            onClick={() => handleKeypadPress(key)}
-            className={`py-8 text-4xl font-bold rounded-2xl border shadow-sm transition-colors ${
-              key === 'C' ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100' :
-              key === 'DEL' ? 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 flex items-center justify-center' :
-              'bg-white text-gray-900 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-            }`}
+          {/* Dynamic Change or Balance Pill */}
+          <div className="min-h-[38px] flex items-center justify-center mt-2">
+            {tenderedNum > 0 && isSufficient && (
+              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-base sm:text-lg font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs animate-in zoom-in-95">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <span>CHANGE: KSh {change.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            {tenderedNum > 0 && !isSufficient && (
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm sm:text-base font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                <span>Remaining: KSh {remaining.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            {tenderedNum === 0 && (
+              <span className="text-xs text-slate-400 font-medium">
+                Tap exact, add preset denominations, or type amount below
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Amount Chips */}
+        <div className="grid grid-cols-5 gap-2 sm:gap-3 mb-4">
+          <button 
+            type="button"
+            onClick={handleSetExact}
+            className="py-3 px-1 text-sm sm:text-base bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-extrabold rounded-xl transition-all shadow-xs active:scale-95 flex items-center justify-center"
           >
-            {key === 'DEL' ? <Delete className="w-10 h-10" /> : key}
+            EXACT
           </button>
-        ))}
+          <button 
+            type="button"
+            onClick={() => handleQuickAdd(100)}
+            className="py-3 px-1 text-sm sm:text-base bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 font-extrabold rounded-xl transition-all shadow-xs active:scale-95"
+          >
+            +100
+          </button>
+          <button 
+            type="button"
+            onClick={() => handleQuickAdd(200)}
+            className="py-3 px-1 text-sm sm:text-base bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 font-extrabold rounded-xl transition-all shadow-xs active:scale-95"
+          >
+            +200
+          </button>
+          <button 
+            type="button"
+            onClick={() => handleQuickAdd(500)}
+            className="py-3 px-1 text-sm sm:text-base bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 font-extrabold rounded-xl transition-all shadow-xs active:scale-95"
+          >
+            +500
+          </button>
+          <button 
+            type="button"
+            onClick={() => handleQuickAdd(1000)}
+            className="py-3 px-1 text-sm sm:text-base bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 font-extrabold rounded-xl transition-all shadow-xs active:scale-95"
+          >
+            +1,000
+          </button>
+        </div>
+
+        {/* Large 3-Column Touch Keypad */}
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5 mb-4">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+            <button
+              key={digit}
+              type="button"
+              onClick={() => handleKeypadPress(digit)}
+              className="h-16 sm:h-18 md:h-20 text-3xl sm:text-4xl font-black rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-900 border border-slate-200 shadow-sm transition-all active:scale-95 flex items-center justify-center select-none"
+            >
+              {digit}
+            </button>
+          ))}
+
+          {/* Bottom Keypad Row: Clear, 0, Backspace */}
+          <button
+            type="button"
+            onClick={() => handleKeypadPress('C')}
+            className="h-16 sm:h-18 md:h-20 text-2xl sm:text-3xl font-black rounded-2xl bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 border border-rose-200 shadow-sm transition-all active:scale-95 flex items-center justify-center select-none"
+          >
+            C
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleKeypadPress('0')}
+            className="h-16 sm:h-18 md:h-20 text-3xl sm:text-4xl font-black rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-900 border border-slate-200 shadow-sm transition-all active:scale-95 flex items-center justify-center select-none"
+          >
+            0
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleKeypadPress('DEL')}
+            className="h-16 sm:h-18 md:h-20 rounded-2xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 border border-slate-300 shadow-sm transition-all active:scale-95 flex items-center justify-center select-none"
+            title="Backspace"
+          >
+            <Delete className="w-8 h-8 sm:w-9 sm:h-9" />
+          </button>
+        </div>
       </div>
 
+      {/* Confirm Payment Button */}
       <button
+        type="button"
         onClick={handleComplete}
         disabled={!isSufficient}
-        className={`mt-auto w-full py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 transition-all ${
+        className={`w-full py-4 sm:py-5 rounded-2xl font-black text-lg sm:text-xl md:text-2xl flex items-center justify-center gap-3 transition-all uppercase tracking-wide shadow-md ${
           isSufficient
-            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200'
-            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 cursor-pointer active:scale-[0.99]'
+            : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
         }`}
       >
-        <CheckCircle2 className="w-6 h-6" />
-        CONFIRM PAYMENT
+        <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" />
+        <span>CONFIRM PAYMENT</span>
+        <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6" />
       </button>
     </div>
   );
