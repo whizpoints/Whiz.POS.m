@@ -38,36 +38,60 @@ export default function StkPush({ totalAmount }: Props) {
     setStatus('sending');
     
     try {
-      // Direct Web Portal push URL for lightning-fast push & callbacks even when local server is offline
-      const pushUrl = businessSetup?.mpesaPushUrl 
-        || `${(businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '')}/api/mpesa/stkpush`;
+      const candidateUrls = [
+        businessSetup?.mpesaPushUrl,
+        `${(businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '')}/api/mpesa/stkpush`,
+        businessSetup?.apiUrl ? `${businessSetup.apiUrl.replace(/\/+$/, '').replace(/\/api$/, '')}/api/mpesa/stkpush` : null,
+        'http://localhost:3000/api/mpesa/stkpush'
+      ].filter(Boolean) as string[];
 
-      const res = await fetch(pushUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          phone: validPhone, 
-          amount: totalAmount, 
-          businessId: activeBusinessId, 
-          locationId: (businessSetup as any)?.locationId || (businessSetup as any)?.cloudLocationId 
-        }),
-        signal: AbortSignal.timeout(12000)
-      });
+      let res: Response | null = null;
+      let lastError: any = null;
+
+      for (const pushUrl of candidateUrls) {
+        try {
+          const r = await fetch(pushUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              phone: validPhone, 
+              amount: totalAmount, 
+              businessId: activeBusinessId, 
+              locationId: (businessSetup as any)?.locationId || (businessSetup as any)?.cloudLocationId 
+            }),
+            signal: AbortSignal.timeout(20000)
+          });
+          if (r.ok) {
+            res = r;
+            break;
+          } else {
+            const errBody = await r.json().catch(() => ({}));
+            lastError = errBody.error || errBody.message || `HTTP ${r.status}`;
+          }
+        } catch (e: any) {
+          lastError = e?.message;
+        }
+      }
       
+      if (!res) {
+        throw new Error(lastError || 'Could not connect to M-Pesa server');
+      }
+
       const data = await res.json();
       
-      if (data.success) {
+      if (data.success || data.ResponseCode === "0") {
         setStatus('sent');
         toast(`STK Push sent to ${validPhone}. Waiting for customer PIN.`, 'success');
       } else {
         setStatus('idle');
-        toast(data.error || data.message || 'Failed to send STK Push', 'error');
+        toast(data.error || data.CustomerMessage || data.message || 'Failed to send STK Push', 'error');
       }
       
       setTimeout(() => setStatus('idle'), 15000);
-    } catch (err) {
+    } catch (err: any) {
       setStatus('idle');
-      toast('Could not connect to M-Pesa. Customer can still pay directly to the Till.', 'error');
+      console.warn('[STK Push] Error:', err);
+      toast(err.message || 'Could not connect to M-Pesa. Customer can still pay directly to the Till.', 'error');
     }
   };
 

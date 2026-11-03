@@ -1,30 +1,21 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSQL } from '@prisma/adapter-libsql';
 import { createClient } from '@libsql/client';
-import { Agent, RetryAgent, setGlobalDispatcher } from 'undici';
+import { Agent, setGlobalDispatcher } from 'undici';
 import dotenv from 'dotenv';
 dotenv.config();
 
-// Configure robust Undici Agent with short keep-alive, zero pipelining, and automatic retry on closed sockets
+// Configure robust Undici Agent with short keep-alive to prevent stale idle socket drops (UND_ERR_SOCKET)
 try {
-  const baseAgent = new Agent({
+  const agent = new Agent({
     connect: { timeout: 15_000 },
-    keepAliveTimeout: 5_000,
-    keepAliveMaxTimeout: 15_000,
-    connections: 30,
-    pipelining: 0
+    keepAliveTimeout: 3_000,
+    keepAliveMaxTimeout: 10_000,
+    connections: 50,
+    pipelining: 1
   });
 
-  const retryAgent = new RetryAgent(baseAgent, {
-    maxRetries: 4,
-    minTimeout: 50,
-    maxTimeout: 1000,
-    timeoutFactor: 2,
-    retryAfter: true,
-    methods: ['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'DELETE', 'PATCH']
-  });
-
-  setGlobalDispatcher(retryAgent);
+  setGlobalDispatcher(agent);
 } catch (e) {
   console.warn('[DB] Could not set global Undici dispatcher:', e);
 }

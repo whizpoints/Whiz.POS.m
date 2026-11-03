@@ -373,42 +373,48 @@ const handleC2bValidation = async (req: any, res: any) => {
     }
 
     if (resolvedBusinessId && cleanTransId && cleanAmount > 0) {
-      await withDbRetry(async () => {
-        return prisma.mpesaTransaction.upsert({
-          where: { transactionId: cleanTransId },
-          create: {
-            businessId: resolvedBusinessId,
-            locationId: config?.locationId || null,
-            transactionId: cleanTransId,
-            amount: cleanAmount,
-            phoneNumber: rawPhone,
-            customerName,
-            status: 'UNLINKED',
-            isEnriched: customerName !== 'M-Pesa Customer',
-            timestamp
-          },
-          update: {
-            customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
-            phoneNumber: rawPhone || undefined,
-            amount: cleanAmount || undefined
-          }
-        });
-      });
-
+      // 1. Emit instant Socket.io event first (0ms latency to POS screen)
       const io = req.app.get('io');
+      const payload = {
+        transactionId: cleanTransId,
+        amount: cleanAmount,
+        phoneNumber: rawPhone,
+        customerName,
+        isEnriched: customerName !== 'M-Pesa Customer',
+        timestamp: timestamp.toISOString(),
+        businessId: resolvedBusinessId
+      };
       if (io) {
-        const payload = {
-          transactionId: cleanTransId,
-          amount: cleanAmount,
-          phoneNumber: rawPhone,
-          customerName,
-          isEnriched: customerName !== 'M-Pesa Customer',
-          timestamp: timestamp.toISOString(),
-          businessId: resolvedBusinessId
-        };
         io.to(`business_${resolvedBusinessId}`).emit('mpesa_payment_received', payload);
         io.emit('mpesa_payment_received', payload);
-        console.log(`[M-Pesa Webhook] C2B Validation recorded & emitted: ${cleanTransId} for KSh ${cleanAmount} (${customerName})`);
+        console.log(`[M-Pesa Webhook] C2B Validation emitted: ${cleanTransId} for KSh ${cleanAmount} (${customerName})`);
+      }
+
+      // 2. Persist to DB with retry
+      try {
+        await withDbRetry(async () => {
+          return prisma.mpesaTransaction.upsert({
+            where: { transactionId: cleanTransId },
+            create: {
+              businessId: resolvedBusinessId,
+              locationId: config?.locationId || null,
+              transactionId: cleanTransId,
+              amount: cleanAmount,
+              phoneNumber: rawPhone,
+              customerName,
+              status: 'UNLINKED',
+              isEnriched: customerName !== 'M-Pesa Customer',
+              timestamp
+            },
+            update: {
+              customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
+              phoneNumber: rawPhone || undefined,
+              amount: cleanAmount || undefined
+            }
+          });
+        });
+      } catch (dbErr) {
+        console.error(`[M-Pesa Webhook] C2B Validation DB save error for ${cleanTransId}:`, dbErr);
       }
     }
 
@@ -484,41 +490,19 @@ const handleC2bConfirmation = async (req: any, res: any) => {
     }
     
     if (cleanTransId) {
-      await withDbRetry(async () => {
-        return prisma.mpesaTransaction.upsert({
-          where: { transactionId: cleanTransId },
-          create: {
-            businessId: resolvedBusinessId,
-            locationId: config?.locationId || null,
-            transactionId: cleanTransId,
-            amount: cleanAmount,
-            phoneNumber: rawPhone,
-            customerName,
-            status: 'UNLINKED',
-            isEnriched,
-            timestamp
-          },
-          update: {
-            customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
-            phoneNumber: rawPhone || undefined,
-            amount: cleanAmount || undefined
-          }
-        });
-      });
-
+      // 1. Emit instant Socket.io event first (0ms latency to POS screen)
       const io = req.app.get('io');
-      if (io) {
-        const payload = {
-          transactionId: cleanTransId,
-          amount: cleanAmount,
-          phoneNumber: rawPhone,
-          customerName,
-          isEnriched,
-          timestamp: timestamp.toISOString(),
-          businessId: resolvedBusinessId
-        };
+      const payload = {
+        transactionId: cleanTransId,
+        amount: cleanAmount,
+        phoneNumber: rawPhone,
+        customerName,
+        isEnriched,
+        timestamp: timestamp.toISOString(),
+        businessId: resolvedBusinessId
+      };
 
-        // Broadcast to resolved business room
+      if (io) {
         io.to(`business_${resolvedBusinessId}`).emit('mpesa_payment_received', payload);
         if (rawBusinessId && rawBusinessId !== resolvedBusinessId) {
           io.to(`business_${rawBusinessId}`).emit('mpesa_payment_received', payload);
@@ -526,26 +510,53 @@ const handleC2bConfirmation = async (req: any, res: any) => {
 
         // Also broadcast to any other business configs sharing this ShortCode / Till
         if (bsc) {
-          try {
-            const sharedConfigs = await prisma.mpesaConfig.findMany({
-              where: {
-                OR: [
-                  { shortcode: bsc },
-                  { tillNumber: bsc },
-                  { paybillNumber: bsc }
-                ]
-              },
-              select: { businessId: true }
-            });
+          prisma.mpesaConfig.findMany({
+            where: {
+              OR: [
+                { shortcode: bsc },
+                { tillNumber: bsc },
+                { paybillNumber: bsc }
+              ]
+            },
+            select: { businessId: true }
+          }).then(sharedConfigs => {
             sharedConfigs.forEach(sc => {
               io.to(`business_${sc.businessId}`).emit('mpesa_payment_received', payload);
             });
-          } catch (e) {}
+          }).catch(() => {});
         }
 
-        // Global emission so any connected POS terminal on this store receives it in 0ms
+        // Global emission so any connected POS terminal receives it in 0ms
         io.emit('mpesa_payment_received', payload);
-        console.log(`[M-Pesa Webhook] C2B Confirmation saved & emitted: ${cleanTransId} for KSh ${cleanAmount} (${customerName})`);
+        console.log(`[M-Pesa Webhook] C2B Confirmation broadcasted instantly: ${cleanTransId} for KSh ${cleanAmount} (${customerName})`);
+      }
+
+      // 2. Persist to DB with retry
+      try {
+        await withDbRetry(async () => {
+          return prisma.mpesaTransaction.upsert({
+            where: { transactionId: cleanTransId },
+            create: {
+              businessId: resolvedBusinessId,
+              locationId: config?.locationId || null,
+              transactionId: cleanTransId,
+              amount: cleanAmount,
+              phoneNumber: rawPhone,
+              customerName,
+              status: 'UNLINKED',
+              isEnriched,
+              timestamp
+            },
+            update: {
+              customerName: customerName !== 'M-Pesa Customer' ? customerName : undefined,
+              phoneNumber: rawPhone || undefined,
+              amount: cleanAmount || undefined
+            }
+          });
+        });
+        console.log(`[M-Pesa Webhook] C2B Confirmation saved to DB: ${cleanTransId}`);
+      } catch (dbErr) {
+        console.error(`[M-Pesa Webhook] C2B Confirmation DB save error for ${cleanTransId}:`, dbErr);
       }
 
       // Query full status if phone is masked or name is missing, deduplicated with lock

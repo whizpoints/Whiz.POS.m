@@ -117,91 +117,104 @@ function App() {
     checkServerConnectivity();
   }, []);
 
-  // Setup Socket.io Real-Time Sync with dynamic reconnect on IP change
+  // Setup Persistent Singleton Socket.io for Real-Time Sync & Instant M-Pesa streaming
   const currentApiUrl = usePosStore(state => state.businessSetup?.apiUrl || state.businessSetup?.backOfficeUrl);
   const backOfficeUrl = usePosStore(state => state.businessSetup?.backOfficeUrl || (state.businessSetup as any)?.cloudUrl);
   const activeBusinessId = usePosStore(state => state.businessSetup?.businessId || (state.businessSetup as any)?.cloudBusinessId);
 
+  // Compute primary target URL: prioritize backoffice, fallback to api or localhost:3000
+  const rawTargetUrl = backOfficeUrl || currentApiUrl || (
+    (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+      ? 'http://localhost:3000'
+      : ''
+  );
+  const targetSocketUrl = rawTargetUrl ? rawTargetUrl.replace(/\/+$/, '').replace(/\/api$/, '') : '';
+
+  const socketRef = useRef<any>(null);
+
   useEffect(() => {
-    const urlsToConnect = new Set<string>();
-    
-    const cleanApi = currentApiUrl?.replace(/\/$/, '')?.replace(/\/api$/, '');
-    if (cleanApi) urlsToConnect.add(cleanApi);
+    if (!targetSocketUrl) return;
 
-    const cleanBackOffice = backOfficeUrl?.replace(/\/$/, '')?.replace(/\/api$/, '');
-    if (cleanBackOffice) urlsToConnect.add(cleanBackOffice);
-
-    // Fallback development default if local backoffice is running on 3000
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      urlsToConnect.add('http://localhost:3000');
+    // Reuse existing socket if connected to the same server
+    if (socketRef.current) {
+      if (socketRef.current.io?.uri === targetSocketUrl && socketRef.current.connected) {
+        return;
+      }
+      socketRef.current.disconnect();
+      socketRef.current = null;
     }
 
-    const activeSockets: any[] = [];
+    console.log('[Socket] Initializing real-time socket connection to:', targetSocketUrl);
+    const socket = io(targetSocketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+    });
+    socketRef.current = socket;
 
-    urlsToConnect.forEach((url) => {
-      try {
-        console.log('[Socket] Connecting socket to:', url);
-        const socket = io(url, {
-          transports: ['websocket', 'polling'],
-          reconnection: true,
-          reconnectionDelay: 1000,
-          reconnectionAttempts: 10,
-        });
-
-        socket.on('connect', () => {
-          console.log('[Socket] Connected to server for real-time sync at', url);
-          const bId = usePosStore.getState().businessSetup?.businessId || (usePosStore.getState().businessSetup as any)?.cloudBusinessId;
-          if (bId) {
-            socket.emit('join_business', bId);
-          }
-        });
-
-        socket.on('connect_error', (err) => {
-          console.warn(`[Socket] Connection error to ${url}:`, err.message);
-        });
-
-        // Receive downward sync from Cloud or other POS terminals
-        socket.on('cloud_sync_received', (data) => {
-          console.log('[Socket] Received real-time sync data:', data);
-          if (typeof usePosStore.getState().syncFromServer === 'function') usePosStore.getState().syncFromServer();
-        });
-
-        socket.on('stock_updated', (data) => {
-          console.log('[Socket] Stock updated remotely:', data);
-          if (typeof usePosStore.getState().syncFromServer === 'function') usePosStore.getState().syncFromServer();
-        });
-
-        // Instant M-Pesa Payment Broadcasts
-        socket.on('mpesa_payment_received', (data) => {
-          console.log('[Socket] Real-time M-Pesa payment received:', data);
-          window.dispatchEvent(new CustomEvent('mpesa_payment_received', { detail: data }));
-        });
-
-        socket.on('mpesa_payment_enriched', (data) => {
-          console.log('[Socket] Real-time M-Pesa payment enriched:', data);
-          window.dispatchEvent(new CustomEvent('mpesa_payment_enriched', { detail: data }));
-        });
-
-        socket.on('mpesa_payment_claimed', (data) => {
-          console.log('[Socket] Real-time M-Pesa payment claimed:', data);
-          window.dispatchEvent(new CustomEvent('mpesa_payment_claimed', { detail: data }));
-        });
-
-        activeSockets.push(socket);
-      } catch (err) {
-        console.warn(`[Socket] Failed to create socket for ${url}:`, err);
+    socket.on('connect', () => {
+      console.log('[Socket] Connected to server for real-time sync at', targetSocketUrl);
+      const bId = usePosStore.getState().businessSetup?.businessId || (usePosStore.getState().businessSetup as any)?.cloudBusinessId;
+      if (bId) {
+        socket.emit('join_business', bId);
       }
     });
 
-    return () => {
-      activeSockets.forEach(s => {
-        try {
-          if (s.connected) s.disconnect();
-          else s.close();
-        } catch (e) {}
-      });
+    socket.on('connect_error', (err) => {
+      console.warn(`[Socket] Connection error to ${targetSocketUrl}:`, err.message);
+    });
+
+    // Debounced downward sync from Cloud or other POS terminals (prevents render thrashing)
+    let syncTimer: any = null;
+    const scheduleSync = () => {
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => {
+        if (typeof usePosStore.getState().syncFromServer === 'function') {
+          usePosStore.getState().syncFromServer();
+        }
+      }, 5000);
     };
-  }, [currentApiUrl, backOfficeUrl, activeBusinessId]);
+
+    socket.on('cloud_sync_received', (data) => {
+      console.log('[Socket] Real-time sync data notice received:', data);
+      scheduleSync();
+    });
+
+    socket.on('stock_updated', (data) => {
+      console.log('[Socket] Stock updated notice received:', data);
+      scheduleSync();
+    });
+
+    // Instant M-Pesa Payment Broadcasts
+    socket.on('mpesa_payment_received', (data) => {
+      console.log('[Socket] Real-time M-Pesa payment received:', data);
+      window.dispatchEvent(new CustomEvent('mpesa_payment_received', { detail: data }));
+    });
+
+    socket.on('mpesa_payment_enriched', (data) => {
+      console.log('[Socket] Real-time M-Pesa payment enriched:', data);
+      window.dispatchEvent(new CustomEvent('mpesa_payment_enriched', { detail: data }));
+    });
+
+    socket.on('mpesa_payment_claimed', (data) => {
+      console.log('[Socket] Real-time M-Pesa payment claimed:', data);
+      window.dispatchEvent(new CustomEvent('mpesa_payment_claimed', { detail: data }));
+    });
+
+    return () => {
+      // Do not prematurely disconnect on every re-render; only disconnect if targetSocketUrl actually unmounts
+      if (syncTimer) clearTimeout(syncTimer);
+    };
+  }, [targetSocketUrl]);
+
+  // Update room membership when active business changes
+  useEffect(() => {
+    if (socketRef.current?.connected && activeBusinessId) {
+      socketRef.current.emit('join_business', activeBusinessId);
+    }
+  }, [activeBusinessId]);
 
   // Periodic Sync (Every 10 seconds)
   useEffect(() => {

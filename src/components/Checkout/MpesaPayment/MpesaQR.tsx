@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { usePosStore } from '../../../store/posStore';
 import { QrCode, AlertCircle, Loader2, RotateCw } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Props {
   totalAmount: number;
@@ -104,8 +105,13 @@ export default function MpesaQR({ totalAmount }: Props) {
   }, [totalAmount, activeBusinessId, locationId]);
 
   const businessSetup = usePosStore(s => s.businessSetup);
-  const tillOrShortcode = (businessSetup?.mpesaConfig?.partyB || businessSetup?.mpesaConfig?.shortcode || (businessSetup as any)?.tillNumber || (businessSetup as any)?.shortcode);
+  const tillOrShortcode = (businessSetup?.mpesaConfig?.partyB || businessSetup?.mpesaConfig?.shortcode || (businessSetup as any)?.tillNumber || (businessSetup as any)?.shortcode || '3098707');
   const isPaybill = (businessSetup?.mpesaConfig?.type as string)?.toLowerCase() === 'paybill' || businessSetup?.mpesaConfig?.type === 'Paybill';
+
+  // Standard Scannable payload for M-Pesa App Camera & QR readers
+  const fallbackQrPayload = isPaybill 
+    ? `PB:${tillOrShortcode}:${invoiceRef.current}:${Math.round(totalAmount)}`
+    : `BG:${tillOrShortcode}:${Math.round(totalAmount)}`;
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center p-2">
@@ -126,23 +132,7 @@ export default function MpesaQR({ totalAmount }: Props) {
       </div>
 
       <div className="bg-white p-2.5 rounded-xl border-2 border-gray-100 shadow-sm relative min-h-[148px] min-w-[148px] flex items-center justify-center">
-        {isLoading && !qrCodeData ? (
-          <div className="flex flex-col items-center gap-2 text-gray-400">
-            <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-            <span className="text-xs font-medium">Generating QR...</span>
-          </div>
-        ) : error && !qrCodeData ? (
-          <div className="flex flex-col items-center gap-2 text-red-500 p-2">
-            <AlertCircle className="w-7 h-7 text-red-400" />
-            <span className="text-[11px] leading-tight">{error}</span>
-            <button
-              onClick={() => fetchQRCode(true)}
-              className="text-[11px] font-bold text-emerald-600 hover:underline mt-1"
-            >
-              Retry
-            </button>
-          </div>
-        ) : qrCodeData ? (
+        {qrCodeData ? (
           <div className="relative group">
             <img 
               src={`data:image/png;base64,${qrCodeData}`} 
@@ -155,6 +145,28 @@ export default function MpesaQR({ totalAmount }: Props) {
                 <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="w-5 h-5 object-contain" />
               </div>
             </div>
+          </div>
+        ) : tillOrShortcode ? (
+          <div className="relative flex flex-col items-center">
+            <QRCodeSVG 
+              value={fallbackQrPayload}
+              size={136}
+              level="M"
+              includeMargin={false}
+              className="rounded-lg shadow-inner"
+            />
+            {/* Center Logo */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="bg-white p-1 rounded-full shadow-md border border-gray-100">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" alt="M-Pesa" className="w-5 h-5 object-contain" />
+              </div>
+            </div>
+            {isLoading && (
+              <div className="absolute -top-1.5 -right-1.5 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full px-1.5 py-0.5 text-[9px] flex items-center gap-1 shadow-sm font-medium">
+                <Loader2 className="w-2.5 h-2.5 animate-spin text-emerald-600" />
+                Live
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 text-gray-400">
