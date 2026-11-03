@@ -4,6 +4,39 @@ const path = require('path');
 const qrcode = require('qrcode');
 
 /**
+ * Safely masks a phone number to prevent data breach on printed receipts.
+ * Examples:
+ *   254740841168 -> 0740 xxx 168
+ *   0740841168   -> 0740 xxx 168
+ *   64-char SHA256 hash -> 07** *** ***
+ */
+function maskPhoneNumber(phone) {
+    if (!phone) return '';
+    const clean = String(phone).trim();
+    // Safaricom SHA256 Till hash (64 hex characters) or invalid long hash
+    if (clean.length >= 30 || /^[a-f0-9]{30,}$/i.test(clean)) {
+        return '07** *** ***';
+    }
+    const digits = clean.replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('254')) {
+        return '0' + digits.slice(3, 6) + ' xxx ' + digits.slice(-3);
+    }
+    if (digits.length === 10 && digits.startsWith('0')) {
+        return digits.slice(0, 4) + ' xxx ' + digits.slice(-3);
+    }
+    if (digits.length === 9) {
+        return '0' + digits.slice(0, 3) + ' xxx ' + digits.slice(-3);
+    }
+    if (clean.includes('*')) {
+        return clean.replace(/\*+/g, 'xxx');
+    }
+    if (digits.length >= 7) {
+        return digits.slice(0, 4) + ' xxx ' + digits.slice(-3);
+    }
+    return clean;
+}
+
+/**
  * Helper function to format a timestamp into a readable date string.
  * Format: YYYY-MM-DD HH:MM AM/PM
  *
@@ -71,7 +104,9 @@ async function generateReceipt(transaction, businessSetup, isReprint = false, is
         }
         singleCustomerName = rawName;
     }
-    template = template.replace('{{customer}}', singleCustomerName);
+    // Only 1 name (first name) printed on the receipt for privacy
+    const customerFirstName = (singleCustomerName || 'Customer').trim().split(/\s+/)[0];
+    template = template.replace('{{customer}}', customerFirstName);
 
     template = template.replace('{{paymentMethod}}', paymentMethod);
 
@@ -85,6 +120,7 @@ async function generateReceipt(transaction, businessSetup, isReprint = false, is
                         <span>${(p.method || 'PAYMENT').toUpperCase()}${p.mpesaCode ? ` (${p.mpesaCode})` : ''}:</span>
                         <span style="font-weight: bold;">Ksh ${parseFloat(p.amount || 0).toFixed(2)}</span>
                     </div>
+                    ${p.phoneNumber ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px; color: #555;"><span>Phone:</span><span>${maskPhoneNumber(p.phoneNumber)}</span></div>` : ''}
                 `).join('')}
             </div>
         `;
@@ -103,7 +139,7 @@ async function generateReceipt(transaction, businessSetup, isReprint = false, is
         paymentDetailsHtml = `
             <div style="font-size: 11px; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 4px;">
                 <div style="font-weight: bold; margin-bottom: 2px; text-align: center;">M-PESA PAYMENT</div>
-                ${transaction.phoneNumber ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Phone:</span><span>${transaction.phoneNumber.replace(/^(\d{4})\d{3}(\d{3})$/, '$1***$2')}</span></div>` : ''}
+                ${transaction.phoneNumber ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Phone:</span><span>${maskPhoneNumber(transaction.phoneNumber)}</span></div>` : ''}
                 ${transaction.mpesaCode ? `<div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Ref Code:</span><span style="font-weight: bold;">${transaction.mpesaCode}</span></div>` : ''}
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span>Amount:</span><span style="font-weight: bold;">Ksh ${total.toFixed(2)}</span></div>
             </div>

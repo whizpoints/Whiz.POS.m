@@ -122,12 +122,16 @@ function App() {
   const backOfficeUrl = usePosStore(state => state.businessSetup?.backOfficeUrl || (state.businessSetup as any)?.cloudUrl);
   const activeBusinessId = usePosStore(state => state.businessSetup?.businessId || (state.businessSetup as any)?.cloudBusinessId);
 
-  // Compute primary target URL: prioritize backoffice, fallback to api or localhost:3000
-  const rawTargetUrl = backOfficeUrl || currentApiUrl || (
-    (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-      ? 'http://localhost:3000'
-      : ''
+  const isLocalHost = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    !window.location.hostname
   );
+
+  // When running locally in dev or local store, prioritize http://localhost:3000 to catch local callbacks in 0ms
+  const rawTargetUrl = isLocalHost
+    ? 'http://localhost:3000'
+    : (backOfficeUrl || currentApiUrl || 'http://localhost:3000');
   const targetSocketUrl = rawTargetUrl ? rawTargetUrl.replace(/\/+$/, '').replace(/\/api$/, '') : '';
 
   const socketRef = useRef<any>(null);

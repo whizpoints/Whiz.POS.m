@@ -10,6 +10,39 @@ interface Props {
   isSplitActive?: boolean;
 }
 
+export function formatMaskedPhone(phone: any): string {
+  if (!phone) return '07** *** ***';
+  const clean = String(phone).trim();
+  // Safaricom SHA256 Till hash (64 hex characters) or long hash
+  if (clean.length >= 30 || /^[a-f0-9]{30,}$/i.test(clean)) {
+    return '07** *** ***';
+  }
+  const digits = clean.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('254')) {
+    return '0' + digits.slice(3, 6) + ' xxx ' + digits.slice(-3);
+  }
+  if (digits.length === 10 && digits.startsWith('0')) {
+    return digits.slice(0, 4) + ' xxx ' + digits.slice(-3);
+  }
+  if (digits.length === 9) {
+    return '0' + digits.slice(0, 3) + ' xxx ' + digits.slice(-3);
+  }
+  if (clean.includes('*')) {
+    return clean.replace(/\*+/g, 'xxx');
+  }
+  if (digits.length >= 7) {
+    return digits.slice(0, 4) + ' xxx ' + digits.slice(-3);
+  }
+  return clean || '07** *** ***';
+}
+
+export function formatMpesaDisplayTime(timestamp: any): string {
+  if (!timestamp) return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, isSplitActive = false }: Props) {
   const effectiveTargetAmount = (remainingAmount !== undefined && remainingAmount >= 0) ? remainingAmount : totalAmount;
 
@@ -113,28 +146,43 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
       const webportalBase = (businessSetup?.backOfficeUrl || (businessSetup as any)?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
       const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
 
+      const isLocal = typeof window !== 'undefined' && (
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' ||
+        !window.location.hostname
+      );
+
       const queryParam = queryText.trim() ? `&q=${encodeURIComponent(queryText.trim())}` : '';
       const params = `businessId=${encodeURIComponent(businessId)}${queryParam}&tillNumber=${encodeURIComponent(tillNumber)}&shortcode=${encodeURIComponent(shortcode)}`;
       
       const candidateUrls = [
+        isLocal ? `http://localhost:3000/api/mpesa/payments/search?${params}` : null,
         `${webportalBase}/api/mpesa/payments/search?${params}`,
         localServerBase ? `${localServerBase}/api/mpesa/payments/search?${params}` : null,
-        `http://localhost:3000/api/mpesa/payments/search?${params}`
+        !isLocal ? `http://localhost:3000/api/mpesa/payments/search?${params}` : null
       ].filter(Boolean) as string[];
 
-      let res: Response | null = null;
+      let foundTxns: any[] = [];
+      let fetchSuccessful = false;
+
       for (const url of candidateUrls) {
         try {
-          const r = await fetch(url, { signal: AbortSignal.timeout(2500) });
+          const r = await fetch(url, { signal: AbortSignal.timeout(2000) });
           if (r.ok) {
-            res = r;
-            break;
+            const data = await r.json();
+            if (Array.isArray(data)) {
+              fetchSuccessful = true;
+              if (data.length > 0) {
+                foundTxns = data;
+                break; // Found actual transactions! Stop querying fallback URLs
+              }
+            }
           }
         } catch (e) {}
       }
 
-      if (res && res.ok) {
-        const txns = await res.json();
+      if (fetchSuccessful) {
+        const txns = foundTxns;
         const localUsedCodes = usePosStore.getState().transactions.map((t: any) => (t as any).mpesaCode).filter(Boolean);
         let locallyClaimedList: string[] = [];
         try {
@@ -269,7 +317,7 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
       if (!isPolling || isManualOffline || detectedPayment) return;
       await fetchPayments();
       if (isPolling && !isManualOffline && !detectedPayment) {
-        timeout = setTimeout(poll, 4000);
+        timeout = setTimeout(poll, 1500);
       }
     };
 
@@ -604,21 +652,23 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase">Customer Phone</p>
-              <p className="font-mono font-bold text-gray-900">{detectedPayment.phoneNumber || 'Not provided'}</p>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="overflow-hidden min-w-0">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Customer Phone</p>
+              <p className="font-mono font-bold text-gray-900 truncate" title={formatMaskedPhone(detectedPayment.phoneNumber)}>
+                {formatMaskedPhone(detectedPayment.phoneNumber)}
+              </p>
+            </div>
+            <div className="overflow-hidden min-w-0">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">M-Pesa Receipt Code</p>
+              <p className="font-mono font-black text-gray-900 tracking-wide truncate">{detectedPayment.transactionId}</p>
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase">M-Pesa Receipt Code</p>
-              <p className="font-mono font-black text-gray-900 tracking-wide">{detectedPayment.transactionId}</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Time Received</p>
+              <p className="font-medium text-gray-700">{formatMpesaDisplayTime(detectedPayment.timestamp)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase">Time Received</p>
-              <p className="font-medium text-gray-700">{new Date(detectedPayment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase">Verification</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Verification</p>
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
                 <ShieldCheck className="w-3 h-3" /> Safaricom Verified
               </span>
@@ -758,11 +808,11 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5 font-mono">
-                          <span className="font-bold text-gray-700">{cand.phoneNumber || 'No phone'}</span>
+                          <span className="font-bold text-gray-700">{formatMaskedPhone(cand.phoneNumber)}</span>
                           <span>•</span>
                           <span className="font-black text-emerald-800">{cand.transactionId}</span>
                           <span>•</span>
-                          <span className="text-gray-400">{new Date(cand.timestamp || cand.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="text-gray-400">{formatMpesaDisplayTime(cand.timestamp || cand.createdAt)}</span>
                         </div>
                       </div>
 
@@ -830,11 +880,11 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5 font-mono">
-                            <span className="font-bold text-gray-700">{cand.phoneNumber || 'No phone'}</span>
+                            <span className="font-bold text-gray-700">{formatMaskedPhone(cand.phoneNumber)}</span>
                             <span>•</span>
                             <span className="font-black text-gray-900">{cand.transactionId}</span>
                             <span>•</span>
-                            <span className="text-gray-400">{new Date(cand.timestamp || cand.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="text-gray-400">{formatMpesaDisplayTime(cand.timestamp || cand.createdAt)}</span>
                           </div>
                         </div>
 

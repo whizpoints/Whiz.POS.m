@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, X, CheckCircle2, AlertTriangle, Loader2, Clock } from 'lucide-react';
 import { Modal } from '../../ui/modal';
 import { usePosStore } from '../../../store/posStore';
+import { formatMaskedPhone, formatMpesaDisplayTime } from './TillMonitor';
 
 interface MpesaTxn {
   transactionId: string;
@@ -202,13 +203,13 @@ export default function SearchModal({ isOpen, onClose, targetAmount, onSelect }:
                           <Clock className="w-2.5 h-2.5" /> Verifying...
                         </span>
                       )}
-                      <p className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {txn.phoneNumber?.length > 15 ? 'Hidden (Privacy)' : txn.phoneNumber}
+                      <p className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full font-mono">
+                        {formatMaskedPhone(txn.phoneNumber)}
                       </p>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
                       <span className="font-bold text-gray-900 font-mono">{txn.transactionId}</span>
-                      <span className="text-gray-500">{new Date(txn.timestamp).toLocaleTimeString()}</span>
+                      <span className="text-gray-500">{formatMpesaDisplayTime(txn.timestamp)}</span>
                     </div>
                   </div>
                   

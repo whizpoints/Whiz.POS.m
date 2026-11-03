@@ -50,6 +50,31 @@ function isStatusCheckLocked(receipt: string): boolean {
   return false;
 }
 
+// Safaricom timestamps are strictly Kenya Time (UTC+3, East Africa Time)
+export function parseMpesaTimestamp(rawTime: any): Date {
+  if (!rawTime) return new Date();
+  const tt = String(rawTime).replace(/\D/g, '');
+  if (tt.length >= 14) {
+    const yr = tt.substring(0, 4);
+    const mo = tt.substring(4, 6);
+    const dy = tt.substring(6, 8);
+    const hr = tt.substring(8, 10);
+    const mn = tt.substring(10, 12);
+    const sc = tt.substring(12, 14);
+    // Explicitly set East Africa Time (+03:00) so JS converts to exact local time without shift
+    const d = new Date(`${yr}-${mo}-${dy}T${hr}:${mn}:${sc}+03:00`);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
+// Detect masked phone numbers or Safaricom 64-character SHA-256 Till hashes
+export function isMaskedOrHashedPhone(phone: any): boolean {
+  if (!phone) return true;
+  const s = String(phone).trim();
+  return s.length < 9 || s.length >= 32 || /^[a-f0-9]{32,}$/i.test(s) || s.includes('*');
+}
+
 async function triggerTransactionStatus(config: any, receipt: string, businessId: string) {
     if (!config.initiatorName || !config.initiatorPassword) return;
     if (!receipt || isStatusCheckLocked(receipt)) {
@@ -273,6 +298,9 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
           }
         } catch (e) {}
 
+        const txDate = items.find((i: any) => i.Name === 'TransactionDate')?.Value;
+        const timestamp = parseMpesaTimestamp(txDate);
+
         const savedTxn = await prisma.mpesaTransaction.upsert({
           where: { transactionId: receipt },
           create: {
@@ -283,7 +311,8 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
             customerName: resolvedName,
             status: 'UNLINKED',
             // If no initiator configured, treat as enriched immediately
-            isEnriched: !hasInitiator
+            isEnriched: !hasInitiator,
+            timestamp
           },
           update: {
             customerName: resolvedName !== 'M-Pesa Customer' ? resolvedName : undefined,
@@ -294,15 +323,18 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
         // Emit real-time Socket.IO event so connected POS terminals are notified immediately
         const io = req.app.get('io');
         if (io) {
-          io.to(`business_${businessId}`).emit('mpesa_payment_received', {
+          const payload = {
             transactionId: receipt,
             amount: parseFloat(amount),
             phoneNumber: phone.toString(),
             customerName: resolvedName,
             isEnriched: !hasInitiator,
+            timestamp: timestamp.toISOString(),
             businessId
-          });
-          console.log(`[M-Pesa Webhook] Socket.IO event emitted to business_${businessId} for ${resolvedName}`);
+          };
+          io.to(`business_${businessId}`).emit('mpesa_payment_received', payload);
+          io.emit('mpesa_payment_received', payload);
+          console.log(`[M-Pesa Webhook] Socket.IO event emitted for STK Push ${receipt} (${resolvedName})`);
         }
 
         // Fetch Customer Name using Transaction Status API
@@ -358,19 +390,8 @@ const handleC2bValidation = async (req: any, res: any) => {
 
     const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || 'M-Pesa Customer';
 
-    // Parse timestamp if available
-    let timestamp = new Date();
-    if (TransTime && String(TransTime).length >= 14) {
-      const tt = String(TransTime);
-      const yr = parseInt(tt.substring(0, 4), 10);
-      const mo = parseInt(tt.substring(4, 6), 10) - 1;
-      const dy = parseInt(tt.substring(6, 8), 10);
-      const hr = parseInt(tt.substring(8, 10), 10);
-      const mn = parseInt(tt.substring(10, 12), 10);
-      const sc = parseInt(tt.substring(12, 14), 10);
-      const d = new Date(Date.UTC(yr, mo, dy, hr, mn, sc));
-      if (!isNaN(d.getTime())) timestamp = d;
-    }
+    // Safaricom timestamps are strictly Kenya Time (UTC+3)
+    const timestamp = parseMpesaTimestamp(TransTime);
 
     if (resolvedBusinessId && cleanTransId && cleanAmount > 0) {
       // 1. Emit instant Socket.io event first (0ms latency to POS screen)
@@ -415,6 +436,11 @@ const handleC2bValidation = async (req: any, res: any) => {
         });
       } catch (dbErr) {
         console.error(`[M-Pesa Webhook] C2B Validation DB save error for ${cleanTransId}:`, dbErr);
+      }
+
+      // Query full status if phone is masked/hashed (e.g. 64-char Till SHA256) or name is generic
+      if (config?.initiatorName && config?.initiatorPassword && (isMaskedOrHashedPhone(rawPhone) || customerName === 'M-Pesa Customer')) {
+        triggerTransactionStatus(config, cleanTransId, resolvedBusinessId);
       }
     }
 
@@ -475,19 +501,8 @@ const handleC2bConfirmation = async (req: any, res: any) => {
     const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || req.body.CustomerName || 'M-Pesa Customer';
     const isEnriched = customerName !== 'M-Pesa Customer';
 
-    // Parse timestamp if available
-    let timestamp = new Date();
-    if (TransTime && String(TransTime).length >= 14) {
-      const tt = String(TransTime);
-      const yr = parseInt(tt.substring(0, 4), 10);
-      const mo = parseInt(tt.substring(4, 6), 10) - 1;
-      const dy = parseInt(tt.substring(6, 8), 10);
-      const hr = parseInt(tt.substring(8, 10), 10);
-      const mn = parseInt(tt.substring(10, 12), 10);
-      const sc = parseInt(tt.substring(12, 14), 10);
-      const d = new Date(Date.UTC(yr, mo, dy, hr, mn, sc));
-      if (!isNaN(d.getTime())) timestamp = d;
-    }
+    // Safaricom timestamps are strictly Kenya Time (UTC+3)
+    const timestamp = parseMpesaTimestamp(TransTime);
     
     if (cleanTransId) {
       // 1. Emit instant Socket.io event first (0ms latency to POS screen)
@@ -559,8 +574,8 @@ const handleC2bConfirmation = async (req: any, res: any) => {
         console.error(`[M-Pesa Webhook] C2B Confirmation DB save error for ${cleanTransId}:`, dbErr);
       }
 
-      // Query full status if phone is masked or name is missing, deduplicated with lock
-      if (config?.initiatorName && config?.initiatorPassword && (rawPhone.length < 9 || !isEnriched)) {
+      // Query full status if phone is masked or 64-char Till hash or name is generic, deduplicated with lock
+      if (config?.initiatorName && config?.initiatorPassword && (isMaskedOrHashedPhone(rawPhone) || !isEnriched)) {
         triggerTransactionStatus(config, cleanTransId, resolvedBusinessId);
       }
     }

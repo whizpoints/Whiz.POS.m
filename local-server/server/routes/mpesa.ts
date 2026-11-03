@@ -40,6 +40,29 @@ function getTimestamp() {
     now.getSeconds().toString().padStart(2, '0');
 }
 
+// Safaricom timestamps are strictly Kenya Time (UTC+3, East Africa Time)
+export function parseMpesaTimestamp(rawTime: any): Date {
+  if (!rawTime) return new Date();
+  const tt = String(rawTime).replace(/\D/g, '');
+  if (tt.length >= 14) {
+    const yr = tt.substring(0, 4);
+    const mo = tt.substring(4, 6);
+    const dy = tt.substring(6, 8);
+    const hr = tt.substring(8, 10);
+    const mn = tt.substring(10, 12);
+    const sc = tt.substring(12, 14);
+    const d = new Date(`${yr}-${mo}-${dy}T${hr}:${mn}:${sc}+03:00`);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
+export function isMaskedOrHashedPhone(phone: any): boolean {
+  if (!phone) return true;
+  const s = String(phone).trim();
+  return s.length < 9 || s.length >= 32 || /^[a-f0-9]{32,}$/i.test(s) || s.includes('*');
+}
+
 // In-memory deduplication cache with 45s TTL to prevent duplicate status checks
 const statusQueryLocks = new Map<string, number>();
 
@@ -321,18 +344,7 @@ const handleLocalC2bValidation = async (req: any, res: any) => {
 
     const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || 'M-Pesa Customer';
 
-    let timestamp = new Date().toISOString();
-    if (TransTime && String(TransTime).length >= 14) {
-      const tt = String(TransTime);
-      const yr = parseInt(tt.substring(0, 4), 10);
-      const mo = parseInt(tt.substring(4, 6), 10) - 1;
-      const dy = parseInt(tt.substring(6, 8), 10);
-      const hr = parseInt(tt.substring(8, 10), 10);
-      const mn = parseInt(tt.substring(10, 12), 10);
-      const sc = parseInt(tt.substring(12, 14), 10);
-      const d = new Date(Date.UTC(yr, mo, dy, hr, mn, sc));
-      if (!isNaN(d.getTime())) timestamp = d.toISOString();
-    }
+    const timestamp = parseMpesaTimestamp(TransTime).toISOString();
 
     if (resolvedBusinessId && cleanTransId && cleanAmount > 0) {
       const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', cleanTransId).executeTakeFirst();
@@ -417,18 +429,7 @@ const handleLocalC2bConfirmation = async (req: any, res: any) => {
 
     const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || req.body.CustomerName || 'M-Pesa Customer';
 
-    let timestamp = new Date().toISOString();
-    if (TransTime && String(TransTime).length >= 14) {
-      const tt = String(TransTime);
-      const yr = parseInt(tt.substring(0, 4), 10);
-      const mo = parseInt(tt.substring(4, 6), 10) - 1;
-      const dy = parseInt(tt.substring(6, 8), 10);
-      const hr = parseInt(tt.substring(8, 10), 10);
-      const mn = parseInt(tt.substring(10, 12), 10);
-      const sc = parseInt(tt.substring(12, 14), 10);
-      const d = new Date(Date.UTC(yr, mo, dy, hr, mn, sc));
-      if (!isNaN(d.getTime())) timestamp = d.toISOString();
-    }
+    const timestamp = parseMpesaTimestamp(TransTime).toISOString();
     
     if (cleanTransId) {
       const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', cleanTransId).executeTakeFirst();
