@@ -44,57 +44,58 @@ export default function MpesaQR({ totalAmount }: Props) {
     setError(null);
 
     try {
-      const webportalBase = (backOfficeUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
-      const qrUrl = mpesaQrUrl || `${webportalBase}/api/mpesa/qrcode`;
+      const isLocalHost = typeof window !== 'undefined' && (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        !window.location.hostname
+      );
 
+      const candidateUrls: string[] = [];
+      if (isLocalHost) {
+        candidateUrls.push('http://localhost:3000/api/mpesa/qrcode');
+      }
+      if (mpesaQrUrl) candidateUrls.push(mpesaQrUrl);
+      const webportalBase = (backOfficeUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+      candidateUrls.push(`${webportalBase}/api/mpesa/qrcode`);
+      const localServerBase = (apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
+      if (localServerBase) candidateUrls.push(`${localServerBase}/api/mpesa/qrcode`);
+      if (!isLocalHost) candidateUrls.push('http://localhost:3000/api/mpesa/qrcode');
+
+      const uniqueUrls = Array.from(new Set(candidateUrls.filter(Boolean)));
       let res: Response | null = null;
-      try {
-        res = await fetch(qrUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            businessId: activeBusinessId,
-            locationId: locationId,
-            amount: totalAmount,
-            refNo: invoiceRef.current
-          }),
-          signal: AbortSignal.timeout(6000)
-        });
-      } catch (cloudErr) {
-        const localServerBase = (apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
-        if (localServerBase) {
-          try {
-            res = await fetch(`${localServerBase}/api/mpesa/qrcode`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                businessId: activeBusinessId,
-                locationId: locationId,
-                amount: totalAmount,
-                refNo: invoiceRef.current
-              }),
-              signal: AbortSignal.timeout(4000)
-            });
-          } catch (e) {}
+
+      const payload = JSON.stringify({
+        businessId: activeBusinessId,
+        locationId: locationId,
+        amount: totalAmount,
+        refNo: invoiceRef.current
+      });
+
+      for (const url of uniqueUrls) {
+        try {
+          res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            signal: AbortSignal.timeout(3000)
+          });
+          if (res && res.ok) break;
+        } catch (e) {
+          // Continue to next candidate URL without erroring
         }
       }
 
-      if (!res || !res.ok) {
-        throw new Error('Failed to generate QR Code');
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data.QRCode) {
+          setQrCodeData(data.QRCode);
+          lastFetchedKey.current = `${activeBusinessId}-${locationId || ''}-${totalAmount}-${invoiceRef.current}`;
+          return;
+        }
       }
-
-      const data = await res.json();
-      if (data.QRCode) {
-        setQrCodeData(data.QRCode);
-        lastFetchedKey.current = `${activeBusinessId}-${locationId || ''}-${totalAmount}-${invoiceRef.current}`;
-      } else {
-        throw new Error('QR Code data missing from response');
-      }
+      // If server QR fetch fails, fallback silently to local QRCodeSVG
     } catch (err: any) {
-      console.error('[MpesaQR] Error generating QR code:', err);
-      setError('Could not generate M-Pesa QR Code.');
+      console.warn('[MpesaQR] Server QR fetch note (using instant local fallback):', err);
     } finally {
       setIsLoading(false);
     }

@@ -44,24 +44,37 @@ export default function SearchModal({ isOpen, onClose, targetAmount, onSelect }:
         return;
       }
 
-      // Query Web Portal directly first for fast response even when local server is off
-      const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
-      const cloudSearchUrl = businessSetup?.mpesaSearchUrl 
-        ? `${businessSetup.mpesaSearchUrl.split('?')[0]}?businessId=${businessId}&q=${encodeURIComponent(query)}`
-        : `${webportalBase}/api/mpesa/payments/search?businessId=${businessId}&q=${encodeURIComponent(query)}`;
+      const isLocalHost = typeof window !== 'undefined' && (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        !window.location.hostname
+      );
 
+      const candidateUrls: string[] = [];
+      if (isLocalHost) {
+        candidateUrls.push(`http://localhost:3000/api/mpesa/payments/search?businessId=${businessId}&q=${encodeURIComponent(query)}`);
+      }
+      if (businessSetup?.mpesaSearchUrl) {
+        candidateUrls.push(`${businessSetup.mpesaSearchUrl.split('?')[0]}?businessId=${businessId}&q=${encodeURIComponent(query)}`);
+      }
+      const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
+      candidateUrls.push(`${webportalBase}/api/mpesa/payments/search?businessId=${businessId}&q=${encodeURIComponent(query)}`);
+      const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
+      if (localServerBase) {
+        candidateUrls.push(`${localServerBase}/api/mpesa/payments/search?businessId=${businessId}&q=${encodeURIComponent(query)}`);
+      }
+      if (!isLocalHost) {
+        candidateUrls.push(`http://localhost:3000/api/mpesa/payments/search?businessId=${businessId}&q=${encodeURIComponent(query)}`);
+      }
+
+      const uniqueUrls = Array.from(new Set(candidateUrls.filter(Boolean)));
       let res: Response | null = null;
-      try {
-        res = await fetch(cloudSearchUrl, { signal: AbortSignal.timeout(4500) });
-      } catch (cloudErr) {
-        const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
-        if (localServerBase) {
-          try {
-            res = await fetch(`${localServerBase}/api/mpesa/payments/search?businessId=${businessId}&q=${encodeURIComponent(query)}`, {
-              signal: AbortSignal.timeout(2500)
-            });
-          } catch (localErr) {}
-        }
+
+      for (const url of uniqueUrls) {
+        try {
+          res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+          if (res && res.ok) break;
+        } catch (e) {}
       }
       
       if (res && res.ok) {
@@ -97,38 +110,22 @@ export default function SearchModal({ isOpen, onClose, targetAmount, onSelect }:
       const webportalBase = (businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '');
       const consumeUrl = businessSetup?.mpesaConsumeUrl || `${webportalBase}/api/mpesa/payments/consume`;
 
-      // Mark the payment as consumed on the webportal (prevents double-use)
-      try {
-        const consumeRes = await fetch(consumeUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transactionId: txn.transactionId, businessId }),
-          signal: AbortSignal.timeout(4000)
-        });
+      // Mark the payment as consumed across candidate endpoints
+      const consumeUrls = [
+        businessSetup?.mpesaConsumeUrl,
+        `${webportalBase}/api/mpesa/payments/consume`,
+        'http://localhost:3000/api/mpesa/payments/consume'
+      ].filter(Boolean) as string[];
 
-        if (!consumeRes.ok) {
-          const err = await consumeRes.json().catch(() => ({}));
-          if (consumeRes.status === 409) {
-            console.warn('[SearchModal] Payment was already claimed, proceeding with selection.');
-          } else {
-            alert(err.error || 'This payment may already have been claimed. Please check.');
-            setSelectingId(null);
-            return;
-          }
-        }
-      } catch (cloudErr) {
-        // Fallback to local server if webportal had a temporary connection failure
-        const localServerBase = (businessSetup?.apiUrl || '').replace(/\/+$/, '').replace(/\/api$/, '');
-        if (localServerBase) {
-          try {
-            await fetch(`${localServerBase}/api/mpesa/payments/consume`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ transactionId: txn.transactionId, businessId }),
-              signal: AbortSignal.timeout(2000)
-            });
-          } catch (e) {}
-        }
+      for (const url of Array.from(new Set(consumeUrls))) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactionId: txn.transactionId, businessId }),
+            signal: AbortSignal.timeout(2000)
+          });
+        } catch (e) {}
       }
 
       // Pass back to parent (CheckoutModal) to call completeTransaction

@@ -14,7 +14,7 @@ export function formatMaskedPhone(phone: any): string {
   if (!phone) return '07** *** ***';
   const clean = String(phone).trim();
   // Safaricom SHA256 Till hash (64 hex characters) or long hash
-  if (clean.length >= 30 || /^[a-f0-9]{30,}$/i.test(clean)) {
+  if (clean.length >= 25 || /^[a-f0-9]{20,}$/i.test(clean)) {
     return '07** *** ***';
   }
   const digits = clean.replace(/\D/g, '');
@@ -30,10 +30,10 @@ export function formatMaskedPhone(phone: any): string {
   if (clean.includes('*')) {
     return clean.replace(/\*+/g, 'xxx');
   }
-  if (digits.length >= 7) {
+  if (digits.length >= 7 && digits.length <= 13) {
     return digits.slice(0, 4) + ' xxx ' + digits.slice(-3);
   }
-  return clean || '07** *** ***';
+  return '07** *** ***';
 }
 
 export function formatMpesaDisplayTime(timestamp: any): string {
