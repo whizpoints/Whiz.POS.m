@@ -55,7 +55,7 @@ export default function LandingPage() {
   ], [tick]);
 
   return (
-    <div className="relative min-h-screen w-full bg-[#030712] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200 overflow-hidden font-sans">
+    <div className="landing-dark relative min-h-screen w-full bg-[#030712] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200 overflow-hidden font-sans">
       
       {/* ========================================================================= */}
       {/* 1. DYNAMIC AMBIENT SILK WAVES & OPTICAL CAUSTICS */}
@@ -107,7 +107,7 @@ export default function LandingPage() {
             </div>
 
             {/* Monumental Editorial Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-[-0.035em] leading-[1.04] text-white">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-[-0.035em] leading-[1.04] !text-white">
               The High-Performance{' '}
               <span className="bg-gradient-to-r from-cyan-300 via-teal-200 to-indigo-300 bg-clip-text text-transparent">
                 Operating System
@@ -116,7 +116,7 @@ export default function LandingPage() {
             </h1>
 
             {/* Architectural Value Statement */}
-            <p className="text-base sm:text-lg text-slate-300/90 leading-relaxed font-normal max-w-2xl">
+            <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-medium max-w-2xl">
               Engineered from the silicon up for zero-latency retail terminals and unified cloud command. 
               Sub-millisecond offline-first execution, automated Safaricom M-Pesa STK callbacks with customer KYC memory, 
               and cryptographic KRA eTIMS signing — whether online or disconnected.
@@ -325,13 +325,13 @@ export default function LandingPage() {
             <Layers className="w-3 h-3" />
             <span>Infrastructure Matrix</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-[-0.03em] text-white">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-[-0.03em] !text-white">
             Architected for zero friction.{' '}
-            <span className="text-slate-400 font-normal">
+            <span className="text-slate-300 font-normal">
               Built for enterprise scale.
             </span>
           </h2>
-          <p className="text-slate-300 text-base mt-3 leading-relaxed">
+          <p className="text-slate-200 text-base mt-3 leading-relaxed font-medium">
             Eliminate traditional SaaS latency. Whiz POS pairs local high-speed embedded execution 
             with multi-tenant cloud orchestration for unprecedented resilience.
           </p>

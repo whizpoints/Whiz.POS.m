@@ -267,7 +267,7 @@ function PublicLayout({ children }: { children: ReactNode }) {
       <div className="bg-orb bg-orb-1"></div>
       <div className="bg-orb bg-orb-2"></div>
 
-      <nav className={`public-nav ${scrolled ? 'scrolled' : ''}`}>
+      <nav className={`public-nav ${scrolled ? 'scrolled' : ''} ${location.pathname === '/' ? 'dark-nav' : ''}`}>
         <div className="public-nav-inner">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="sidebar-logo">

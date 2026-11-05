@@ -1891,3 +1891,35 @@ h1, h2, h3, h4, h5, h6 {
     padding-right: 16px;
   }
 }
+/* Dark Nav variant for Landing Page and dark backdrops */
+.public-nav.dark-nav {
+  background: rgba(3, 7, 18, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.public-nav.dark-nav .sidebar-brand {
+  color: #ffffff !important;
+}
+
+.public-nav.dark-nav .sidebar-brand span {
+  color: #38bdf8 !important;
+}
+
+.public-nav.dark-nav .public-nav-links a {
+  color: #e2e8f0 !important;
+  font-weight: 600 !important;
+}
+
+.public-nav.dark-nav .public-nav-links a:hover {
+  color: #38bdf8 !important;
+}
+
+/* Enforce crisp high contrast on Landing Page */
+.landing-dark h1,
+.landing-dark h2,
+.landing-dark h3,
+.landing-dark h4 {
+  color: #ffffff !important;
+}
