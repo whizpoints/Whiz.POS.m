@@ -2,10 +2,11 @@ import React from 'react';
 import { usePosStore } from '../store/posStore';
 import { User, LogOut, Menu } from 'lucide-react';
 import ConnectionHealthPill from './ConnectionHealthPill';
+import RealTimeClock from './RealTimeClock';
 
 /**
  * Header component for the application.
- * Displays the current logged-in cashier, connection health pill, and a logout button.
+ * Displays the current logged-in cashier, connection health pill, real-time clock, and a logout button.
  */
 const Header = () => {
   const { currentCashier, logout, toggleSidebar } = usePosStore();
@@ -25,6 +26,7 @@ const Header = () => {
           <Menu className="w-5 h-5" />
         </button>
         <ConnectionHealthPill />
+        <RealTimeClock />
       </div>
 
       <div className="flex items-center space-x-4">

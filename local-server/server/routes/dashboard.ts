@@ -846,12 +846,21 @@ router.get('/reports/executive-daily', async (req: any, res: any) => {
     const grossProfit = Math.round(totalRevenue * 0.28 * 100) / 100;
     const vatTax = Math.round((totalRevenue / 1.16) * 0.16 * 100) / 100;
 
+    let bSettings: any = {};
+    try {
+      bSettings = typeof (business as any)?.settings === 'string' ? JSON.parse((business as any).settings || '{}') : ((business as any)?.settings || {});
+    } catch (e) {}
+
+    const resolvedKraPin = (business as any)?.kraPin || bSettings.kraPin || bSettings.etimsPin || '';
+    const resolvedPhone = bSettings.phone || bSettings.contact || (business as any)?.phone || '';
+    const resolvedEmail = (business as any)?.email || bSettings.email || '';
+
     res.json({
       business: {
-        name: business?.name || 'Whizpoint Solutions',
-        phone: (business as any)?.phone || '0740 841 168',
-        email: business?.email || 'support@whizpoint.app',
-        kraPin: (business as any)?.kraPin || 'A019451957X'
+        name: business?.name || 'Business',
+        phone: resolvedPhone,
+        email: resolvedEmail,
+        kraPin: resolvedKraPin
       },
       date: dayStart.toISOString().slice(0, 10),
       metrics: {
@@ -866,6 +875,9 @@ router.get('/reports/executive-daily', async (req: any, res: any) => {
         mpesa: Math.round(mpesaTotal * 100) / 100,
         credit: Math.round(creditTotal * 100) / 100
       },
+      expenses: [],
+      totalExpenses: 0,
+      netProfit: grossProfit,
       topBestsellers,
       cashiers: Object.values(cashierTotals),
       inventoryHealth: {

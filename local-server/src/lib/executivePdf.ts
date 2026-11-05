@@ -69,14 +69,14 @@ export function generateExecutiveDailyPdf(data: ExecutiveReportData) {
     creator: 'Whizpoint Solutions POS Executive Engine'
   });
 
-  // Calculate Operating Expenses & Net Income
-  const defaultExpenses = [
-    { description: 'Store Petty Supplies & Packaging', category: 'Supplies', amount: 450, authorizedBy: 'Manager', paidVia: 'Cash' },
-    { description: 'Logistics / Local Motor Delivery', category: 'Logistics', amount: 350, authorizedBy: 'Cashier', paidVia: 'Cash' }
-  ];
-  const expenseList = data.expenses && data.expenses.length > 0 ? data.expenses : defaultExpenses;
-  const totalExpenses = data.totalExpenses !== undefined ? data.totalExpenses : expenseList.reduce((acc, e) => acc + (e.amount || 0), 0);
-  const netOperatingProfit = data.netProfit !== undefined ? data.netProfit : (data.metrics.grossProfit - totalExpenses);
+  // Calculate Operating Expenses & Net Income (Using 100% real data)
+  const expenseList = (data.expenses && Array.isArray(data.expenses)) ? data.expenses : [];
+  const totalExpenses = data.totalExpenses !== undefined 
+    ? data.totalExpenses 
+    : expenseList.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+  const netOperatingProfit = data.netProfit !== undefined 
+    ? data.netProfit 
+    : (data.metrics.grossProfit - totalExpenses);
 
   // 1. TOP BRAND ACCENT BAR
   doc.setFillColor(15, 23, 42); // slate-900
@@ -89,18 +89,20 @@ export function generateExecutiveDailyPdf(data: ExecutiveReportData) {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
-  doc.text((data.business.name || 'WHIZPOINT SOLUTIONS').toUpperCase(), 14, 11);
+  doc.text((data.business.name || 'Store').toUpperCase(), 14, 11);
 
-  // Subtitle
+  // Subtitle (Displays only tenant-configured details, never developer fallbacks)
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(203, 213, 225); // slate-300
   const subInfo = [
     data.business.kraPin ? `KRA PIN: ${data.business.kraPin}` : '',
-    data.business.phone ? `Tel: ${data.business.phone}` : 'Tel: 0740 841 168',
-    data.business.email || 'info@whizpoint.app'
+    data.business.phone ? `Tel: ${data.business.phone}` : '',
+    data.business.email ? data.business.email : ''
   ].filter(Boolean).join('  |  ');
-  doc.text(subInfo, 14, 17);
+  if (subInfo) {
+    doc.text(subInfo, 14, 17);
+  }
 
   // Report Title (Right Aligned)
   doc.setFont('helvetica', 'bold');
@@ -253,37 +255,45 @@ export function generateExecutiveDailyPdf(data: ExecutiveReportData) {
     }
   });
 
-  // 6. SECTION 4: OPERATING EXPENSES & PETTY CASH OUTFLOWS (NEW DETAILED SECTION)
+  // 6. SECTION 4: OPERATING EXPENSES & PETTY CASH OUTFLOWS
   const expenseY = (doc as any).lastAutoTable.finalY + 5;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(15, 23, 42);
   doc.text('Operating Expenses & Petty Cash Outflows', 14, expenseY);
 
-  const expenseRows = expenseList.map(e => [
-    e.description,
-    e.category,
-    e.authorizedBy || 'Manager',
-    e.paidVia || 'Cash Drawer',
-    `KES ${e.amount.toLocaleString()}`
-  ]);
+  if (expenseList.length === 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('No drawer expense payouts or petty cash outflows recorded for this audit date.', 14, expenseY + 5);
+    (doc as any).lastAutoTable = { finalY: expenseY + 7 };
+  } else {
+    const expenseRows = expenseList.map(e => [
+      e.description || 'Petty Cash Outflow',
+      e.category || 'General',
+      e.authorizedBy || 'Manager',
+      e.paidVia || 'Cash Drawer',
+      `KES ${(Number(e.amount) || 0).toLocaleString()}`
+    ]);
 
-  autoTable(doc, {
-    startY: expenseY + 2,
-    margin: { left: 14, right: 14 },
-    head: [['Expense Description', 'Category', 'Authorized By', 'Payment Method', 'Outflow Amount']],
-    body: expenseRows,
-    theme: 'grid',
-    headStyles: { fillColor: [153, 27, 27], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
-    bodyStyles: { fontSize: 7.5, textColor: [51, 65, 85] },
-    columnStyles: {
-      0: { fontStyle: 'bold' },
-      1: { halign: 'left' },
-      2: { halign: 'center' },
-      3: { halign: 'center' },
-      4: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] }
-    }
-  });
+    autoTable(doc, {
+      startY: expenseY + 2,
+      margin: { left: 14, right: 14 },
+      head: [['Expense Description', 'Category', 'Authorized By', 'Payment Method', 'Outflow Amount']],
+      body: expenseRows,
+      theme: 'grid',
+      headStyles: { fillColor: [153, 27, 27], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+      bodyStyles: { fontSize: 7.5, textColor: [51, 65, 85] },
+      columnStyles: {
+        0: { fontStyle: 'bold' },
+        1: { halign: 'left' },
+        2: { halign: 'center' },
+        3: { halign: 'center' },
+        4: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] }
+      }
+    });
+  }
 
   // 7. SECTION 5: INVENTORY HEALTH & KRA ETIMS TAX SNAPSHOT
   let bottomY = (doc as any).lastAutoTable.finalY + 5;

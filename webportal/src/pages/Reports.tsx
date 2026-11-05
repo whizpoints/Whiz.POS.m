@@ -156,6 +156,22 @@ export default function Reports() {
       });
       if (!res.ok) throw new Error('Failed to fetch executive daily data');
       const dailyData: ExecutiveReportData = await res.json();
+      
+      // If user recorded shift petty cash payouts on this screen, incorporate real data
+      if ((!dailyData.expenses || dailyData.expenses.length === 0) && pettyCashPayouts > 0) {
+        dailyData.expenses = [
+          {
+            description: 'Cash Drawer Petty Cash Outflow',
+            category: 'Operating Expense',
+            amount: pettyCashPayouts,
+            authorizedBy: shiftCashier !== 'All Cashiers' ? shiftCashier : 'Shift Cashier',
+            paidVia: 'Cash Drawer'
+          }
+        ];
+        dailyData.totalExpenses = pettyCashPayouts;
+        dailyData.netProfit = dailyData.metrics.grossProfit - pettyCashPayouts;
+      }
+
       generateExecutiveDailyPdf(dailyData);
       toast.success('Executive PDF downloaded successfully!', { id: 'pdf' });
     } catch (err: any) {

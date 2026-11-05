@@ -30,7 +30,7 @@ const newPromiseAll = `    const [allProducts, allUsers, categories, customers, 
 const oldBizSetup = `      businessSetup: business ? (() => {
         let bSettings = {};
         try { bSettings = typeof business.settings === 'string' ? JSON.parse(business.settings) : (business.settings || {}); } catch(e) {}
-        const effectivePin = business.kraPin || bSettings.kraPin || bSettings.etimsPin || 'A019451957X';
+        const effectivePin = business.kraPin || bSettings.kraPin || bSettings.etimsPin || '';
         return {
           id: business.id,
           businessId: business.id,
@@ -52,7 +52,7 @@ const oldBizSetup = `      businessSetup: business ? (() => {
 const newBizSetup = `      businessSetup: business ? (() => {
         let bSettings = {};
         try { bSettings = typeof business.settings === 'string' ? JSON.parse(business.settings) : (business.settings || {}); } catch(e) {}
-        const effectivePin = business.kraPin || bSettings.kraPin || bSettings.etimsPin || 'A019451957X';
+        const effectivePin = business.kraPin || bSettings.kraPin || bSettings.etimsPin || '';
         const till = mpesaConfig?.tillNumber || bSettings.mpesaTill || bSettings.tillNumber || '';
         const paybill = mpesaConfig?.paybillNumber || bSettings.mpesaPaybill || bSettings.paybillNumber || '';
         const accNum = mpesaConfig?.accountReference || bSettings.mpesaAccountNumber || bSettings.accountNumber || '';

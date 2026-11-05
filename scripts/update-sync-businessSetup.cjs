@@ -11,7 +11,7 @@ const targetStr = `      businessSetup: business ? {
 const replacementStr = `      businessSetup: business ? (() => {
         let bSettings = {};
         try { bSettings = typeof business.settings === 'string' ? JSON.parse(business.settings) : (business.settings || {}); } catch(e) {}
-        const effectivePin = business.kraPin || bSettings.kraPin || bSettings.etimsPin || 'A019451957X';
+        const effectivePin = business.kraPin || bSettings.kraPin || bSettings.etimsPin || '';
         return {
           id: business.id,
           businessId: business.id,

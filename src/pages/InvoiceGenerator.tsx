@@ -825,10 +825,10 @@ export default function InvoiceGenerator() {
             <div className="flex justify-between items-start">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                  {businessSetup?.businessName || 'WHIZ SOLUTIONS'}
+                  {businessSetup?.businessName || 'INVOICE'}
                 </h2>
-                <p className="text-xs text-slate-500 mt-1">{businessSetup?.address || 'Kagwe Town, Kenya'}</p>
-                <p className="text-xs text-slate-500">Tel: {businessSetup?.phone || '0740 841 168'}</p>
+                {businessSetup?.address && <p className="text-xs text-slate-500 mt-1">{businessSetup.address}</p>}
+                {businessSetup?.phone && <p className="text-xs text-slate-500">Tel: {businessSetup.phone}</p>}
                 {businessSetup?.email && <p className="text-xs text-slate-500">Email: {businessSetup.email}</p>}
               </div>
 
