@@ -1,29 +1,131 @@
-End User License Agreement (EULA)
+================================================================================
+WHIZ POS - END USER LICENSE AGREEMENT (EULA) & TERMS OF USE
+Version 7.4.0-Production | Whizpoint Solutions | All Rights Reserved
+================================================================================
 
-This End User License Agreement is a binding legal agreement between Whizpoint Solutions and you (the User) for the software product Whiz POS.
+IMPORTANT — READ CAREFULLY BEFORE INSTALLING OR USING THIS SOFTWARE:
 
-1. License Grant
-Whizpoint Solutions grants you a non-exclusive, non-transferable license to use the Whiz POS Desktop, Back Office Dashboard, and Mobile App for your business operations. This license is for your internal use only. You may not sub-license, rent, or lease this software to third parties.
+This End User License Agreement ("Agreement" or "EULA") is a legally binding
+contract between you (either an individual business operator or a legally 
+registered commercial enterprise, hereinafter referred to as the "Licensee" or 
+"User") and Whizpoint Solutions ("Licensor", "Company", "we", or "us"), 
+governing the installation, access, and operational use of the Whiz POS 
+software suite, including the desktop terminal application, edge database 
+engines, local server daemons, cloud web portals, synchronization protocols, 
+and associated documentation (collectively, the "Software" or "System").
 
-2. Intellectual Property
-The software, including its source code, design, and architecture, is the sole property of Whizpoint Solutions. You agree not to reverse engineer, decompile, or attempt to derive the source code of any component within the ecosystem.
+BY CLICKING "I AGREE", COMPLETING THE INSTALLATION WIZARD, OR OPERATING THE 
+SOFTWARE, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND UNCONDITIONALLY 
+AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT AGREE, CANCEL 
+THIS INSTALLATION IMMEDIATELY AND REMOVE ALL ASSOCIATED FILES FROM YOUR SYSTEM.
 
-3. Data & Privacy
-Whiz POS is an offline-first system. You are responsible for the security of your local hardware and MongoDB instances. Whizpoint Solutions is not liable for data loss caused by hardware failure, improper backup routines, or unauthorized local access.
+--------------------------------------------------------------------------------
+1. GRANT OF COMMERCIAL LICENSE
+--------------------------------------------------------------------------------
+Subject to the terms of this Agreement and active subscription standing:
+(a) Licensor grants Licensee a non-exclusive, non-transferable, revocable 
+    commercial license to install and execute the Software on designated local 
+    point-of-sale workstations, checkout registers, and server machines.
+(b) This license is granted strictly for internal business operations within 
+    Licensee's authorized branch locations and retail outlets.
+(c) Sublicensing, renting, leasing, timesharing, hosting as a white-label 
+    service, or redistributing the Software or its installer binary to any 
+    third party without prior written authorization from Whizpoint Solutions 
+    is strictly prohibited and constitutes a material breach of this contract.
 
-4. Updates & Maintenance
-We provide periodic updates (such as version 5.2.3) to improve functionality. The software is provided "as is" without any express or implied warranties regarding its fitness for a particular purpose.
+--------------------------------------------------------------------------------
+2. INTELLECTUAL PROPERTY & PROPRIETARY PROTECTIONS
+--------------------------------------------------------------------------------
+(a) The Software, including but not limited to its binary compilation, source 
+    code, user interface layouts, edge-sync protocol algorithms, cryptographic 
+    signature routines, print spooling drivers, visual styles, and brand assets, 
+    is the exclusive intellectual property of Whizpoint Solutions.
+(b) Licensee agrees not to decompile, disassemble, reverse engineer, decrypt, 
+    or attempt to derive the underlying source code, schemas, or algorithms of 
+    any component within the Whiz POS ecosystem.
+(c) Any modification, patching, or tampering with licensing tokens, security 
+    checksums, or validation handshakes will trigger immediate, automatic 
+    revocation of the license and may result in civil and criminal prosecution.
 
-5. Payment & Subscription
-Your right to use the Sync API and Back Office features is subject to your specific payment plan. Failure to maintain an active subscription may result in the suspension of cloud-based services and dashboard access.
+--------------------------------------------------------------------------------
+3. DATA ARCHITECTURE, PERSISTENCE & TENANT PRIVACY
+--------------------------------------------------------------------------------
+(a) Offline-First Edge Engine: Whiz POS utilizes an enterprise-grade, offline-
+    first SQLite (LibSQL Edge Native) local datastore. All operational sales, 
+    inventory movements, cashier sessions, and customer transactions are 
+    committed locally to the hardware register instantly, ensuring zero spinner 
+    delay and uninterrupted sales during internet outages.
+(b) Tenant Data Ownership: Licensee retains full and exclusive ownership of 
+    all commercial data entered into the System. Whizpoint Solutions does not 
+    sell, broker, or commercially exploit Licensee's proprietary sales records.
+(c) Security & Backup Responsibility: While the Software provides automated 
+    AES-256 encrypted snapshot backups (.wpos format), Licensee is solely 
+    responsible for maintaining physical hardware security, operating system 
+    access credentials, and routine off-site copies of backup archives. 
+    Whizpoint Solutions is not liable for data loss resulting from hardware 
+    destruction, unmitigated malware, or accidental local disk formatting.
 
-6. Limitation of Liability
-In no event shall Whizpoint Solutions be liable for any financial loss, business interruptions, or data corruption arising from the use of this software. You are responsible for ensuring that receipt formatting and tax calculations comply with your local regulations.
+--------------------------------------------------------------------------------
+4. TELEMETRY, PAYMENT INTEGRATIONS & REGULATORY COMPLIANCE
+--------------------------------------------------------------------------------
+(a) M-Pesa & Third-Party Payment APIs: Whiz POS provides native integration 
+    with Safaricom Daraja M-Pesa (STK Push, C2B Till, Paybill) and authorized 
+    card processors. Whizpoint Solutions operates strictly as a software provider 
+    and is not a bank, escrow agent, or financial intermediary. Licensee is solely 
+    responsible for securing their own API keys, Till credentials, and Passkeys.
+(b) Fiscal Compliance & eTIMS: The Software includes automated KRA eTIMS 
+    (VSCU / OSCU) fiscal signing modules and QR code verification capabilities. 
+    Licensee is responsible for providing valid tax credentials (KRA PIN, Branch 
+    Code, Device Serial) and verifying the accuracy of tax classifications, 
+    VAT rates, and fiscal invoices issued to consumers.
+(c) Anti-Money Laundering (AML): Licensee covenants that the Software shall 
+    not be utilized to facilitate fraud, tax evasion, money laundering, or the 
+    sale of contraband goods. Whizpoint Solutions reserves the right to terminate 
+    service immediately upon notice of unlawful activities from competent legal 
+    authorities.
 
-7. Termination
-This license is effective until terminated. We reserve the right to terminate your access if you violate these terms. Upon termination, you must cease all use of the software and delete all copies.
+--------------------------------------------------------------------------------
+5. UPDATES, MAINTENANCE & CLOUD BACK-OFFICE SYNCHRONIZATION
+--------------------------------------------------------------------------------
+(a) Whizpoint Solutions regularly delivers automated minor patches, fiscal 
+    rule updates, and performance optimizations.
+(b) Real-time multi-branch inventory tracking, remote cloud analytics, and 
+    automated STK dispatch require continuous connection to the Whiz POS Cloud 
+    Relay. Access to these remote cloud capabilities is contingent upon maintaining 
+    an active tenant subscription.
 
-Contact Support
-Phone: 0740-841-168
-Email: whiz.techke@gmail.com
-Made by Whizpoint Solutions
+--------------------------------------------------------------------------------
+6. DISCLAIMER OF WARRANTIES & LIMITATION OF LIABILITY
+--------------------------------------------------------------------------------
+(a) The Software is provided "AS IS" and "AS AVAILABLE". To the maximum extent 
+    permitted by law, Licensor disclaims all other warranties, whether express, 
+    implied, statutory, or otherwise, including merchantability and fitness for 
+    a particular commercial purpose.
+(b) In no event shall Whizpoint Solutions, its founders, engineers, or directors 
+    be held liable for indirect, incidental, special, punitive, or consequential 
+    damages—including lost profits, lost revenue, business interruption, or stock 
+    discrepancies—arising out of the operation or inability to operate the Software, 
+    even if advised of the possibility of such damages.
+(c) The cumulative liability of Licensor under any provision of this Agreement 
+    shall not exceed the total subscription fees paid by Licensee to Whizpoint 
+    Solutions during the three (3) months immediately preceding the event.
+
+--------------------------------------------------------------------------------
+7. TERMINATION & GOVERNING LAW
+--------------------------------------------------------------------------------
+(a) This Agreement remains effective until terminated by Licensee's cessation 
+    of use or by Licensor for breach of contract. Upon termination, Licensee 
+    must uninstall the desktop application and cease accessing cloud endpoints.
+(b) This Agreement shall be governed by and construed in accordance with the 
+    laws of the Republic of Kenya. Any legal proceedings arising from this 
+    contract shall be subject to the exclusive jurisdiction of the competent 
+    commercial courts of Kenya.
+
+--------------------------------------------------------------------------------
+WHIZPOINT SOLUTIONS - OFFICIAL SUPPORT & AUTHORIZED COMMUNICATIONS
+--------------------------------------------------------------------------------
+Web Portal:   https://whizpoint.app | https://pos.whizpoint.app
+Support Desk: support@whizpoint.app | info@whizpoint.app
+Telephone:    +254 740 841 168
+Headquarters: Nairobi, Kenya | Engineered for African Commerce
+================================================================================

@@ -1,84 +1,129 @@
-import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Lock, EyeOff, Server, Database, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#060b14] py-12 px-4 sm:px-6 lg:px-8 font-sans transition-colors duration-200">
-      <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900/90 rounded-2xl shadow-sm border border-slate-200 dark:border-white/10 overflow-hidden">
-        <div className="p-8 sm:p-12">
-          <Link to="/auth" className="inline-flex items-center text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors mb-8">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Login
-          </Link>
+      <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900/90 rounded-3xl shadow-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+        <div className="p-6 sm:p-12">
+          
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-6 mb-8">
+            <Link 
+              to="/auth" 
+              className="inline-flex items-center text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Return to Authentication
+            </Link>
+
+            <span className="text-[11px] font-mono uppercase tracking-widest text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/60">
+              Data Privacy Certified
+            </span>
+          </div>
           
           <div className="flex items-center gap-4 mb-4">
-            <ShieldCheck className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">Global Privacy Policy</h1>
+            <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center border border-cyan-500/20 shadow-sm shrink-0">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                Global Privacy Policy & Data Charter
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">
+                Whizpoint Solutions • Protection Under the Kenya Data Protection Act (KDPA 2019)
+              </p>
+            </div>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium border-b border-slate-200 dark:border-white/10 pb-8">
-            Last Updated and Effective: September 2026
-          </p>
           
-          <div className="max-w-none space-y-8 text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
+          <div className="space-y-8 text-slate-700 dark:text-slate-300 text-sm leading-relaxed mt-8 border-t border-slate-200 dark:border-white/10 pt-8">
             
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">1. Introduction and Scope</h2>
+            {/* Section 1 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <FileText className="w-4 h-4 text-cyan-500" />
+                <h2>1. Executive Charter & Privacy Commitment</h2>
+              </div>
               <p>
-                Welcome to Whiz POS ("Company", "we", "our", "us"). We are committed to protecting your personal information and your right to privacy. This Global Privacy Policy governs the data collection, processing, and usage practices of the Whiz POS platform, encompassing all associated web applications, mobile applications, APIs, and cloud services (collectively, the "Services"). 
+                At <strong>Whiz POS</strong> (developed and operated by Whizpoint Solutions), we recognize that your commercial transaction histories, daily gross receipts, inventory profit margins, and customer databases represent your most sensitive business assets.
               </p>
-              <p className="mt-2">
-                By accessing or using our Services, you entrust us with your business and personal information. We take this responsibility with the utmost seriousness. This document outlines explicitly what data we collect, how it is processed, and the rigorous measures we employ to secure it.
+              <p>
+                Our privacy framework is founded upon a strict premise: <strong>we are a pure software service provider, not a data broker</strong>. We never sell, rent, monetize, or utilize tenant sales data for competitive surveillance or third-party advertising.
               </p>
             </section>
 
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">2. Information We Collect</h2>
+            {/* Section 2 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <Database className="w-4 h-4 text-emerald-500" />
+                <h2>2. Categories of Information Handled</h2>
+              </div>
               <p>
-                To provide you with secure and efficient point-of-sale services, we collect information that identifies, relates to, describes, or is reasonably capable of being associated with you or your business.
+                The platform processes only the minimum data required to facilitate real-time checkout, offline syncing, and fiscal reporting:
               </p>
-              <ul className="list-disc pl-5 mt-4 space-y-2">
-                <li><strong className="text-slate-900 dark:text-white">Identity and Business Data:</strong> First name, last name, business registration name, email addresses, phone numbers, and location details.</li>
-                <li><strong className="text-slate-900 dark:text-white">Financial and Transactional Data:</strong> Records of products, inventory metrics, sales logs, receipts, tax configurations, and customer details that you actively input into the platform.</li>
-                <li><strong className="text-slate-900 dark:text-white">System and Diagnostic Data:</strong> IP addresses, geographical location data, browser specifications, access timestamps, and interaction analytics. This data is strictly utilized for security monitoring and operational diagnostics.</li>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><strong className="text-slate-900 dark:text-white">Commercial Transaction Ledgers:</strong> Line-item SKUs, retail pricing, quantities sold, cashier IDs, timestamped receipts, payment tender classifications (Cash, M-Pesa, Card, Credit).</li>
+                <li><strong className="text-slate-900 dark:text-white">Payment Rail Telemetry:</strong> Safaricom M-Pesa transaction reference codes (e.g. <code>UK5KZ13A22</code>), customer phone numbers (masked in administrative views), and payer identities for automated receipt association.</li>
+                <li><strong className="text-slate-900 dark:text-white">Tenant Identity & Hardware Telemetry:</strong> Business registration names, outlet register designations, local workstation machine IDs, ESC/POS printer status, and Cloudflare Tunnel connection heartbeats.</li>
               </ul>
             </section>
 
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">3. How We Process and Handle Your Data</h2>
+            {/* Section 3 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <Lock className="w-4 h-4 text-blue-500" />
+                <h2>3. Cryptographic Storage & Multi-Tenant Siloing</h2>
+              </div>
               <p>
-                We process your data strictly to fulfill our contractual obligations to you and to operate our business efficiently. We process data via secure, proprietary cloud infrastructure. To protect our systems from cyber reconnaissance, we do not publicly disclose the specific technical architectures, database engines, or backend frameworks utilized in our data processing centers. 
+                Every business operating on Whiz POS is strictly isolated into an independent tenant silo:
               </p>
-              <p className="mt-4 font-bold text-slate-900 dark:text-white">Your data is processed for the following purposes:</p>
-              <ul className="list-disc pl-5 mt-2 space-y-2">
-                <li><strong className="text-slate-900 dark:text-white">Service Provisioning:</strong> To create, maintain, and authenticate your tenant workspace, ensuring total isolation of your business data from other platform users.</li>
-                <li><strong className="text-slate-900 dark:text-white">Security Operations:</strong> To continuously monitor for fraudulent activity, unauthorized access attempts, and abnormal traffic patterns using automated security algorithms.</li>
-                <li><strong className="text-slate-900 dark:text-white">Communication:</strong> To dispatch critical system alerts, transaction receipts, security notices, and administrative broadcasts.</li>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><strong className="text-slate-900 dark:text-white">Edge-Local Isolation:</strong> On the physical register, data is committed to an encrypted, zero-latency SQLite edge instance stored locally on the merchant's machine.</li>
+                <li><strong className="text-slate-900 dark:text-white">TLS 1.3 Transmission:</strong> All cloud telemetry communicating between edge registers and the central webportal travels exclusively across TLS 1.3 encrypted HTTPS and WSS WebSocket pipes authenticated by Cloudflare Edge SSL.</li>
+                <li><strong className="text-slate-900 dark:text-white">Database Encryption:</strong> Offline database backup archives (<code>.wpos</code>) are cryptographically sealed using AES-256 GCM encryption.</li>
               </ul>
             </section>
 
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">4. Data Sharing and Disclosure</h2>
+            {/* Section 4 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <EyeOff className="w-4 h-4 text-rose-500" />
+                <h2>4. Zero Third-Party Monetization</h2>
+              </div>
               <p>
-                Whiz POS operates strictly as a Software-as-a-Service (SaaS) provider. We are not data brokers. We do not sell, rent, trade, or otherwise commercially exploit your personal or business data. Information is only shared under the following strict conditions:
+                Whizpoint Solutions does not track retail consumers across merchants, build behavioral advertising profiles, or share sales turnover figures with competitors, marketing networks, or credit bureaus. 
               </p>
-              <ul className="list-disc pl-5 mt-2 space-y-2">
-                <li><strong className="text-slate-900 dark:text-white">Legal Compliance:</strong> We will disclose data if compelled by a court of law, government request, or regulatory body to comply with legal obligations, particularly concerning anti-money laundering (AML) or fraud investigations.</li>
-                <li><strong className="text-slate-900 dark:text-white">Service Execution:</strong> Data may be routed through secured, vetted infrastructure partners solely for the purpose of keeping the platform operational (e.g., automated email dispatch servers).</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">5. Security Measures and Protection</h2>
               <p>
-                We employ robust, state-of-the-art security measures designed to protect the integrity and confidentiality of your data. This includes end-to-end cryptographic transmission protocols, continuous threat monitoring, and stringent access controls. However, no electronic transmission over the internet or information storage technology can be guaranteed to be 100% secure. You are equally responsible for safeguarding your account credentials.
+                Data is shared strictly with authorized infrastructure partners required to deliver essential functionality (e.g. Safaricom Daraja API for STK push confirmations and KRA eTIMS endpoints for fiscal compliance validation).
               </p>
             </section>
 
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">6. Data Retention Policy</h2>
+            {/* Section 5 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <Server className="w-4 h-4 text-indigo-500" />
+                <h2>5. Data Retention, Portability & Right to Erasure</h2>
+              </div>
               <p>
-                We retain personal and operational data only for as long as necessary to fulfill the purposes outlined in this Privacy Policy, unless a longer retention period is required or permitted by law (such as for tax, accounting, or other legal requirements). Upon termination or deletion of your account, your data will be queued for secure, irrecoverable digital wiping from our primary processing centers.
+                You retain complete portability over your business assets. You may export comprehensive Excel or JSON dumps of your entire inventory, customer accounts, and sales history at any time.
               </p>
+              <p>
+                Upon verified termination of your tenant subscription, your cloud database records are securely scrubbed and permanently overwritten in accordance with NIST 800-88 digital sanitization guidelines. Local workstation copies remain under your sole physical control.
+              </p>
+            </section>
+
+            {/* Section 6 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <h2>6. Data Protection Officer (DPO) Contact</h2>
+              </div>
+              <p>
+                For statutory inquiries under the Kenya Data Protection Act (KDPA 2019) or general questions regarding our cryptographic data safeguards:
+              </p>
+              <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-white/5 space-y-1 text-xs">
+                <div className="font-bold text-slate-900 dark:text-white">Whizpoint Solutions Compliance Office:</div>
+                <div>Email: <span className="font-mono text-slate-800 dark:text-slate-200">privacy@whizpoint.app</span> | <span className="font-mono text-slate-800 dark:text-slate-200">support@whizpoint.app</span></div>
+                <div>Headquarters: Nairobi, Kenya</div>
+              </div>
             </section>
 
           </div>

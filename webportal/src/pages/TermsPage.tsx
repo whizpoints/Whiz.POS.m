@@ -1,79 +1,129 @@
-import { ArrowLeft, Scale } from 'lucide-react';
+import { ArrowLeft, Scale, ShieldAlert, Cpu, Database, Receipt, Lock, HelpCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#060b14] py-12 px-4 sm:px-6 lg:px-8 font-sans transition-colors duration-200">
-      <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900/90 rounded-2xl shadow-sm border border-slate-200 dark:border-white/10 overflow-hidden">
-        <div className="p-8 sm:p-12">
-          <Link to="/auth" className="inline-flex items-center text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors mb-8">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Login
-          </Link>
+      <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900/90 rounded-3xl shadow-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+        <div className="p-6 sm:p-12">
+          
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-6 mb-8">
+            <Link 
+              to="/auth" 
+              className="inline-flex items-center text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Return to Authentication
+            </Link>
+
+            <span className="text-[11px] font-mono uppercase tracking-widest text-slate-500 dark:text-slate-400 font-bold bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-white/5">
+              Production Release v7.4
+            </span>
+          </div>
           
           <div className="flex items-center gap-4 mb-4">
-            <Scale className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">Terms of Service & EULA</h1>
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shadow-sm shrink-0">
+              <Scale className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                Terms of Service & Commercial EULA
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">
+                Whizpoint Solutions • Effective Date: November 2026 • Governed under the Laws of Kenya
+              </p>
+            </div>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium border-b border-slate-200 dark:border-white/10 pb-8">
-            Last Updated and Effective: September 2026
-          </p>
           
-          <div className="max-w-none space-y-8 text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
+          <div className="space-y-8 text-slate-700 dark:text-slate-300 text-sm leading-relaxed mt-8 border-t border-slate-200 dark:border-white/10 pt-8">
             
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">1. Binding Agreement</h2>
+            {/* Section 1 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <Cpu className="w-4 h-4 text-cyan-500" />
+                <h2>1. Commercial License & Scope of Service</h2>
+              </div>
               <p>
-                By accessing, registering, or utilizing the Whiz POS platform and its associated services (collectively, the "Services"), you are entering into a legally binding agreement with Whiz POS. If you are accepting these terms on behalf of a company, business, or other legal entity, you represent that you have the authority to bind such entity to these Terms.
+                By creating a tenant workspace, downloading the Whiz POS desktop terminal binary, connecting peripheral hardware, or executing transactions across our cloud infrastructure, you enter into a legally binding agreement with <strong>Whizpoint Solutions</strong>.
+              </p>
+              <p>
+                We grant your business a non-exclusive, non-transferable, revocable commercial license to operate the Whiz POS platform across authorized store checkout registers and back-office management terminals. You may not sub-license, reverse-engineer, redistribute, mirror, or repackage the software for third-party commercial exploitation.
               </p>
             </section>
 
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">2. Financial Compliance and Anti-Money Laundering (AML)</h2>
+            {/* Section 2 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <Database className="w-4 h-4 text-blue-500" />
+                <h2>2. Offline Edge Architecture & Data Sovereignty</h2>
+              </div>
               <p>
-                Whiz POS provides software solutions for business management and is strictly <strong className="text-slate-900 dark:text-white">not a bank, payment gateway, money transmitter, or financial institution</strong>. You bear the sole and absolute responsibility for all financial transactions, records, and activities conducted through your tenant account.
+                Whiz POS is engineered on an <strong>offline-first edge computing architecture (SQLite / LibSQL Edge Native)</strong>. Sales, inventory deduction, shift balancing, and receipt dispatch continue locally without interruption even during internet blackouts.
               </p>
-              <ul className="list-disc pl-5 mt-4 space-y-2">
-                <li><strong className="text-slate-900 dark:text-white">Prohibited Activities:</strong> You expressly agree that you will not use the Services to facilitate, conduct, or conceal any illegal activities, including but not limited to money laundering, terrorist financing, tax evasion, fraud, or the sale of illicit goods and services.</li>
-                <li><strong className="text-slate-900 dark:text-white">Regulatory Compliance:</strong> You are solely responsible for ensuring that your business complies with all applicable local, national, and international laws, tax regulations, and accounting standards.</li>
-                <li><strong className="text-slate-900 dark:text-white">Right to Suspend:</strong> We reserve the absolute right to immediately suspend, restrict, or permanently terminate your access to the Services, without prior notice, if we detect, suspect, or are notified by law enforcement of any fraudulent, suspicious, or illegal activity occurring within your workspace.</li>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><strong className="text-slate-900 dark:text-white">Tenant Ownership:</strong> You retain absolute, unencumbered ownership of all commercial data, including customer rosters, inventory costs, and transactional ledgers.</li>
+                <li><strong className="text-slate-900 dark:text-white">Local Snapshot Protection:</strong> The terminal provides automated AES-256 encrypted database snapshot routines (<code>.wpos</code>). You are responsible for ensuring physical machine security and creating periodic external disk backups.</li>
+                <li><strong className="text-slate-900 dark:text-white">Zero Cloud Lock-in:</strong> You may export full product lists, inventory valuations, and financial audit logs into open Excel/CSV formats at any time.</li>
               </ul>
             </section>
 
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">3. Limitation of Liability and Indemnification</h2>
+            {/* Section 3 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <Receipt className="w-4 h-4 text-emerald-500" />
+                <h2>3. Payment Telemetry & Financial Non-Custodial Status</h2>
+              </div>
               <p>
-                To the maximum extent permitted by applicable law, in no event shall Whiz POS, its creators, affiliates, directors, or employees be liable for any indirect, punitive, incidental, special, consequential, or exemplary damages.
+                Whiz POS provides high-speed telemetric hooks into third-party payment rails, including <strong>Safaricom Daraja M-Pesa (STK Push, C2B Till, Paybill)</strong> and bank PDQ terminals. 
               </p>
-              <ul className="list-disc pl-5 mt-4 space-y-2">
-                <li><strong className="text-slate-900 dark:text-white">Data & Financial Accuracy:</strong> We provide no warranty regarding the accuracy of financial calculations, tax outputs, or inventory valuations generated by the Services. You are entirely responsible for verifying all financial data before filing taxes or making financial decisions.</li>
-                <li><strong className="text-slate-900 dark:text-white">Indemnification:</strong> You agree to defend, indemnify, and hold harmless Whiz POS from any claims, damages, obligations, losses, liabilities, costs, or debt arising from your violation of these Terms, your violation of any third-party right, or any claim that your use of the Services caused damage to a third party or violated financial laws.</li>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><strong className="text-slate-900 dark:text-white">Non-Custodial Role:</strong> Whizpoint Solutions is strictly a software technology provider. We are <strong>not a bank, payment processor, or wallet custodian</strong>. Funds paid via M-Pesa or bank transfer deposit directly into your own Safaricom Till or commercial bank account.</li>
+                <li><strong className="text-slate-900 dark:text-white">Credential Safeguarding:</strong> You are solely responsible for maintaining the confidentiality of your Daraja consumer secrets, passkeys, and API tokens.</li>
+                <li><strong className="text-slate-900 dark:text-white">Transaction Verification:</strong> The system verifies STK callback signatures and C2B transaction codes. However, cash reconciliation and cashier float balancing remain the operational responsibility of the store management.</li>
               </ul>
             </section>
 
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">4. Proprietary Rights & System Integrity</h2>
+            {/* Section 4 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <ShieldAlert className="w-4 h-4 text-amber-500" />
+                <h2>4. Fiscal Compliance, KRA eTIMS & Anti-Money Laundering (AML)</h2>
+              </div>
               <p>
-                The Services—including all source code, architecture, design logic, user interfaces, and security mechanisms—are the exclusive intellectual property of Whiz POS.
+                The platform contains cryptographic fiscal signing modules supporting KRA eTIMS (VSCU/OSCU) protocols and fiscal QR code generation.
               </p>
-              <ul className="list-disc pl-5 mt-4 space-y-2">
-                <li>You shall not attempt to reverse engineer, decompile, hack, or compromise the underlying processing engines or security firewalls of the platform.</li>
-                <li>You shall not probe, scan, or test the vulnerability of the system, nor breach the security or authentication measures. Any such actions will result in immediate legal action and permanent account termination.</li>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><strong className="text-slate-900 dark:text-white">Taxpayer Accuracy:</strong> You are responsible for configuring accurate KRA PINs, VAT tax codes (A, B, C, D, E), and branch identifiers. Whizpoint Solutions disclaims liability for tax penalties resulting from erroneous tenant tax configuration.</li>
+                <li><strong className="text-slate-900 dark:text-white">AML Compliance:</strong> You explicitly covenant that your workspace will not be used for money laundering, illicit narcotics trade, counterfeit goods, or sanctions violations. Suspected accounts will be frozen pending law enforcement inquiry.</li>
               </ul>
             </section>
 
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">5. Data Ownership and Processing</h2>
+            {/* Section 5 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <Lock className="w-4 h-4 text-indigo-500" />
+                <h2>5. System Integrity & Security Audits</h2>
+              </div>
               <p>
-                You retain all rights and ownership to the business data you input into the Services. By submitting data, you grant Whiz POS a limited, non-exclusive license to process, store, and transmit this data strictly for the purpose of providing the Services to you. Our data processing methodologies are strictly confidential to prevent cyber reconnaissance and protect the structural integrity of our cloud environment.
+                All cloud webportal endpoints, tunnel gateways, and terminal APIs are monitored with automated intrusion detection and rate-limiting protocols. Any attempt to exploit injection vulnerabilities, tamper with multi-tenant workspace sharding, spoof webhook receipts, or decompile protected server binaries will trigger permanent account termination and legal prosecution under the Kenya Computer Misuse and Cybercrimes Act.
               </p>
             </section>
 
-            <section>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">6. Termination</h2>
+            {/* Section 6 */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-base">
+                <HelpCircle className="w-4 h-4 text-slate-400" />
+                <h2>6. Support, Subscriptions & Service Level</h2>
+              </div>
               <p>
-                We may terminate or suspend your account immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms. Upon termination, your right to use the Services will immediately cease, and your data may be scheduled for permanent deletion in accordance with our security protocols.
+                Cloud backup synchronization, remote webportal management, and telemetric STK callbacks are provided under active subscription tiers. We guarantee 99.9% uptime on our cloud API relay. In the event of upstream network outages (e.g. telecom maintenance), the local POS workstation automatically switches to offline queueing mode.
               </p>
+              <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-white/5 space-y-1 text-xs">
+                <div className="font-bold text-slate-900 dark:text-white">Whizpoint Solutions Contact Desk:</div>
+                <div>Portal: <a href="https://whizpoint.app" className="text-cyan-600 dark:text-cyan-400 underline font-mono">https://whizpoint.app</a></div>
+                <div>Technical Support: <span className="font-mono text-slate-800 dark:text-slate-200">support@whizpoint.app</span> | Tel: <span className="font-mono text-slate-800 dark:text-slate-200">+254 740 841 168</span></div>
+                <div>Corporate Headquarters: Nairobi, Kenya</div>
+              </div>
             </section>
 
           </div>
