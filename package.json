@@ -107,10 +107,14 @@
       "mpesa-daraja.cjs",
       "receipt-template.html",
       "closing-report-template.html",
-      "startup-invoice-template.html"
+      "startup-invoice-template.html",
+      "!dist/win-unpacked/**",
+      "!dist/*.exe",
+      "!dist/*.blockmap"
     ],
     "directories": {
-      "buildResources": "assets"
+      "buildResources": "assets",
+      "output": "release"
     },
     "win": {
       "icon": "assets/logo.ico",

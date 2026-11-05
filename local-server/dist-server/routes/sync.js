@@ -97,9 +97,33 @@ router.get('/', async (req, res) => {
         if (targetOutletId) {
             targetOutlet = await db.selectFrom('Outlet').selectAll().where('id', '=', targetOutletId).executeTakeFirst();
         }
+        let bSettings = {};
+        try {
+            bSettings = typeof business?.settings === 'string' ? JSON.parse(business.settings) : (business?.settings || {});
+        }
+        catch (e) { }
+        const isSharedInventory = bSettings.inventoryMode === 'SHARED' || bSettings.sharedInventory === true;
         let finalProducts = [];
         let finalUsers = [];
-        if (targetOutletId) {
+        if (isSharedInventory) {
+            // 0. SHARED INVENTORY MODE:
+            // Outlets share the exact same inventory pool across this location.
+            const invList = await db.selectFrom('ProductInventory')
+                .selectAll()
+                .where('productId', 'in', allProducts.length > 0 ? allProducts.map(p => p.id) : [''])
+                .execute();
+            const stockMap = new Map();
+            for (const inv of invList) {
+                const cur = stockMap.get(inv.productId) || 0;
+                stockMap.set(inv.productId, cur + (Number(inv.stock) || 0));
+            }
+            finalProducts = allProducts.map(p => ({
+                ...p,
+                stock: stockMap.get(p.id) ?? 0
+            }));
+            finalUsers = allUsers;
+        }
+        else if (targetOutletId) {
             // 1. Scoped to a specific Outlet: ONLY return products explicitly assigned to this outlet
             const outletInventories = await db.selectFrom('ProductInventory')
                 .selectAll()
@@ -335,6 +359,13 @@ router.post('/', async (req, res) => {
             if (!validOutlet)
                 targetOutletId = null;
         }
+        let bSettings = {};
+        try {
+            const bObj = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
+            bSettings = typeof bObj?.settings === 'string' ? JSON.parse(bObj.settings) : (bObj?.settings || {});
+        }
+        catch (e) { }
+        const isSharedInventory = bSettings.inventoryMode === 'SHARED' || bSettings.sharedInventory === true;
         const io = req.app.get('io');
         let processedCount = 0;
         // Helper to record a single transaction into DB
@@ -419,25 +450,47 @@ router.post('/', async (req, res) => {
                     catch (e) { }
                     // Deduct from ProductInventory
                     let inv = null;
-                    if (outId) {
+                    if (isSharedInventory) {
                         inv = await db.selectFrom('ProductInventory')
                             .selectAll()
                             .where('productId', '=', String(prodId))
-                            .where('outletId', '=', outId)
+                            .where('outletId', 'is', null)
                             .executeTakeFirst();
+                        if (!inv && locId) {
+                            inv = await db.selectFrom('ProductInventory')
+                                .selectAll()
+                                .where('productId', '=', String(prodId))
+                                .where('locationId', '=', locId)
+                                .executeTakeFirst();
+                        }
+                        if (!inv) {
+                            inv = await db.selectFrom('ProductInventory')
+                                .selectAll()
+                                .where('productId', '=', String(prodId))
+                                .executeTakeFirst();
+                        }
                     }
-                    if (!inv && locId) {
-                        inv = await db.selectFrom('ProductInventory')
-                            .selectAll()
-                            .where('productId', '=', String(prodId))
-                            .where('locationId', '=', locId)
-                            .executeTakeFirst();
+                    else {
+                        if (outId) {
+                            inv = await db.selectFrom('ProductInventory')
+                                .selectAll()
+                                .where('productId', '=', String(prodId))
+                                .where('outletId', '=', outId)
+                                .executeTakeFirst();
+                        }
+                        if (!inv && locId) {
+                            inv = await db.selectFrom('ProductInventory')
+                                .selectAll()
+                                .where('productId', '=', String(prodId))
+                                .where('locationId', '=', locId)
+                                .executeTakeFirst();
+                        }
                     }
                     if (inv) {
                         const newStock = Math.max(0, (Number(inv.stock) || 0) - qty);
                         await db.updateTable('ProductInventory').set({ stock: newStock }).where('id', '=', inv.id).execute();
                         if (io)
-                            io.emit('stock_updated', { productId: prodId, stock: newStock, outletId: outId });
+                            io.emit('stock_updated', { productId: prodId, stock: newStock, outletId: isSharedInventory ? null : outId });
                     }
                 }
             }
@@ -650,19 +703,41 @@ router.post('/', async (req, res) => {
                             // Atomically update ProductInventory
                             const delta = isDeduction ? -absQty : absQty;
                             let inv = null;
-                            if (targetOutletId) {
+                            if (isSharedInventory) {
                                 inv = await db.selectFrom('ProductInventory')
                                     .selectAll()
                                     .where('productId', '=', String(log.productId))
-                                    .where('outletId', '=', targetOutletId)
+                                    .where('outletId', 'is', null)
                                     .executeTakeFirst();
+                                if (!inv && targetLocationId) {
+                                    inv = await db.selectFrom('ProductInventory')
+                                        .selectAll()
+                                        .where('productId', '=', String(log.productId))
+                                        .where('locationId', '=', targetLocationId)
+                                        .executeTakeFirst();
+                                }
+                                if (!inv) {
+                                    inv = await db.selectFrom('ProductInventory')
+                                        .selectAll()
+                                        .where('productId', '=', String(log.productId))
+                                        .executeTakeFirst();
+                                }
                             }
-                            if (!inv && targetLocationId) {
-                                inv = await db.selectFrom('ProductInventory')
-                                    .selectAll()
-                                    .where('productId', '=', String(log.productId))
-                                    .where('locationId', '=', targetLocationId)
-                                    .executeTakeFirst();
+                            else {
+                                if (targetOutletId) {
+                                    inv = await db.selectFrom('ProductInventory')
+                                        .selectAll()
+                                        .where('productId', '=', String(log.productId))
+                                        .where('outletId', '=', targetOutletId)
+                                        .executeTakeFirst();
+                                }
+                                if (!inv && targetLocationId) {
+                                    inv = await db.selectFrom('ProductInventory')
+                                        .selectAll()
+                                        .where('productId', '=', String(log.productId))
+                                        .where('locationId', '=', targetLocationId)
+                                        .executeTakeFirst();
+                                }
                             }
                             if (inv) {
                                 const newStock = Math.max(0, (Number(inv.stock) || 0) + delta);
@@ -671,7 +746,7 @@ router.post('/', async (req, res) => {
                                     updatedAt: new Date().toISOString()
                                 }).where('id', '=', inv.id).execute();
                                 if (io)
-                                    io.emit('stock_updated', { productId: log.productId, stock: newStock, outletId: targetOutletId });
+                                    io.emit('stock_updated', { productId: log.productId, stock: newStock, outletId: isSharedInventory ? null : targetOutletId });
                             }
                             processedCount++;
                         }

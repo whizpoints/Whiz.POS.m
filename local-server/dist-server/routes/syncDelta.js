@@ -93,6 +93,13 @@ router.get('/', async (req, res) => {
         if (!since)
             return res.status(400).json({ error: 'Missing "since" timestamp parameter' });
         const sinceDate = new Date(since);
+        const bRecord = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
+        let bSettings = {};
+        try {
+            bSettings = typeof bRecord?.settings === 'string' ? JSON.parse(bRecord.settings) : (bRecord?.settings || {});
+        }
+        catch (e) { }
+        const isSharedInventory = bSettings.inventoryMode === 'SHARED' || bSettings.sharedInventory === true;
         let usersQuery = db.selectFrom('User').selectAll().where('businessId', '=', businessId).where('updatedAt', '>', sinceDate.toISOString());
         if (req.user.outletId) {
             usersQuery = usersQuery.where((eb) => eb.or([
@@ -102,7 +109,7 @@ router.get('/', async (req, res) => {
             ]));
         }
         let productsQuery = db.selectFrom('Product').selectAll().where('businessId', '=', businessId);
-        if (req.user.outletId) {
+        if (req.user.outletId && !isSharedInventory) {
             productsQuery = productsQuery.where((eb) => eb.exists(eb.selectFrom('ProductInventory')
                 .select('id')
                 .whereRef('ProductInventory.productId', '=', 'Product.id')
@@ -125,7 +132,7 @@ router.get('/', async (req, res) => {
             .where('ProductInventory.updatedAt', '>', sinceDate.toISOString());
         if (locationId)
             inventoryQuery = inventoryQuery.where('ProductInventory.locationId', '=', String(locationId));
-        if (outletId)
+        if (outletId && !isSharedInventory)
             inventoryQuery = inventoryQuery.where('ProductInventory.outletId', '=', String(outletId));
         let stockQuery = db.selectFrom('StockMovement').selectAll().where('updatedAt', '>', sinceDate.toISOString());
         if (locationId)
@@ -249,6 +256,13 @@ router.post('/', async (req, res) => {
     try {
         const { businessId } = req.user;
         const { users, products, customers, suppliers, transactions, stockMovements, inventory, categories, outlets, terminals, businessSetup, documents, savedDocuments, clients, mpesaConfigs, isFromCloud, deletedOutletIds } = req.body;
+        const bRecordPost = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
+        let bSettingsPost = {};
+        try {
+            bSettingsPost = typeof bRecordPost?.settings === 'string' ? JSON.parse(bRecordPost.settings) : (bRecordPost?.settings || {});
+        }
+        catch (e) { }
+        const isSharedInventory = bSettingsPost.inventoryMode === 'SHARED' || bSettingsPost.sharedInventory === true;
         let targetLocationId = null;
         let targetOutletId = null;
         let mappedLocalLocationId = null;
@@ -609,16 +623,29 @@ router.post('/', async (req, res) => {
                             updatedAt: (m.updatedAt ? new Date(m.updatedAt) : new Date()).toISOString()
                         }).execute();
                         // Update inventory based on movement type
-                        let invExistingQuery = db.selectFrom('ProductInventory').selectAll().where('productId', '=', m.productId);
-                        if (resolvedLocationId)
-                            invExistingQuery = invExistingQuery.where('locationId', '=', resolvedLocationId);
-                        else
-                            invExistingQuery = invExistingQuery.where('locationId', 'is', null);
-                        if (resolvedOutletId)
-                            invExistingQuery = invExistingQuery.where('outletId', '=', resolvedOutletId);
-                        else
-                            invExistingQuery = invExistingQuery.where('outletId', 'is', null);
-                        const invExisting = await invExistingQuery.executeTakeFirst();
+                        let invExisting = null;
+                        if (isSharedInventory) {
+                            let q = db.selectFrom('ProductInventory').selectAll().where('productId', '=', m.productId);
+                            if (resolvedLocationId)
+                                q = q.where('locationId', '=', resolvedLocationId);
+                            q = q.where('outletId', 'is', null);
+                            invExisting = await q.executeTakeFirst();
+                            if (!invExisting) {
+                                invExisting = await db.selectFrom('ProductInventory').selectAll().where('productId', '=', m.productId).executeTakeFirst();
+                            }
+                        }
+                        else {
+                            let invExistingQuery = db.selectFrom('ProductInventory').selectAll().where('productId', '=', m.productId);
+                            if (resolvedLocationId)
+                                invExistingQuery = invExistingQuery.where('locationId', '=', resolvedLocationId);
+                            else
+                                invExistingQuery = invExistingQuery.where('locationId', 'is', null);
+                            if (resolvedOutletId)
+                                invExistingQuery = invExistingQuery.where('outletId', '=', resolvedOutletId);
+                            else
+                                invExistingQuery = invExistingQuery.where('outletId', 'is', null);
+                            invExisting = await invExistingQuery.executeTakeFirst();
+                        }
                         let stockChange = Number(m.quantity);
                         const mType = String(m.type || '').toUpperCase();
                         if (['SALE', 'TRANSFER_OUT', 'ADJUSTMENT_DOWN', 'SUBTRACT', 'OUT'].includes(mType))
@@ -636,9 +663,13 @@ router.post('/', async (req, res) => {
                                 .values({ id: randomUUID(),
                                 productId: m.productId,
                                 locationId: resolvedLocationId,
-                                outletId: resolvedOutletId,
+                                outletId: isSharedInventory ? null : resolvedOutletId,
                                 stock: stockChange,
                                 updatedAt: new Date().toISOString() }).execute();
+                        }
+                        const io = req.app.get('io');
+                        if (io) {
+                            io.emit('stock_updated', { productId: m.productId, outletId: isSharedInventory ? null : resolvedOutletId });
                         }
                         results.inventory++;
                     }

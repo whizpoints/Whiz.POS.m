@@ -5,8 +5,13 @@ import { randomUUID } from 'crypto';
 import { MpesaCallbackUrlService } from '../services/mpesaUrls.js';
 import { generateSecurityCredential } from '../utils/crypto.js';
 const router = Router();
-// Helper to get OAuth Token
+const tokenCache = new Map();
 async function getOAuthToken(consumerKey, consumerSecret, environment) {
+    const cacheKey = `${environment}_${consumerKey}`;
+    const cached = tokenCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.token;
+    }
     const isProduction = environment?.toLowerCase() === 'production' || environment?.toLowerCase() === 'live';
     const url = isProduction
         ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
@@ -23,7 +28,84 @@ async function getOAuthToken(consumerKey, consumerSecret, environment) {
         throw new Error(`Failed to fetch OAuth token (${response.status}): ${errorBody}`);
     }
     const data = await response.json();
+    const expiresInMs = (parseInt(data.expires_in, 10) || 3599) * 1000;
+    // Cache for up to 50 minutes (safety margin before 60 min token expiration)
+    tokenCache.set(cacheKey, {
+        token: data.access_token,
+        expiresAt: Date.now() + Math.min(expiresInMs - 60000, 3000000)
+    });
     return data.access_token;
+}
+// In-memory deduplication cache for in-flight STK Pushes (15s TTL)
+const stkPushLocks = new Map();
+// In-memory phone-to-customer-name cache for sub-millisecond name resolution
+export const phoneToCustomerNameCache = new Map();
+export function getLogTimestamp() {
+    const d = new Date();
+    const pad = (n, z = 2) => String(n).padStart(z, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+}
+export function formatMpesaCustomerName(rawName) {
+    if (!rawName)
+        return '';
+    let cleaned = String(rawName).trim();
+    cleaned = cleaned.replace(/^[\d+*\s-]+/, '').trim();
+    cleaned = cleaned.replace(/[*#_]/g, ' ').replace(/\s+/g, ' ').trim();
+    const lower = cleaned.toLowerCase();
+    if (!cleaned || lower === 'mpesa customer' || lower === 'm-pesa customer' || lower === 'customer' || lower === 'unknown') {
+        return '';
+    }
+    const words = cleaned.split(/\s+/).filter(Boolean);
+    if (words.length === 0)
+        return '';
+    const titleWords = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    if (titleWords.length >= 3) {
+        return `${titleWords[0]} ${titleWords[titleWords.length - 1]}`;
+    }
+    return titleWords.join(' ');
+}
+export async function resolveCustomerNameForPhone(businessId, phone) {
+    if (!phone)
+        return 'M-Pesa Customer';
+    const cleanPhone = String(phone).replace(/\D/g, '');
+    const phoneSuffix = cleanPhone.slice(-9);
+    if (!phoneSuffix)
+        return 'M-Pesa Customer';
+    const cached = phoneToCustomerNameCache.get(phoneSuffix);
+    if (cached)
+        return cached;
+    try {
+        const cust = await db.selectFrom('Customer').selectAll().where('businessId', '=', businessId).where('phone', 'like', `%${phoneSuffix}`).executeTakeFirst();
+        if (cust?.name) {
+            const formatted = formatMpesaCustomerName(cust.name);
+            if (formatted) {
+                phoneToCustomerNameCache.set(phoneSuffix, formatted);
+                return formatted;
+            }
+        }
+        const pastTxn = await db.selectFrom('MpesaTransaction').selectAll().where('businessId', '=', businessId).where('phoneNumber', 'like', `%${phoneSuffix}`).where('customerName', 'not in', ['M-Pesa Customer', 'Customer', 'Unknown', '']).orderBy('timestamp', 'desc').executeTakeFirst();
+        if (pastTxn?.customerName) {
+            const formatted = formatMpesaCustomerName(pastTxn.customerName);
+            if (formatted) {
+                phoneToCustomerNameCache.set(phoneSuffix, formatted);
+                return formatted;
+            }
+        }
+        const pastReceipt = await db.selectFrom('Receipt').selectAll().where('businessId', '=', businessId).where('customerPhone', 'like', `%${phoneSuffix}`).orderBy('createdAt', 'desc').executeTakeFirst();
+        if (pastReceipt && pastReceipt.cashierName) {
+            // Checked
+        }
+        const staff = await db.selectFrom('User').selectAll().where('businessId', '=', businessId).where('email', 'like', `%${phoneSuffix}%`).executeTakeFirst();
+        if (staff?.name) {
+            const formatted = formatMpesaCustomerName(staff.name);
+            if (formatted) {
+                phoneToCustomerNameCache.set(phoneSuffix, formatted);
+                return formatted;
+            }
+        }
+    }
+    catch (err) { }
+    return 'M-Pesa Customer';
 }
 function getTimestamp() {
     const now = new Date();
@@ -33,6 +115,30 @@ function getTimestamp() {
         now.getHours().toString().padStart(2, '0') +
         now.getMinutes().toString().padStart(2, '0') +
         now.getSeconds().toString().padStart(2, '0');
+}
+// Safaricom timestamps are strictly Kenya Time (UTC+3, East Africa Time)
+export function parseMpesaTimestamp(rawTime) {
+    if (!rawTime)
+        return new Date();
+    const tt = String(rawTime).replace(/\D/g, '');
+    if (tt.length >= 14) {
+        const yr = tt.substring(0, 4);
+        const mo = tt.substring(4, 6);
+        const dy = tt.substring(6, 8);
+        const hr = tt.substring(8, 10);
+        const mn = tt.substring(10, 12);
+        const sc = tt.substring(12, 14);
+        const d = new Date(`${yr}-${mo}-${dy}T${hr}:${mn}:${sc}+03:00`);
+        if (!isNaN(d.getTime()))
+            return d;
+    }
+    return new Date();
+}
+export function isMaskedOrHashedPhone(phone) {
+    if (!phone)
+        return true;
+    const s = String(phone).trim();
+    return s.length < 9 || s.length >= 32 || /^[a-f0-9]{32,}$/i.test(s) || s.includes('*');
 }
 // In-memory deduplication cache with 45s TTL to prevent duplicate status checks
 const statusQueryLocks = new Map();
@@ -91,11 +197,26 @@ async function triggerTransactionStatus(config, receipt, businessId) {
 }
 // 1. STK Push Request
 router.post('/stkpush', async (req, res) => {
+    const reqStartTime = Date.now();
+    const reqTimestamp = getLogTimestamp();
     try {
         const { phone, amount, businessId, locationId } = req.body;
-        console.log(`[Backend STK Push] Received request for ${phone}, Amount: ${amount}, Business: ${businessId}, Location: ${locationId || 'default'}`);
+        console.log(`[${reqTimestamp}] [Backend STK Push] 📥 Received request for ${phone}, Amount: ${amount}, Business: ${businessId}, Location: ${locationId || 'default'}`);
         if (!phone || !amount || !businessId) {
             return res.status(400).json({ error: 'Missing required fields' });
+        }
+        // Deduplication guard: if an identical STK push was initiated in the last 15 seconds, return the same result
+        const lockKey = `${businessId}_${phone}_${Math.round(amount)}`;
+        const existingLock = stkPushLocks.get(lockKey);
+        if (existingLock && (Date.now() - existingLock.timestamp) < 15000) {
+            console.log(`[${getLogTimestamp()}] [Backend STK Push] ⚠️ Deduplicating duplicate STK push for ${phone} (KES ${amount}) - request already in progress.`);
+            try {
+                const result = await existingLock.resultPromise;
+                return res.json(result);
+            }
+            catch (err) {
+                return res.status(400).json({ success: false, message: err.message });
+            }
         }
         let config = null;
         if (locationId) {
@@ -105,14 +226,16 @@ router.post('/stkpush', async (req, res) => {
             config = await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst();
         }
         if (!config) {
-            console.error(`[Backend STK Push] Error: M-Pesa not configured for business ${businessId}`);
+            console.error(`[${getLogTimestamp()}] [Backend STK Push] Error: M-Pesa not configured for business ${businessId}`);
             return res.status(400).json({ error: 'M-Pesa not configured for this business' });
         }
         if (!config.stkEnabled) {
-            console.error(`[Backend STK Push] Error: STK Push is disabled for business ${businessId}`);
+            console.error(`[${getLogTimestamp()}] [Backend STK Push] Error: STK Push is disabled for business ${businessId}`);
             return res.status(400).json({ error: 'STK Push is disabled for this business' });
         }
+        const tokenStartTime = Date.now();
         const token = await getOAuthToken(config.consumerKey, config.consumerSecret, config.environment);
+        const tokenDuration = Date.now() - tokenStartTime;
         const timestamp = getTimestamp();
         const password = Buffer.from(`${config.shortcode}${config.passkey}${timestamp}`).toString('base64');
         const url = config.environment === 'production'
@@ -134,26 +257,41 @@ router.post('/stkpush', async (req, res) => {
             AccountReference: accountRef,
             TransactionDesc: "Payment"
         };
-        console.log(`[Daraja Request] Sending STK Push to ${url} with payload:`, JSON.stringify({ ...payload, Password: '***' }));
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        console.log(`[Daraja Response] STK Push Response:`, JSON.stringify(data));
-        if (data.ResponseCode === "0") {
-            res.json({ success: true, message: 'STK push sent', CheckoutRequestID: data.CheckoutRequestID });
+        const elapsedBeforeSend = Date.now() - reqStartTime;
+        console.log(`[${getLogTimestamp()}] [+?${elapsedBeforeSend}ms] [Daraja Request] 📤 Sending STK Push to ${url} (Auth token ready in ${tokenDuration}ms) with payload:`, JSON.stringify({ ...payload, Password: '***' }));
+        const pushPromise = (async () => {
+            const fetchStartTime = Date.now();
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            const darajaLatency = Date.now() - fetchStartTime;
+            const totalElapsed = Date.now() - reqStartTime;
+            const d = await resp.json();
+            console.log(`[${getLogTimestamp()}] [+?${totalElapsed}ms] [Daraja Response] 📲 STK Push Response (Daraja round-trip: ${darajaLatency}ms): `, JSON.stringify(d));
+            if (d.ResponseCode === "0") {
+                return { success: true, message: 'STK push sent', CheckoutRequestID: d.CheckoutRequestID, elapsedMs: totalElapsed, darajaLatencyMs: darajaLatency, receivedAt: reqTimestamp };
+            }
+            else {
+                throw new Error(d.errorMessage || 'STK push failed');
+            }
+        })();
+        stkPushLocks.set(lockKey, { timestamp: Date.now(), resultPromise: pushPromise });
+        try {
+            const data = await pushPromise;
+            res.json(data);
         }
-        else {
-            res.status(400).json({ success: false, message: data.errorMessage || 'STK push failed', details: data });
+        catch (pushErr) {
+            stkPushLocks.delete(lockKey);
+            res.status(400).json({ success: false, message: pushErr.message });
         }
     }
     catch (err) {
-        console.error('STK Push error:', err);
+        console.error(`[${getLogTimestamp()}] STK Push error:`, err);
         res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
     }
 });
@@ -196,7 +334,7 @@ const handleLocalStkCallback = async (req, res) => {
     try {
         const businessId = req.params?.businessId;
         const callbackData = req.body?.Body?.stkCallback;
-        console.log(`[Local M-Pesa Webhook] STK Callback received for business ${businessId}:`, JSON.stringify(req.body, null, 2));
+        console.log(`[${getLogTimestamp()}] [Local M-Pesa Webhook] 🔔 STK Callback received for business ${businessId}:`, JSON.stringify(req.body, null, 2));
         if (callbackData && (callbackData.ResultCode === 0 || callbackData.ResultCode === "0")) {
             const items = callbackData.CallbackMetadata?.Item || [];
             const amount = items.find((i) => i.Name === 'Amount')?.Value;
@@ -209,6 +347,9 @@ const handleLocalStkCallback = async (req, res) => {
             const config = businessId ? await db.selectFrom('MpesaConfig').selectAll().where('businessId', '=', businessId).executeTakeFirst() : null;
             if (cleanReceipt && (config || businessId)) {
                 const resolvedBizId = config?.businessId || businessId;
+                // Resolve customer name from cache or DB before emitting
+                let resolvedName = await resolveCustomerNameForPhone(resolvedBizId, cleanPhone);
+                resolvedName = formatMpesaCustomerName(resolvedName) || 'M-Pesa Customer';
                 const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', cleanReceipt).executeTakeFirst();
                 if (!existingTx) {
                     await db.insertInto('MpesaTransaction').values({
@@ -220,7 +361,7 @@ const handleLocalStkCallback = async (req, res) => {
                         phoneNumber: cleanPhone,
                         status: 'UNLINKED',
                         isEnriched: (config?.initiatorName && config?.initiatorPassword ? 0 : 1),
-                        customerName: 'M-Pesa Customer',
+                        customerName: resolvedName,
                         timestamp: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                     }).execute();
@@ -232,12 +373,13 @@ const handleLocalStkCallback = async (req, res) => {
                         transactionId: cleanReceipt,
                         amount: cleanAmount,
                         phoneNumber: cleanPhone,
-                        customerName: 'M-Pesa Customer',
+                        customerName: resolvedName,
                         isEnriched: true,
                         businessId: resolvedBizId
                     };
                     io.to(`business_${resolvedBizId}`).emit('mpesa_payment_received', payload);
                     io.emit('mpesa_payment_received', payload);
+                    console.log(`[${getLogTimestamp()}] [Local M-Pesa Webhook] ⚡ Socket.IO event emitted for STK Push ${cleanReceipt} (KSh ${cleanAmount}) - Customer: ${resolvedName}`);
                 }
                 // Fetch Customer Name using Transaction Status API
                 if (config?.initiatorName && config?.initiatorPassword) {
@@ -283,19 +425,7 @@ const handleLocalC2bValidation = async (req, res) => {
         if (rawPhone.startsWith('+'))
             rawPhone = rawPhone.slice(1);
         const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || 'M-Pesa Customer';
-        let timestamp = new Date().toISOString();
-        if (TransTime && String(TransTime).length >= 14) {
-            const tt = String(TransTime);
-            const yr = parseInt(tt.substring(0, 4), 10);
-            const mo = parseInt(tt.substring(4, 6), 10) - 1;
-            const dy = parseInt(tt.substring(6, 8), 10);
-            const hr = parseInt(tt.substring(8, 10), 10);
-            const mn = parseInt(tt.substring(10, 12), 10);
-            const sc = parseInt(tt.substring(12, 14), 10);
-            const d = new Date(Date.UTC(yr, mo, dy, hr, mn, sc));
-            if (!isNaN(d.getTime()))
-                timestamp = d.toISOString();
-        }
+        const timestamp = parseMpesaTimestamp(TransTime).toISOString();
         if (resolvedBusinessId && cleanTransId && cleanAmount > 0) {
             const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', cleanTransId).executeTakeFirst();
             if (!existingTx) {
@@ -370,19 +500,7 @@ const handleLocalC2bConfirmation = async (req, res) => {
         if (rawPhone.startsWith('+'))
             rawPhone = rawPhone.slice(1);
         const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ').trim() || req.body.CustomerName || 'M-Pesa Customer';
-        let timestamp = new Date().toISOString();
-        if (TransTime && String(TransTime).length >= 14) {
-            const tt = String(TransTime);
-            const yr = parseInt(tt.substring(0, 4), 10);
-            const mo = parseInt(tt.substring(4, 6), 10) - 1;
-            const dy = parseInt(tt.substring(6, 8), 10);
-            const hr = parseInt(tt.substring(8, 10), 10);
-            const mn = parseInt(tt.substring(10, 12), 10);
-            const sc = parseInt(tt.substring(12, 14), 10);
-            const d = new Date(Date.UTC(yr, mo, dy, hr, mn, sc));
-            if (!isNaN(d.getTime()))
-                timestamp = d.toISOString();
-        }
+        const timestamp = parseMpesaTimestamp(TransTime).toISOString();
         if (cleanTransId) {
             const existingTx = await db.selectFrom('MpesaTransaction').selectAll().where('transactionId', '=', cleanTransId).executeTakeFirst();
             if (!existingTx) {

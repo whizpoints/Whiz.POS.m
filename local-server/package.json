@@ -1,7 +1,7 @@
 {
   "name": "whizpos-local-server",
   "private": true,
-  "version": "0.0.0",
+  "version": "7.1.0",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -12,6 +12,7 @@
     "server": "node ./node_modules/tsx/dist/cli.mjs server/index.ts",
     "start": "node ./node_modules/tsx/dist/cli.mjs server/index.ts",
     "pre-electron": "node scripts/build-db.cjs",
+    "postinstall": "electron-builder install-app-deps",
     "wipe": "cd .. && wipe-data.bat",
     "electron:dev": "npm run pre-electron && tsc --project tsconfig.electron.json && concurrently \"vite --port 5175\" \"wait-on tcp:5175 && electron .\"",
     "electron:build": "npm run pre-electron && vite build && tsc --project tsconfig.electron.json && tsc --project tsconfig.server.json && electron-builder"
@@ -24,7 +25,10 @@
       "dist-electron/**/*",
       "dist-server/**/*",
       "assets/**/*",
-      "node_modules/.prisma/**/*"
+      "node_modules/.prisma/**/*",
+      "!dist/win-unpacked/**",
+      "!dist/*.exe",
+      "!dist/*.blockmap"
     ],
     "asarUnpack": [
       "node_modules/@prisma/client/**/*",
@@ -39,7 +43,8 @@
       }
     ],
     "directories": {
-      "buildResources": "assets"
+      "buildResources": "assets",
+      "output": "release"
     },
     "win": {
       "target": "nsis",
@@ -61,9 +66,7 @@
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
       "artifactName": "${productName} Setup ${version}.${ext}"
-    },
-    "npmRebuild": false,
-    "buildDependenciesFromSource": false
+    }
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1105.0",
@@ -112,7 +115,7 @@
     "autoprefixer": "^10.5.4",
     "concurrently": "^10.0.4",
     "cross-env": "^10.1.0",
-    "electron": "^43.4.0",
+    "electron": "^31.7.7",
     "electron-builder": "^26.15.3",
     "oxlint": "^1.75.0",
     "postcss": "^8.5.26",

@@ -35,9 +35,25 @@ router.get('/', async (req, res) => {
             }
             return prods;
         })().catch(async () => []);
+        const bizRow = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
+        let bSettings = {};
+        try {
+            bSettings = typeof bizRow?.settings === 'string' ? JSON.parse(bizRow.settings) : (bizRow?.settings || {});
+        }
+        catch (e) { }
+        const isShared = bSettings.inventoryMode === 'SHARED' || bSettings.sharedInventory === true;
         const formatted = products.map(p => {
             const invList = (p.inventory && Array.isArray(p.inventory)) ? p.inventory : [];
             const totalStock = invList.reduce((sum, inv) => sum + (Number(inv.stock) || 0), 0);
+            if (isShared) {
+                return {
+                    ...p,
+                    stock: totalStock,
+                    inStoreStock: totalStock,
+                    totalStock,
+                    outletStock: totalStock
+                };
+            }
             // Central Store stock is strictly where outletId is null
             let centralInvs = invList.filter((i) => !i.outletId);
             if (locationId && locationId !== 'ALL') {
@@ -77,6 +93,70 @@ async function resolveCategory(businessId, categoryId, categoryFallback) {
     }
     return categoryFallback || null;
 }
+async function getNextSequentialSku(businessId, offset = 0) {
+    try {
+        const products = await db.selectFrom('Product')
+            .select('sku')
+            .where('businessId', '=', businessId)
+            .execute();
+        let maxNum = 0;
+        for (const p of products) {
+            if (!p.sku)
+                continue;
+            const matches = p.sku.match(/(\d+)/g);
+            if (matches) {
+                const lastDigits = matches[matches.length - 1];
+                const n = parseInt(lastDigits, 10);
+                if (!isNaN(n) && n > maxNum) {
+                    maxNum = n;
+                }
+            }
+        }
+        const nextNum = maxNum + 1 + offset;
+        return `SKU-${String(nextNum).padStart(5, '0')}`;
+    }
+    catch (err) {
+        return `SKU-${String(1 + offset).padStart(5, '0')}`;
+    }
+}
+async function ensureCategoryExists(businessId, categoryName) {
+    if (!categoryName || typeof categoryName !== 'string')
+        return;
+    const trimmed = categoryName.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'general')
+        return;
+    try {
+        const existing = await db.selectFrom('Category')
+            .selectAll()
+            .where('businessId', '=', businessId)
+            .where('name', '=', trimmed)
+            .executeTakeFirst();
+        if (!existing) {
+            await db.insertInto('Category').values({
+                id: randomUUID(),
+                businessId,
+                name: trimmed,
+                color: '#3B82F6',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            }).execute();
+        }
+    }
+    catch (err) {
+        console.error('ensureCategoryExists error:', err);
+    }
+}
+// Get next auto-sequenced SKU
+router.get('/next-sku', async (req, res) => {
+    try {
+        const { businessId } = req.user;
+        const nextSku = await getNextSequentialSku(businessId);
+        res.json({ nextSku });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 // Create product
 router.post('/', async (req, res) => {
     try {
@@ -91,8 +171,11 @@ router.post('/', async (req, res) => {
         stock = parseInt(stock) || 0;
         reorderLevel = parseInt(reorderLevel) || 5;
         // Generate SKU if missing (Prisma requires it
-        if (!sku) {
-            sku = 'SKU-' + Date.now().toString(36).toUpperCase();
+        if (!sku || (typeof sku === 'string' && sku.trim() === '')) {
+            sku = await getNextSequentialSku(businessId);
+        }
+        if (resolvedCategory) {
+            await ensureCategoryExists(businessId, resolvedCategory);
         }
         // Create product
         const product = await db.insertInto('Product').values({ id: randomUUID(),
@@ -311,6 +394,7 @@ router.post('/import/products', upload.single('file'), async (req, res) => {
         await workbook.xlsx.load(req.file.buffer);
         const sheet = workbook.getWorksheet('Products') || workbook.worksheets[0];
         let count = 0;
+        let missingSkuOffset = 0;
         const rows = sheet.getRows(2, sheet.rowCount) || [];
         for (const row of rows) {
             const name = row.getCell(1).text?.trim();
@@ -318,10 +402,11 @@ router.post('/import/products', upload.single('file'), async (req, res) => {
                 continue;
             let sku = row.getCell(2).text?.trim();
             if (!sku) {
-                sku = 'SKU-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+                sku = await getNextSequentialSku(businessId, missingSkuOffset++);
             }
             const barcode = row.getCell(3).text?.trim() || null;
             const categoryName = row.getCell(4).text?.trim() || 'General';
+            await ensureCategoryExists(businessId, categoryName);
             const price = Number(row.getCell(5).value) || 0;
             const costPrice = Number(row.getCell(6).value) || 0;
             const taxRate = Number(row.getCell(7).value) || 16.0;
@@ -515,11 +600,11 @@ router.post('/quick-add', async (req, res) => {
         res.status(500).json({ error: 'Failed to add stock' });
     }
 });
-// Receive stock into Central Store (GRN)
+// Receive stock into Central Store or Direct to Inventory (GRN)
 router.post('/receive-stock', async (req, res) => {
     try {
         const { businessId } = req.user;
-        const { productId, quantity: rawQty, costPrice, referenceNote, locationId } = req.body;
+        const { productId, quantity: rawQty, costPrice, referenceNote, locationId, destinationType, destinationOutletId } = req.body;
         const quantity = parseInt(rawQty, 10);
         if (isNaN(quantity) || quantity <= 0) {
             return res.status(400).json({ error: 'Quantity must be a positive integer' });
@@ -535,18 +620,46 @@ router.post('/receive-stock', async (req, res) => {
         }
         if (!targetLocationId)
             return res.status(400).json({ error: 'No location found' });
+        const bizRow = await db.selectFrom('Business').selectAll().where('id', '=', businessId).executeTakeFirst();
+        let bSettings = {};
+        try {
+            bSettings = typeof bizRow?.settings === 'string' ? JSON.parse(bizRow.settings) : (bizRow?.settings || {});
+        }
+        catch (e) { }
+        const isShared = bSettings.inventoryMode === 'SHARED' || bSettings.sharedInventory === true;
+        const hasCentralStore = bSettings.hasCentralStore !== false;
+        // Determine target outletId
+        let targetOutletId = null;
+        let isDirect = false;
+        if (destinationType === 'OUTLET' && destinationOutletId) {
+            targetOutletId = destinationOutletId;
+            isDirect = true;
+        }
+        else if (destinationType === 'SHARED' || !hasCentralStore || isShared) {
+            targetOutletId = null; // Shared pool
+            isDirect = true;
+        }
+        else {
+            targetOutletId = null; // Central Store
+            isDirect = false;
+        }
         const now = new Date().toISOString();
-        const centralInv = await db.selectFrom('ProductInventory')
+        let targetInvQuery = db.selectFrom('ProductInventory')
             .selectAll()
-            .where('productId', '=', productId)
-            .where('outletId', 'is', null)
-            .executeTakeFirst();
+            .where('productId', '=', productId);
+        if (targetOutletId) {
+            targetInvQuery = targetInvQuery.where('outletId', '=', targetOutletId);
+        }
+        else {
+            targetInvQuery = targetInvQuery.where('outletId', 'is', null);
+        }
+        const targetInv = await targetInvQuery.executeTakeFirst();
         let newStock = quantity;
-        if (centralInv) {
-            newStock = Number(centralInv.stock || 0) + quantity;
+        if (targetInv) {
+            newStock = Number(targetInv.stock || 0) + quantity;
             await db.updateTable('ProductInventory')
                 .set({ stock: newStock, updatedAt: now })
-                .where('id', '=', centralInv.id)
+                .where('id', '=', targetInv.id)
                 .execute();
         }
         else {
@@ -554,7 +667,7 @@ router.post('/receive-stock', async (req, res) => {
                 id: randomUUID(),
                 productId,
                 locationId: targetLocationId,
-                outletId: null,
+                outletId: targetOutletId,
                 stock: quantity,
                 reorderLevel: 5,
                 updatedAt: now
@@ -567,25 +680,29 @@ router.post('/receive-stock', async (req, res) => {
                 .where('id', '=', productId)
                 .execute();
         }
+        const defaultRef = isDirect
+            ? (targetOutletId ? 'Goods Received Note (GRN) Direct to Outlet' : 'Goods Received Note (GRN) Direct to Inventory')
+            : 'Goods Received Note (GRN) into Central Store';
         // Log StockMovement
         await db.insertInto('StockMovement').values({
             id: `grn_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
             businessId,
             productId,
             locationId: targetLocationId,
-            outletId: null,
+            outletId: targetOutletId,
             type: 'PURCHASE',
             quantity,
-            reference: referenceNote || 'Goods Received Note (GRN) into Central Store',
+            reference: referenceNote || defaultRef,
             sourceTerminal: 'SERVER',
             timestamp: now,
             updatedAt: now
         }).execute();
         const io = req.app.get('io');
         if (io) {
-            io.emit('stock_updated', { productId, inStoreStock: newStock });
+            io.emit('stock_updated', { productId, inStoreStock: newStock, stock: newStock, outletId: targetOutletId });
         }
-        res.json({ success: true, inStoreStock: newStock, message: 'Stock received into Central Store successfully' });
+        const successMsg = isDirect ? 'Stock received directly into Inventory successfully' : 'Stock received into Central Store successfully';
+        res.json({ success: true, inStoreStock: newStock, stock: newStock, message: successMsg });
     }
     catch (error) {
         console.error('Receive stock error:', error);

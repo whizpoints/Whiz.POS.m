@@ -1,4 +1,3 @@
-const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,13 +8,21 @@ if (fs.existsSync(dbPath)) {
   fs.unlinkSync(dbPath);
 }
 
-const db = new Database(dbPath);
 const sql = fs.readFileSync(sqlPath, 'utf8');
 
-db.exec(sql);
-db.close();
-
-console.log('Successfully generated template.db from schema.sql');
+try {
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(dbPath);
+  db.exec(sql);
+  db.close();
+  console.log('Successfully generated template.db from schema.sql using node:sqlite');
+} catch (e) {
+  const Database = require('better-sqlite3');
+  const db = new Database(dbPath);
+  db.exec(sql);
+  db.close();
+  console.log('Successfully generated template.db from schema.sql using better-sqlite3');
+}
 
 // Ensure backup-crypto.cjs is copied to dist-server
 const cryptoSrc = path.join(__dirname, '../server/backup-crypto.cjs');
