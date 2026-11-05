@@ -6,7 +6,20 @@ import { generateSecurityCredential, decrypt } from '../utils/crypto.js';
 const router = Router();
 
 // Helper to get OAuth Token
+// In-memory OAuth token cache (valid for 50 mins) to prevent repetitive slow calls to Safaricom
+interface TokenCacheItem {
+  token: string;
+  expiresAt: number;
+}
+const tokenCache = new Map<string, TokenCacheItem>();
+
 async function getOAuthToken(consumerKey: string, consumerSecret: string, environment: string) {
+  const cacheKey = `${environment}_${consumerKey}`;
+  const cached = tokenCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.token;
+  }
+
   const isProduction = environment?.toLowerCase() === 'production' || environment?.toLowerCase() === 'live';
   const url = isProduction 
     ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
@@ -26,7 +39,124 @@ async function getOAuthToken(consumerKey: string, consumerSecret: string, enviro
     throw new Error(`Failed to fetch OAuth token (${response.status}): ${errorBody}`);
   }
   const data: any = await response.json();
+  const expiresInMs = (parseInt(data.expires_in, 10) || 3599) * 1000;
+  // Cache for up to 50 minutes (safety margin before 60 min token expiration)
+  tokenCache.set(cacheKey, {
+    token: data.access_token,
+    expiresAt: Date.now() + Math.min(expiresInMs - 60000, 3000000)
+  });
   return data.access_token;
+}
+
+// In-memory deduplication cache for in-flight STK Pushes (15s TTL)
+const stkPushLocks = new Map<string, { timestamp: number; resultPromise: Promise<any> }>();
+
+// In-memory phone-to-customer-name cache for sub-millisecond name resolution
+export const phoneToCustomerNameCache = new Map<string, string>();
+
+export function getLogTimestamp(): string {
+  const d = new Date();
+  const pad = (n: number, z = 2) => String(n).padStart(z, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+}
+
+export function formatMpesaCustomerName(rawName?: string | null): string {
+  if (!rawName) return '';
+  let cleaned = String(rawName).trim();
+  // Strip phone prefix e.g. "254740841168 - JOSPHAT NJUGUNA MBURU" or "0740841168-JOSPHAT"
+  cleaned = cleaned.replace(/^[\d+*\s-]+/, '').trim();
+  // Strip special symbols and asterisks
+  cleaned = cleaned.replace(/[*#_]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const lower = cleaned.toLowerCase();
+  if (!cleaned || lower === 'mpesa customer' || lower === 'm-pesa customer' || lower === 'customer' || lower === 'unknown') {
+    return '';
+  }
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+
+  const titleWords = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  // If 3 or more names (e.g. JOSPHAT NJUGUNA MBURU), format as First + Last -> "Josphat Mburu"
+  if (titleWords.length >= 3) {
+    return `${titleWords[0]} ${titleWords[titleWords.length - 1]}`;
+  }
+  return titleWords.join(' ');
+}
+
+export async function resolveCustomerNameForPhone(businessId: string, phone: string): Promise<string> {
+  if (!phone) return 'M-Pesa Customer';
+  const cleanPhone = String(phone).replace(/\D/g, '');
+  const phoneSuffix = cleanPhone.slice(-9);
+  if (!phoneSuffix) return 'M-Pesa Customer';
+
+  // 1. Check in-memory RAM cache (0ms)
+  const cached = phoneToCustomerNameCache.get(phoneSuffix);
+  if (cached) return cached;
+
+  try {
+    // 2. Check Customer directory
+    const cust = await prisma.customer.findFirst({
+      where: { businessId, phone: { contains: phoneSuffix } }
+    });
+    if (cust?.name) {
+      const formatted = formatMpesaCustomerName(cust.name);
+      if (formatted) {
+        phoneToCustomerNameCache.set(phoneSuffix, formatted);
+        return formatted;
+      }
+    }
+
+    // 3. Check past enriched M-Pesa transactions
+    const pastTxn = await prisma.mpesaTransaction.findFirst({
+      where: {
+        businessId,
+        phoneNumber: { contains: phoneSuffix },
+        customerName: { notIn: ['M-Pesa Customer', 'Customer', 'Unknown', ''] }
+      },
+      orderBy: { timestamp: 'desc' }
+    });
+    if (pastTxn?.customerName) {
+      const formatted = formatMpesaCustomerName(pastTxn.customerName);
+      if (formatted) {
+        phoneToCustomerNameCache.set(phoneSuffix, formatted);
+        return formatted;
+      }
+    }
+
+    // 4. Check past Receipts where phone was recorded
+    const pastReceipt = await prisma.receipt.findFirst({
+      where: {
+        businessId,
+        customerPhone: { contains: phoneSuffix }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    if (pastReceipt && (pastReceipt as any).customerName) {
+      const formatted = formatMpesaCustomerName((pastReceipt as any).customerName);
+      if (formatted) {
+        phoneToCustomerNameCache.set(phoneSuffix, formatted);
+        return formatted;
+      }
+    }
+
+    // 5. Check staff/user accounts (e.g. store owner / manager testing their own phone)
+    const staff = await prisma.user.findFirst({
+      where: {
+        businessId,
+        email: { contains: phoneSuffix }
+      }
+    });
+    if (staff?.name) {
+      const formatted = formatMpesaCustomerName(staff.name);
+      if (formatted) {
+        phoneToCustomerNameCache.set(phoneSuffix, formatted);
+        return formatted;
+      }
+    }
+  } catch (err) {}
+
+  return 'M-Pesa Customer';
 }
 
 function getTimestamp() {
@@ -187,12 +317,27 @@ async function triggerTransactionStatus(config: any, receipt: string, businessId
 
 // 1. STK Push Request
 router.post('/stkpush', async (req: any, res: any) => {
+  const reqStartTime = Date.now();
+  const reqTimestamp = getLogTimestamp();
   try {
     const { phone, amount, businessId, locationId } = req.body;
-    console.log(`[Backend STK Push] Received request for ${phone}, Amount: ${amount}, Business: ${businessId}, Location: ${locationId || 'default'}`);
+    console.log(`[${reqTimestamp}] [Backend STK Push] 📥 Received request for ${phone}, Amount: ${amount}, Business: ${businessId}, Location: ${locationId || 'default'}`);
     
     if (!phone || !amount || !businessId) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Deduplication guard: if an identical STK push was initiated in the last 15 seconds, return the same result
+    const lockKey = `${businessId}_${phone}_${Math.round(amount)}`;
+    const existingLock = stkPushLocks.get(lockKey);
+    if (existingLock && (Date.now() - existingLock.timestamp) < 15000) {
+      console.log(`[${getLogTimestamp()}] [Backend STK Push] ⚠️ Deduplicating duplicate STK push for ${phone} (KES ${amount}) - request already in progress.`);
+      try {
+        const result = await existingLock.resultPromise;
+        return res.json(result);
+      } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
     }
 
     let config = null;
@@ -203,15 +348,17 @@ router.post('/stkpush', async (req: any, res: any) => {
       config = await prisma.mpesaConfig.findFirst({ where: { businessId } });
     }
     if (!config) {
-      console.error(`[Backend STK Push] Error: M-Pesa not configured for business ${businessId}`);
+      console.error(`[${getLogTimestamp()}] [Backend STK Push] Error: M-Pesa not configured for business ${businessId}`);
       return res.status(400).json({ error: 'M-Pesa not configured for this business' });
     }
     if (!config.stkEnabled) {
-      console.error(`[Backend STK Push] Error: STK Push is disabled for business ${businessId}`);
+      console.error(`[${getLogTimestamp()}] [Backend STK Push] Error: STK Push is disabled for business ${businessId}`);
       return res.status(400).json({ error: 'STK Push is disabled for this business' });
     }
 
+    const tokenStartTime = Date.now();
     const token = await getOAuthToken(config.consumerKey, config.consumerSecret, config.environment);
+    const tokenDuration = Date.now() - tokenStartTime;
     const timestamp = getTimestamp();
     const password = Buffer.from(`${config.shortcode}${config.passkey}${timestamp}`).toString('base64');
     
@@ -237,27 +384,41 @@ router.post('/stkpush', async (req: any, res: any) => {
       TransactionDesc: "Payment"
     };
 
-    console.log(`[Daraja Request] Sending STK Push to ${url} with payload:`, JSON.stringify({ ...payload, Password: '***' }));
+    const elapsedBeforeSend = Date.now() - reqStartTime;
+    console.log(`[${getLogTimestamp()}] [+?${elapsedBeforeSend}ms] [Daraja Request] 📤 Sending STK Push to ${url} (Auth token ready in ${tokenDuration}ms) with payload:`, JSON.stringify({ ...payload, Password: '***' }));
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+    const pushPromise = (async () => {
+      const fetchStartTime = Date.now();
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      const darajaLatency = Date.now() - fetchStartTime;
+      const totalElapsed = Date.now() - reqStartTime;
+      const d: any = await resp.json();
+      console.log(`[${getLogTimestamp()}] [+?${totalElapsed}ms] [Daraja Response] 📲 STK Push Response (Daraja round-trip: ${darajaLatency}ms): `, JSON.stringify(d));
+      if (d.ResponseCode === "0") {
+        return { success: true, message: 'STK push sent', CheckoutRequestID: d.CheckoutRequestID, elapsedMs: totalElapsed, darajaLatencyMs: darajaLatency, receivedAt: reqTimestamp };
+      } else {
+        throw new Error(d.errorMessage || 'STK push failed');
+      }
+    })();
 
-    const data: any = await response.json();
-    console.log(`[Daraja Response] STK Push Response:`, JSON.stringify(data));
-    
-    if (data.ResponseCode === "0") {
-      res.json({ success: true, message: 'STK push sent', CheckoutRequestID: data.CheckoutRequestID });
-    } else {
-      res.status(400).json({ success: false, message: data.errorMessage || 'STK push failed', details: data });
+    stkPushLocks.set(lockKey, { timestamp: Date.now(), resultPromise: pushPromise });
+
+    try {
+      const data = await pushPromise;
+      res.json(data);
+    } catch (pushErr: any) {
+      stkPushLocks.delete(lockKey);
+      res.status(400).json({ success: false, message: pushErr.message });
     }
   } catch (err: any) {
-    console.error('STK Push error:', err);
+    console.error(`[${getLogTimestamp()}] STK Push error:`, err);
     res.status(500).json({ success: false, message: 'Internal server error', error: err.message });
   }
 });
@@ -310,7 +471,7 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
     const { businessId } = req.params;
     const callbackData = req.body?.Body?.stkCallback;
     
-    console.log(`[M-Pesa Webhook] STK Callback received for business ${businessId}:`, JSON.stringify(req.body, null, 2));
+    console.log(`[${getLogTimestamp()}] [M-Pesa Webhook] 🔔 STK Callback received for business ${businessId}:`, JSON.stringify(req.body, null, 2));
     
     if (callbackData && (callbackData.ResultCode === 0 || callbackData.ResultCode === "0")) {
       const items = callbackData.CallbackMetadata.Item;
@@ -325,7 +486,10 @@ router.post('/callback/stk/:businessId', async (req: any, res: any) => {
       // Check config cache first to avoid blocking on DB
       const cachedConfig = configCacheByBiz.get(businessId);
       const hasInitiator = !!(cachedConfig?.initiatorName && cachedConfig?.initiatorPassword);
-      let resolvedName = 'M-Pesa Customer';
+      
+      // Resolve customer name (checking RAM cache, Customer directory, past sales, etc.)
+      let resolvedName = await resolveCustomerNameForPhone(businessId, cleanPhone);
+      resolvedName = formatMpesaCustomerName(resolvedName) || 'M-Pesa Customer';
 
       // 1. Immediately store in RAM cache (0ms, survives DB drops)
       if (receipt && cleanAmount > 0) {
@@ -699,7 +863,8 @@ router.post('/callback/transaction-status/:businessId', async (req: any, res: an
       if (receiptNumber && rawPartyName) {
         const nameParts = rawPartyName.split('-');
         const rawPhone = nameParts[0].trim();
-        const customerName = nameParts.length > 1 ? nameParts.slice(1).join('-').trim() : rawPartyName;
+        const rawCustomerName = nameParts.length > 1 ? nameParts.slice(1).join('-').trim() : rawPartyName;
+        const customerName = formatMpesaCustomerName(rawCustomerName) || rawCustomerName;
         
         let formattedPhone = rawPhone.replace(/\s+/g, '');
         if (formattedPhone.startsWith('254') && formattedPhone.length === 12) {

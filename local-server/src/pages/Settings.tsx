@@ -1,6 +1,7 @@
 import { useConfirm } from '../context/ConfirmContext';
 import { useState, useEffect, type ReactNode } from 'react';
 import {
+  Boxes, Store,
   Key, Copy, CheckCircle2, CreditCard, ShieldCheck, AlertTriangle,
   RefreshCw, Eye, EyeOff, Save, Building2, Globe, Lock, User2, Mail,
   Bell, Palette, Database, Download, Trash2, ChevronRight, Link,
@@ -10,10 +11,11 @@ import toast from 'react-hot-toast';
 import { getApiBaseUrl } from '../lib/utils';
 
 
-type Tab = 'profile' | 'security' | 'payments' | 'etims' | 'email' | 'backup';
+type Tab = 'profile' | 'inventory' | 'security' | 'payments' | 'etims' | 'email' | 'backup';
 
 const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'profile', label: 'Business Profile', icon: <Building2 className="w-4 h-4" /> },
+  { id: 'inventory', label: 'Inventory & Store', icon: <Boxes className="w-4 h-4" /> },
   { id: 'security', label: 'Server Link (API)', icon: <Key className="w-4 h-4" /> },
   { id: 'payments', label: 'Payment Methods', icon: <CreditCard className="w-4 h-4" /> },
   { id: 'etims', label: 'eTIMS KRA', icon: <ShieldCheck className="w-4 h-4" /> },
@@ -126,6 +128,7 @@ export default function Settings() {
         {tab === 'payments' && <PaymentsPanel />}
         {tab === 'etims' && <ETimsPanel profile={profile} onSave={updateProfileSettings} />}
         {tab === 'profile' && <ProfilePanel profile={profile} onSave={updateProfileSettings} />}
+        {tab === 'inventory' && <InventoryPanel profile={profile} onSave={updateProfileSettings} />}
         {tab === 'email' && <EmailPanel profile={profile} onSave={updateProfileSettings} />}
         {tab === 'backup' && <BackupPanel />}
       </div>
@@ -2129,3 +2132,162 @@ function EmailPanel({ profile, onSave }: any) {
   );
 }
 
+
+
+/* --------------------------- Inventory & Store Panel --------------------------- */
+
+function InventoryPanel({ profile, onSave }: { profile: any; onSave: (u: any) => Promise<any> }) {
+  const getSettings = (p: any) => {
+    try {
+      return typeof p?.settings === 'string' ? JSON.parse(p.settings) : (p?.settings || {});
+    } catch {
+      return {};
+    }
+  };
+
+  const s = getSettings(profile);
+  const [inventoryMode, setInventoryMode] = useState<'SHARED' | 'SEPARATE'>(
+    s.inventoryMode === 'SHARED' || s.sharedInventory === true ? 'SHARED' : 'SEPARATE'
+  );
+  const [hasCentralStore, setHasCentralStore] = useState<boolean>(s.hasCentralStore !== false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    await onSave({
+      inventoryMode,
+      hasCentralStore,
+      sharedInventory: inventoryMode === 'SHARED'
+    });
+    setIsSaving(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* 1. Inventory Architecture Mode */}
+      <div className="bg-[color:var(--bg-secondary)] border border-[color:var(--border-color)] rounded-xl overflow-hidden shadow-sm">
+        <div className="p-5 border-b border-[color:var(--border-color)]">
+          <h3 className="font-semibold text-lg text-[color:var(--text-primary)] flex items-center gap-2">
+            <Boxes className="w-5 h-5 text-blue-600" />
+            Inventory Sharing Architecture
+          </h3>
+          <p className="text-sm text-[color:var(--text-secondary)] mt-1">
+            Choose whether registers and outlets in your business share stock or track inventory independently.
+          </p>
+        </div>
+
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            onClick={() => setInventoryMode('SHARED')}
+            className={`p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+              inventoryMode === 'SHARED'
+                ? 'border-blue-600 bg-blue-50/50 shadow-sm'
+                : 'border-[color:var(--border-color)] hover:border-gray-300 bg-[color:var(--bg-primary)]'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="inline-block px-2.5 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 mb-2">
+                  Unified Pool
+                </span>
+                <h4 className="font-bold text-gray-900 text-base">Shared Inventory (Single Pool)</h4>
+                <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">
+                  All outlets & POS registers pull from and decrement the same stock pool. Ideal for multiple registers in a single location or shared backstore.
+                </p>
+              </div>
+              <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-1 ${
+                inventoryMode === 'SHARED' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+              }`}>
+                {inventoryMode === 'SHARED' && <div className="w-2 h-2 rounded-full bg-white" />}
+              </div>
+            </div>
+          </div>
+
+          <div
+            onClick={() => setInventoryMode('SEPARATE')}
+            className={`p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+              inventoryMode === 'SEPARATE'
+                ? 'border-blue-600 bg-blue-50/50 shadow-sm'
+                : 'border-[color:var(--border-color)] hover:border-gray-300 bg-[color:var(--bg-primary)]'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="inline-block px-2.5 py-0.5 text-xs font-bold rounded-full bg-gray-100 text-gray-700 mb-2">
+                  Multi-Branch
+                </span>
+                <h4 className="font-bold text-gray-900 text-base">Separate Outlet Inventory</h4>
+                <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">
+                  Each branch maintains its own isolated stock levels. Stock must be transferred between locations explicitly.
+                </p>
+              </div>
+              <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-1 ${
+                inventoryMode === 'SEPARATE' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+              }`}>
+                {inventoryMode === 'SEPARATE' && <div className="w-2 h-2 rounded-full bg-white" />}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Warehouse & Receiving Workflow */}
+      <div className="bg-[color:var(--bg-secondary)] border border-[color:var(--border-color)] rounded-xl overflow-hidden shadow-sm">
+        <div className="p-5 border-b border-[color:var(--border-color)]">
+          <h3 className="font-semibold text-lg text-[color:var(--text-primary)] flex items-center gap-2">
+            <Store className="w-5 h-5 text-indigo-600" />
+            Central Warehouse & Goods Receiving (GRN)
+          </h3>
+          <p className="text-sm text-[color:var(--text-secondary)] mt-1">
+            Configure how new supplier deliveries and purchase orders are accepted into your business.
+          </p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div
+            onClick={() => setHasCentralStore(!hasCentralStore)}
+            className="flex items-center justify-between p-4 rounded-xl border border-[color:var(--border-color)] bg-[color:var(--bg-primary)] cursor-pointer hover:border-gray-300 transition-colors"
+          >
+            <div className="pr-4">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-gray-900 text-sm">Enable Central Warehouse / Holding Store</span>
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${hasCentralStore ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {hasCentralStore ? 'Warehouse Enabled' : 'Direct-to-Selling'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {hasCentralStore
+                  ? 'Suppliers deliver to a central warehouse/store first. Outlets must request internal transfers to replenish their shelves.'
+                  : 'Businesses without a warehouse bypass the holding store. GRN receiving goes directly into active selling inventory.'}
+              </p>
+            </div>
+            <div className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${hasCentralStore ? 'bg-blue-600' : 'bg-gray-300'}`}>
+              <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${hasCentralStore ? 'translate-x-6' : 'translate-x-0'}`} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-2">
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="btn btn-primary px-6 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 shadow-sm"
+        >
+          {isSaving ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Saving Settings...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              Save Inventory Configuration
+            </>
+          )}
+        </button>
+      </div>
+    </form>
+  );
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Send, Smartphone, Loader2, CheckCircle2 } from 'lucide-react';
 import { usePosStore } from '../../../store/posStore';
 import { useToast } from '../../ui/use-toast';
@@ -10,6 +10,7 @@ interface Props {
 export default function StkPush({ totalAmount }: Props) {
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const isSendingRef = useRef(false);
   const { toast } = useToast();
   const { businessSetup } = usePosStore();
 
@@ -22,6 +23,8 @@ export default function StkPush({ totalAmount }: Props) {
   };
 
   const handleSend = async () => {
+    if (isSendingRef.current || status === 'sending') return;
+
     const validPhone = normalizePhone(phone);
     if (!validPhone) {
       toast('Please enter a valid Kenyan phone number', 'error');
@@ -35,15 +38,19 @@ export default function StkPush({ totalAmount }: Props) {
       return;
     }
 
+    isSendingRef.current = true;
     setStatus('sending');
     
     try {
-      const candidateUrls = [
+      const rawUrls = [
         businessSetup?.mpesaPushUrl,
         `${(businessSetup?.backOfficeUrl || businessSetup?.cloudUrl || 'https://backoffice.whizpoint.app').replace(/\/+$/, '')}/api/mpesa/stkpush`,
         businessSetup?.apiUrl ? `${businessSetup.apiUrl.replace(/\/+$/, '').replace(/\/api$/, '')}/api/mpesa/stkpush` : null,
         'http://localhost:3000/api/mpesa/stkpush'
       ].filter(Boolean) as string[];
+
+      // Strictly deduplicate candidate URLs to prevent redundant network hits
+      const candidateUrls = Array.from(new Set(rawUrls));
 
       let res: Response | null = null;
       let lastError: any = null;
@@ -59,7 +66,7 @@ export default function StkPush({ totalAmount }: Props) {
               businessId: activeBusinessId, 
               locationId: (businessSetup as any)?.locationId || (businessSetup as any)?.cloudLocationId 
             }),
-            signal: AbortSignal.timeout(20000)
+            signal: AbortSignal.timeout(35000)
           });
           if (r.ok) {
             res = r;
@@ -87,8 +94,12 @@ export default function StkPush({ totalAmount }: Props) {
         toast(data.error || data.CustomerMessage || data.message || 'Failed to send STK Push', 'error');
       }
       
-      setTimeout(() => setStatus('idle'), 15000);
+      setTimeout(() => {
+        isSendingRef.current = false;
+        setStatus('idle');
+      }, 15000);
     } catch (err: any) {
+      isSendingRef.current = false;
       setStatus('idle');
       console.warn('[STK Push] Error:', err);
       toast(err.message || 'Could not connect to M-Pesa. Customer can still pay directly to the Till.', 'error');

@@ -71,19 +71,88 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
   const { completeTransaction } = usePosStore();
   const { toast } = useToast();
 
+  const formatCustomerDisplayName = (rawName?: string | null): string => {
+    if (!rawName) return '';
+    let cleaned = String(rawName).trim();
+    cleaned = cleaned.replace(/^[\d+*\s-]+/, '').trim();
+    cleaned = cleaned.replace(/[*#_]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const lower = cleaned.toLowerCase();
+    if (!cleaned || lower === 'mpesa customer' || lower === 'm-pesa customer' || lower === 'customer' || lower === 'unknown') {
+      return '';
+    }
+
+    const words = cleaned.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return '';
+
+    const titleWords = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    if (titleWords.length >= 3) {
+      return `${titleWords[0]} ${titleWords[titleWords.length - 1]}`;
+    }
+    return titleWords.join(' ');
+  };
+
   const enrichCustomerName = (matchingTxn: any) => {
-    let resolvedName = matchingTxn.customerName || '';
-    if (!resolvedName || resolvedName === 'Customer' || resolvedName === 'Unknown' || resolvedName === 'M-Pesa Customer') {
-      const state = usePosStore.getState();
-      if (matchingTxn.phoneNumber) {
-        const phoneSuffix = String(matchingTxn.phoneNumber).slice(-9);
-        const cCust = state.creditCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
-        const lCust = state.loyaltyCustomers?.find(c => c.phone?.endsWith(phoneSuffix));
-        if (cCust) resolvedName = cCust.name;
-        else if (lCust) resolvedName = lCust.name;
+    let resolvedName = matchingTxn?.customerName || '';
+    const cleanCurrent = formatCustomerDisplayName(resolvedName);
+    if (cleanCurrent) {
+      return cleanCurrent;
+    }
+
+    const state = usePosStore.getState();
+    const rawPhone = matchingTxn?.phoneNumber || '';
+    if (rawPhone) {
+      const phoneDigits = String(rawPhone).replace(/\D/g, '');
+      const phoneSuffix = phoneDigits.slice(-9);
+
+      if (phoneSuffix) {
+        // 1. General customers list
+        const gCust = (state as any).customers?.find((c: any) => {
+          const cp = c?.phone ? String(c.phone).replace(/\D/g, '') : '';
+          return cp.endsWith(phoneSuffix);
+        });
+        if (gCust?.name) resolvedName = gCust.name;
+
+        // 2. Credit customers
+        if (!resolvedName) {
+          const cCust = state.creditCustomers?.find(c => {
+            const cp = c?.phone ? String(c.phone).replace(/\D/g, '') : '';
+            return cp.endsWith(phoneSuffix);
+          });
+          if (cCust?.name) resolvedName = cCust.name;
+        }
+
+        // 3. Loyalty customers
+        if (!resolvedName) {
+          const lCust = state.loyaltyCustomers?.find(c => {
+            const cp = c?.phone ? String(c.phone).replace(/\D/g, '') : '';
+            return cp.endsWith(phoneSuffix);
+          });
+          if (lCust?.name) resolvedName = lCust.name;
+        }
+
+        // 4. Past transactions in posStore
+        if (!resolvedName) {
+          const pastTx = (state.transactions || []).find((t: any) => {
+            const p = t?.customerPhone || t?.phoneNumber || t?.phone;
+            const tp = p ? String(p).replace(/\D/g, '') : '';
+            return tp.endsWith(phoneSuffix) && t.customerName && t.customerName !== 'M-Pesa Customer' && t.customerName !== 'Customer';
+          });
+          if (pastTx && (pastTx as any).customerName) resolvedName = (pastTx as any).customerName;
+        }
+
+        // 5. Local phone directory
+        if (!resolvedName) {
+          try {
+            const dir = JSON.parse(localStorage.getItem('pos_customer_phone_directory') || '{}');
+            if (dir[phoneSuffix]) resolvedName = dir[phoneSuffix];
+          } catch (e) {}
+        }
       }
     }
-    return resolvedName || 'M-Pesa Customer';
+
+    const formatted = formatCustomerDisplayName(resolvedName);
+    return formatted || 'M-Pesa Customer';
   };
 
   const onPaymentDetected = (matchingTxn: any) => {
@@ -377,7 +446,21 @@ export default function TillMonitor({ totalAmount, remainingAmount, onAddSplit, 
       return;
     }
 
-    const finalCustomerName = customCustomerName.trim() || detectedPayment.customerName || 'M-Pesa Customer';
+    const rawName = customCustomerName.trim() || detectedPayment.customerName || '';
+    const finalCustomerName = formatCustomerDisplayName(rawName) || rawName || 'M-Pesa Customer';
+    
+    // Save to phone directory so future transactions remember this customer automatically
+    if (finalCustomerName && finalCustomerName !== 'M-Pesa Customer' && detectedPayment.phoneNumber) {
+      const phoneDigits = String(detectedPayment.phoneNumber).replace(/\D/g, '');
+      const phoneSuffix = phoneDigits.slice(-9);
+      if (phoneSuffix) {
+        try {
+          const dir = JSON.parse(localStorage.getItem('pos_customer_phone_directory') || '{}');
+          dir[phoneSuffix] = finalCustomerName;
+          localStorage.setItem('pos_customer_phone_directory', JSON.stringify(dir));
+        } catch (e) {}
+      }
+    }
 
     try {
       const businessSetup = usePosStore.getState().businessSetup;
