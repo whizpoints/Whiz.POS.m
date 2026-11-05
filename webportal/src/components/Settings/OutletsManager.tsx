@@ -80,9 +80,9 @@ export default function OutletsManager() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white dark:bg-slate-900/90 rounded-xl shadow-sm border border-gray-200 dark:border-white/10 p-6 text-slate-900 dark:text-white">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Store className="w-5 h-5 text-blue-500" /> Manage Registers / Outlets
           </h3>
           <button onClick={handleNew} className="btn btn-primary btn-sm inline-flex items-center gap-2">
@@ -99,7 +99,7 @@ export default function OutletsManager() {
                     <Store className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                    <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                       {o.name}
                     </h4>
                     <p className="text-xs text-gray-400 font-mono">ID: {o.id}</p>
@@ -113,7 +113,7 @@ export default function OutletsManager() {
                     <Package className="w-3.5 h-3.5" /> Manage Inventory & Staff
                     <ChevronRight className="w-3.5 h-3.5" />
                   </Link>
-                  <button onClick={() => handleEdit(o)} title="Edit Outlet Name" className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg">
+                  <button onClick={() => handleEdit(o)} title="Edit Outlet Name" className="text-gray-500 dark:text-slate-400 hover:bg-gray-100 p-2 rounded-lg">
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleDelete(o.id)} title="Delete Outlet" className="text-red-500 hover:bg-red-50 p-2 rounded-lg">
@@ -122,7 +122,7 @@ export default function OutletsManager() {
                 </div>
               </div>
             ))}
-            {outlets.length === 0 && <p className="text-gray-500 text-center py-4">No outlets configured yet.</p>}
+            {outlets.length === 0 && <p className="text-gray-500 dark:text-slate-400 text-center py-4">No outlets configured yet.</p>}
           </div>
         )}
       </div>

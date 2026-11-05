@@ -559,22 +559,22 @@ export default function InvoiceGenerator() {
   const isLetter = DOCUMENT_TYPES.find(t => t.id === docType)?.category === 'letter';
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-4 md:p-6 pb-24">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#060b14] text-slate-900 dark:text-slate-100 px-4 py-4 md:p-6 pb-24 transition-colors">
 
       {/* Header Area */}
       <div className="max-w-5xl mx-auto mb-6 md:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
              <LayoutTemplate className="w-6 h-6 text-sky-600" />
              Document Generator
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Create Quotes, Invoices, Orders & Legal Notices</p>
+          <p className="text-slate-500 dark:text-slate-400 dark:text-slate-400 text-sm mt-1">Create Quotes, Invoices, Orders & Legal Notices</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
            <button
              onClick={() => setShowSavedDocs(true)}
-             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
+             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200 dark:text-slate-200 hover:border-sky-500 hover:text-sky-600 dark:hover:text-sky-400 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
            >
              <FolderOpen className="w-4 h-4" /> Open
            </button>
@@ -588,13 +588,13 @@ export default function InvoiceGenerator() {
            <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1"></div>
            <button
              onClick={() => openPreview('a4')}
-             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
+             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200 dark:text-slate-200 hover:border-sky-500 hover:text-sky-600 dark:hover:text-sky-400 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
            >
              <Eye className="w-4 h-4" /> A4
            </button>
            <button
              onClick={() => openPreview('a5')}
-             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white border border-slate-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
+             className="flex-1 sm:flex-none justify-center flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200 dark:text-slate-200 hover:border-sky-500 hover:text-sky-600 dark:hover:text-sky-400 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
            >
              <Eye className="w-4 h-4" /> A5
            </button>
@@ -604,14 +604,14 @@ export default function InvoiceGenerator() {
       {/* Client Search Modal */}
       {showClientModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col">
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-slate-800">Select Client</h2>
-              <button onClick={() => setShowClientModal(false)} className="text-slate-400 hover:text-slate-600">
+          <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl shadow-2xl border border-slate-200 dark:border-white/10 w-full max-w-md flex flex-col">
+            <div className="p-4 border-b border-slate-100 dark:border-white/10 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Select Client</h2>
+              <button onClick={() => setShowClientModal(false)} className="text-slate-400 hover:text-slate-600 dark:text-slate-300">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 border-b border-slate-100">
+            <div className="p-4 border-b border-slate-100 dark:border-white/10">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                 <input
@@ -619,7 +619,7 @@ export default function InvoiceGenerator() {
                   placeholder="Search clients..."
                   value={clientSearch}
                   onChange={(e) => setClientSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500"
                 />
               </div>
             </div>
@@ -636,12 +636,12 @@ export default function InvoiceGenerator() {
                   }}
                   className="w-full text-left p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0"
                 >
-                  <div className="font-medium text-slate-800 text-sm">{client.name}</div>
-                  <div className="text-xs text-slate-500 mt-1">{client.email} {client.phone && `• ${client.phone}`}</div>
+                  <div className="font-medium text-slate-900 dark:text-white text-sm">{client.name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{client.email} {client.phone && `• ${client.phone}`}</div>
                 </button>
               ))}
               {creditCustomers.length === 0 && (
-                <div className="text-center p-4 text-sm text-slate-500">No saved clients found.</div>
+                <div className="text-center p-4 text-sm text-slate-500 dark:text-slate-400">No saved clients found.</div>
               )}
             </div>
           </div>
@@ -651,26 +651,26 @@ export default function InvoiceGenerator() {
       {/* Saved Documents Modal */}
       {showSavedDocs && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+           <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl shadow-2xl border border-slate-200 dark:border-white/10 w-full max-w-2xl max-h-[80vh] flex flex-col">
+              <div className="p-4 border-b border-slate-100 dark:border-white/10 flex justify-between items-center">
+                 <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                    <FolderOpen className="w-5 h-5 text-sky-600" /> Saved Documents
                  </h2>
-                 <button onClick={() => setShowSavedDocs(false)} className="text-slate-400 hover:text-slate-600">
+                 <button onClick={() => setShowSavedDocs(false)} className="text-slate-400 hover:text-slate-600 dark:text-slate-300">
                    <X className="w-5 h-5" />
                  </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                  {documents && documents.length > 0 ? (
                     documents.map(doc => (
-                       <div key={doc.id} onClick={() => handleLoadDocument(doc)} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group">
+                       <div key={doc.id} onClick={() => handleLoadDocument(doc)} className="flex items-center justify-between p-3 border border-slate-200 dark:border-white/10 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group">
                           <div className="flex items-center gap-3">
                              <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center text-sky-600 font-bold text-xs uppercase">
                                {(doc.type || 'DOC').substring(0, 3)}
                              </div>
                              <div>
-                                <div className="font-medium text-slate-800">{doc.name || 'Untitled Document'}</div>
-                                <div className="text-xs text-slate-500">{doc.date ? new Date(doc.date).toLocaleDateString() : 'Recent'} • {doc.id}{doc.status ? ` • ${doc.status}` : ''}</div>
+                                <div className="font-medium text-slate-900 dark:text-white">{doc.name || 'Untitled Document'}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">{doc.date ? new Date(doc.date).toLocaleDateString() : 'Recent'} • {doc.id}{doc.status ? ` • ${doc.status}` : ''}</div>
                              </div>
                           </div>
                           <button onClick={(e) => handleDeleteDocument(doc.id, e)} className="p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -692,26 +692,26 @@ export default function InvoiceGenerator() {
       {/* Settings Modal */}
       {showSettingsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+           <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl shadow-2xl border border-slate-200 dark:border-white/10 w-full max-w-2xl max-h-[90vh] flex flex-col">
+              <div className="p-4 border-b border-slate-100 dark:border-white/10 flex justify-between items-center">
+                 <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                    <Settings className="w-5 h-5 text-sky-600" /> Default Document Settings
                  </h2>
-                 <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-slate-600">
+                 <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-slate-600 dark:text-slate-300">
                    <X className="w-5 h-5" />
                  </button>
               </div>
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                  
                  <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Branding (Set Once & Done)</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white border-b pb-2">Branding (Set Once & Done)</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div
                         onClick={() => fileInputLogoRef.current?.click()}
                         className="flex flex-col items-center justify-center p-4 border border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors h-32"
                       >
                          {tempSettings.logoImage ? <img src={tempSettings.logoImage} className="w-full h-20 object-contain mb-2" /> : <Upload className="w-6 h-6 text-slate-400 mb-2" />}
-                         <div className="text-xs font-medium text-slate-700">Logo Image</div>
+                         <div className="text-xs font-medium text-slate-700 dark:text-slate-200">Logo Image</div>
                          <input ref={fileInputLogoRef} type="file" className="hidden" onChange={(e) => handleImageUpload(e, (img) => setTempSettings({...tempSettings, logoImage: img}), 'logo')} />
                       </div>
                       
@@ -720,35 +720,35 @@ export default function InvoiceGenerator() {
                         className="flex flex-col items-center justify-center p-4 border border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors h-32"
                       >
                          {tempSettings.backgroundImage ? <img src={tempSettings.backgroundImage} className="w-full h-20 object-cover mb-2" /> : <ImageIcon className="w-6 h-6 text-slate-400 mb-2" />}
-                         <div className="text-xs font-medium text-slate-700">Watermark / Background</div>
+                         <div className="text-xs font-medium text-slate-700 dark:text-slate-200">Watermark / Background</div>
                          <input ref={fileInputBgRef} type="file" className="hidden" onChange={(e) => handleImageUpload(e, (img) => setTempSettings({...tempSettings, backgroundImage: img}), 'watermark')} />
                       </div>
                     </div>
                     <label className="flex items-center gap-2 mt-2 cursor-pointer">
                        <input type="checkbox" checked={tempSettings.showWatermark ?? true} onChange={(e) => setTempSettings({...tempSettings, showWatermark: e.target.checked})} className="rounded text-sky-500 focus:ring-sky-500" />
-                       <span className="text-sm text-slate-700">Default to showing Watermark</span>
+                       <span className="text-sm text-slate-700 dark:text-slate-200">Default to showing Watermark</span>
                     </label>
                  </div>
 
                  <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Default Texts</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white border-b pb-2">Default Texts</h3>
                     
                     <div>
-                      <label className="text-xs text-slate-500 mb-1 block">Default Footer Note</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Default Footer Note</label>
                       <textarea 
                          value={tempSettings.defaultNotes || "This is a computer generated document and doesn't need a stamp or signature for receiving."} 
                          onChange={(e) => setTempSettings({...tempSettings, defaultNotes: e.target.value})} 
-                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                         className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500"
                          rows={2}
                       />
                     </div>
 
                     <div>
-                      <label className="text-xs text-slate-500 mb-1 block">Default Payment Info (Bank details, Till number, etc)</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Default Payment Info (Bank details, Till number, etc)</label>
                       <textarea 
                          value={tempSettings.defaultPaymentInfo || ''} 
                          onChange={(e) => setTempSettings({...tempSettings, defaultPaymentInfo: e.target.value})} 
-                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                         className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500"
                          rows={3}
                          placeholder={`Bank: Example Bank\nAcc: 123456789`}
                       />
@@ -756,8 +756,8 @@ export default function InvoiceGenerator() {
                  </div>
                  
               </div>
-              <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-xl">
-                 <button onClick={() => setShowSettingsModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+              <div className="p-4 border-t border-slate-100 dark:border-white/10 flex justify-end gap-3 bg-slate-50 dark:bg-slate-950/50 rounded-b-xl">
+                 <button onClick={() => setShowSettingsModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 rounded-lg transition-colors">
                     Cancel
                  </button>
                  <button onClick={async () => {
@@ -788,7 +788,7 @@ export default function InvoiceGenerator() {
         </div>
       )}
 
-      <div className="max-w-5xl mx-auto mb-6 bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-5">
+      <div className="max-w-5xl mx-auto mb-6 bg-white dark:bg-slate-900/90 rounded-xl shadow-sm border border-slate-200 dark:border-white/10 p-4 md:p-5">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Document Type</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap gap-2">
              {DOCUMENT_TYPES.filter(t => ['QUOTATION', 'PURCHASE_ORDER', 'INVOICE', 'DELIVERY_NOTE'].includes(t.id)).map((type) => {
@@ -801,7 +801,7 @@ export default function InvoiceGenerator() {
                     "w-full md:flex-1 text-left px-3 py-2.5 md:py-2 rounded-lg text-[11px] md:text-xs font-semibold border transition-all flex items-center justify-center md:justify-start gap-2 shadow-sm",
                     docType === type.id
                       ? "bg-sky-50 border-sky-500 text-sky-700 ring-1 ring-sky-500/20"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                      : "bg-white border-slate-200 text-slate-600 dark:text-slate-300 hover:border-slate-300 hover:bg-slate-50"
                   )}
                 >
                    <Icon className={cn("w-3.5 h-3.5", docType === type.id ? "text-sky-500" : "text-slate-400")} />
@@ -816,7 +816,7 @@ export default function InvoiceGenerator() {
                    "w-full appearance-none px-3 py-2.5 md:py-2 rounded-lg text-[11px] md:text-xs font-semibold border transition-all outline-none cursor-pointer shadow-sm",
                    !['QUOTATION', 'PURCHASE_ORDER', 'INVOICE', 'DELIVERY_NOTE'].includes(docType)
                      ? "bg-sky-50 border-sky-500 text-sky-700 ring-1 ring-sky-500/20"
-                     : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                     : "bg-white border-slate-200 text-slate-600 dark:text-slate-300 hover:border-slate-300"
                  )}
                  value={['QUOTATION', 'PURCHASE_ORDER', 'INVOICE', 'DELIVERY_NOTE'].includes(docType) ? "" : docType}
                  onChange={(e) => {
@@ -828,7 +828,7 @@ export default function InvoiceGenerator() {
                    <option key={type.id} value={type.id}>{type.label}</option>
                  ))}
                </select>
-               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500 dark:text-slate-400">
                   <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
                </div>
              </div>
@@ -841,7 +841,7 @@ export default function InvoiceGenerator() {
         <div className="space-y-6 order-2 lg:order-1">
 
            {/* Settings & Branding */}
-           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+           <div className="bg-white dark:bg-slate-900/90 rounded-xl shadow-sm border border-slate-200 dark:border-white/10 p-5 space-y-4">
                <div className="flex items-center justify-between">
                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                    <Settings className="w-4 h-4" /> Branding & Settings
@@ -869,7 +869,7 @@ export default function InvoiceGenerator() {
                </div>
                
                <div className="flex items-center justify-between p-3 border border-slate-100 rounded-lg bg-slate-50">
-                 <div className="text-xs font-medium text-slate-700">Include Watermark</div>
+                 <div className="text-xs font-medium text-slate-700 dark:text-slate-200">Include Watermark</div>
                  <label className="relative inline-flex items-center cursor-pointer">
                    <input type="checkbox" checked={showWatermark} onChange={(e) => {
                      setShowWatermark(e.target.checked);
@@ -883,14 +883,14 @@ export default function InvoiceGenerator() {
            </div>
 
            {/* Details */}
-           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4 relative">
+           <div className="bg-white dark:bg-slate-900/90 rounded-xl shadow-sm border border-slate-200 dark:border-white/10 p-5 space-y-4 relative">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                  <Settings className="w-4 h-4" /> Document Details
                </h3>
 
                {/* Transaction Lookup */}
                <div className="relative">
-                  <label className="text-xs text-slate-500 mb-1 block">Import Transaction</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Import Transaction</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -898,7 +898,7 @@ export default function InvoiceGenerator() {
                       value={searchTerm}
                       onChange={(e) => { setSearchTerm(e.target.value); setShowTransactionSearch(true); }}
                       onFocus={() => setShowTransactionSearch(true)}
-                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500"
                     />
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   </div>
@@ -912,10 +912,10 @@ export default function InvoiceGenerator() {
                             <button
                               key={t.id}
                               onClick={() => handleImportTransaction(t)}
-                              className="w-full text-left px-4 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                              className="w-full text-left px-4 py-2 hover:bg-slate-50 border-b border-slate-100 dark:border-white/10 last:border-0"
                             >
-                               <div className="font-medium text-slate-800 text-xs">{t.creditCustomer || 'Cash Sale'}</div>
-                               <div className="flex justify-between text-[10px] text-slate-500">
+                               <div className="font-medium text-slate-900 dark:text-white text-xs">{t.creditCustomer || 'Cash Sale'}</div>
+                               <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400">
                                   <span>{t.id}</span>
                                   <span>{new Date(t.timestamp).toLocaleDateString()}</span>
                                   <span className="font-bold text-sky-600">{t.total.toLocaleString()}</span>
@@ -934,18 +934,18 @@ export default function InvoiceGenerator() {
                   )}
                </div>
 
-               <div className="space-y-3 pt-2 border-t border-slate-100">
+               <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-white/10">
                   <div>
-                    <label className="text-xs text-slate-500 mb-1 block">Ref Number</label>
-                    <input type="text" value={docNumber} onChange={(e) => setDocNumber(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500" />
+                    <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Ref Number</label>
+                    <input type="text" value={docNumber} onChange={(e) => setDocNumber(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-slate-500 mb-1 block">Issue Date</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Issue Date</label>
                       <DatePicker value={date} onChange={setDate} />
                     </div>
                     <div>
-                      <label className="text-xs text-slate-500 mb-1 block">Due Date</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Due Date</label>
                       <DatePicker value={dueDate} onChange={setDueDate} />
                     </div>
                   </div>
@@ -969,17 +969,17 @@ export default function InvoiceGenerator() {
                     </button>
                     <button
                       onClick={() => setShowClientModal(true)}
-                      className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 transition-colors"
+                      className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors"
                     >
                       Select Saved Client...
                     </button>
                   </div>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="text" placeholder="Company Name" value={clientCompany} onChange={(e) => setClientCompany(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500" />
-                  <input type="text" placeholder="Contact Person" value={clientName} onChange={(e) => setClientName(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500" />
-                  <input type="email" placeholder="Email Address" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500" />
-                  <input type="text" placeholder="Physical Address" value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500" />
+                  <input type="text" placeholder="Company Name" value={clientCompany} onChange={(e) => setClientCompany(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500" />
+                  <input type="text" placeholder="Contact Person" value={clientName} onChange={(e) => setClientName(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500" />
+                  <input type="email" placeholder="Email Address" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500" />
+                  <input type="text" placeholder="Physical Address" value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500" />
                </div>
             </div>
 
@@ -991,13 +991,13 @@ export default function InvoiceGenerator() {
                 </h3>
 
                 <div className="mb-6">
-                  <label className="text-xs text-slate-500 mb-1 block">Project / Subject Line (Optional)</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Project / Subject Line (Optional)</label>
                   <input
                     type="text"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                     placeholder="e.g. Installation of Wi-Fi Network"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500 font-medium"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500 font-medium"
                   />
                 </div>
 
@@ -1005,7 +1005,7 @@ export default function InvoiceGenerator() {
                     {/* Explicit Table Headers to make UI clear */}
                     <div className="flex gap-2 items-end px-2">
                        <span className="w-6"></span>
-                       <div className="flex-1 grid grid-cols-12 gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                       <div className="flex-1 grid grid-cols-12 gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           <div className="col-span-5">Description</div>
                           <div className="col-span-2 text-center">Qty</div>
                             <div className="col-span-2">Unit <span className="text-[9px] font-normal lowercase">(opt)</span></div>
@@ -1073,13 +1073,13 @@ export default function InvoiceGenerator() {
                     ))}
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/10 flex justify-between items-center">
                     <button onClick={addItem} className="flex items-center gap-2 text-sm font-medium text-sky-600 hover:text-sky-700 px-3 py-2 rounded-lg hover:bg-sky-50 transition-colors">
                       <Plus className="w-4 h-4" /> Add Line Item
                     </button>
                     <div className="text-right">
-                       <div className="text-xs text-slate-500">Total Amount</div>
-                       <div className="text-xl font-bold text-slate-800">{total.toLocaleString()}</div>
+                       <div className="text-xs text-slate-500 dark:text-slate-400">Total Amount</div>
+                       <div className="text-xl font-bold text-slate-900 dark:text-white">{total.toLocaleString()}</div>
                     </div>
                 </div>
               </div>
@@ -1092,12 +1092,12 @@ export default function InvoiceGenerator() {
                  <div className="space-y-4">
                     {/* Common Subject Line */}
                     <div>
-                      <label className="text-xs text-slate-500 mb-1 block">Project / Subject Line</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Project / Subject Line</label>
                       <input
                         type="text"
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500 font-medium"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500 font-medium"
                       />
                     </div>
 
@@ -1106,23 +1106,23 @@ export default function InvoiceGenerator() {
                     {docType === 'DEMAND_LETTER_PARTIAL' && (
                        <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label className="text-xs text-slate-500 mb-1 block">Total Outstanding</label>
-                            <div className="text-sm font-bold text-slate-700 px-3 py-2 bg-slate-100 rounded-lg border border-transparent">
+                            <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Total Outstanding</label>
+                            <div className="text-sm font-bold text-slate-700 dark:text-slate-200 px-3 py-2 bg-slate-100 rounded-lg border border-transparent">
                                 {total.toLocaleString()}
                             </div>
                             <p className="text-[10px] text-slate-400 mt-1">Calculated from Line Items (hidden)</p>
                           </div>
                           <div>
-                            <label className="text-xs text-slate-500 mb-1 block">Partial Amount Requested</label>
+                            <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Partial Amount Requested</label>
                             <input
                               type="number"
                               value={partialAmount}
                               onChange={(e) => setPartialAmount(parseFloat(e.target.value))}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500"
                             />
                           </div>
                           <div>
-                             <label className="text-xs text-slate-500 mb-1 block">Final Settlement Date</label>
+                             <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Final Settlement Date</label>
                              <DatePicker value={settlementDate} onChange={setSettlementDate} />
                           </div>
                        </div>
@@ -1130,23 +1130,23 @@ export default function InvoiceGenerator() {
 
                     {docType === 'FINAL_NOTICE' && (
                        <div>
-                          <label className="text-xs text-slate-500 mb-1 block">Days Notice (Legal Action)</label>
+                          <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Days Notice (Legal Action)</label>
                           <input
                               type="number"
                               value={daysNotice}
                               onChange={(e) => setDaysNotice(parseFloat(e.target.value))}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500"
                             />
                        </div>
                     )}
 
                     {docType === 'PAYMENT_RECEIPT' && (
                         <div>
-                          <label className="text-xs text-slate-500 mb-1 block">Payment Mode</label>
+                          <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Payment Mode</label>
                            <select
                              value={paymentMode}
                              onChange={(e) => setPaymentMode(e.target.value)}
-                             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500"
                            >
                               <option value="">Select Mode...</option>
                               <option value="Cash">Cash</option>
@@ -1159,13 +1159,13 @@ export default function InvoiceGenerator() {
 
                     {docType === 'COMPLETION_CERTIFICATE' && (
                         <div>
-                           <label className="text-xs text-slate-500 mb-1 block">Project Reference</label>
+                           <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Project Reference</label>
                            <input
                               type="text"
                               value={projectReference}
                               onChange={(e) => setProjectReference(e.target.value)}
                               placeholder="e.g. Website Development Project"
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500"
+                              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500"
                             />
                         </div>
                     )}
@@ -1181,7 +1181,7 @@ export default function InvoiceGenerator() {
                      <textarea
                        value={notes}
                        onChange={(e) => setNotes(e.target.value)}
-                       className="w-full h-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500 placeholder:text-slate-400 resize-none"
+                       className="w-full h-24 px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500 placeholder:text-slate-400 resize-none"
                      />
                   </div>
                   <div>
@@ -1189,7 +1189,7 @@ export default function InvoiceGenerator() {
                      <textarea
                        value={paymentInfo}
                        onChange={(e) => setPaymentInfo(e.target.value)}
-                       className="w-full h-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-sky-500 placeholder:text-slate-400 resize-none font-mono"
+                       className="w-full h-24 px-3 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-sky-500 placeholder:text-slate-400 resize-none font-mono"
                      />
                   </div>
                </div>

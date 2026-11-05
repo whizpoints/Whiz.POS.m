@@ -692,7 +692,7 @@ export default function Inventory() {
 
       {/* Central Store Context Banner */}
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm text-blue-900 shadow-sm">
+      <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 text-sm text-blue-900 dark:text-blue-200 shadow-sm">
 
         <div className="flex items-center gap-3">
 
@@ -704,11 +704,11 @@ export default function Inventory() {
 
           <div>
 
-            <div className="font-semibold text-blue-950 flex items-center gap-2">
+            <div className="font-bold text-blue-950 dark:text-blue-100 flex items-center gap-2 flex-wrap">
 
               Central Store & Warehouse Receiving
 
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50">
 
                 Primary Supply Pool
 
@@ -716,11 +716,11 @@ export default function Inventory() {
 
             </div>
 
-            <p className="text-xs text-blue-700 mt-0.5">
+            <p className="text-xs text-blue-700 dark:text-blue-300/80 mt-0.5">
 
               Incoming supplier deliveries enter Central Store. Distribute stock to POS terminals via{' '}
 
-              <Link to="/dashboard/outlets" className="underline font-semibold hover:text-blue-950">
+              <Link to="/dashboard/outlets" className="underline font-semibold hover:text-blue-950 dark:hover:text-blue-100">
 
                 Outlets & Terminals
 
@@ -732,13 +732,10 @@ export default function Inventory() {
 
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
           <button 
-
             onClick={openReceiveModal}
-
-            className="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-1.5 shadow-sm"
+            className="w-full sm:w-auto justify-center btn btn-sm bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-1.5 shadow-sm rounded-xl py-2 px-3.5 cursor-pointer"
 
           >
 
@@ -752,142 +749,86 @@ export default function Inventory() {
 
       <section className="section">
 
-        <div className="section-header">
-
+        <div className="section-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-
-            <h2 className="section-title">Inventory & Products</h2>
-
-            <p className="section-desc">Manage your product catalog, stock levels, and categories.</p>
-
+            <h2 className="section-title text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Inventory & Products</h2>
+            <p className="section-desc text-xs sm:text-sm text-slate-500 dark:text-slate-400">Manage your product catalog, stock levels, and categories.</p>
           </div>
-
-          <div className="flex items-center gap-2">
-
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
             <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleImport} />
-
             <button 
-
               onClick={handleExport}
-
-              className="btn btn-secondary btn-sm inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
-
+              className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl"
             >
-
-              <Download className="w-4 h-4 text-green-600" /> Export Excel
-
+              <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> 
+              <span>Export</span>
             </button>
-
             <button 
-
               onClick={() => fileInputRef.current?.click()}
-
-              className="btn btn-secondary btn-sm inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
-
+              className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl"
             >
-
-              <FileUp className="w-4 h-4 text-blue-600" /> Import Excel
-
+              <FileUp className="w-4 h-4 text-blue-600 dark:text-blue-400" /> 
+              <span>Import</span>
             </button>
-
             <button 
-
               onClick={() => setIsTransferModalOpen(true)}
-
-              className="btn btn-secondary btn-sm inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
-
+              className="btn btn-secondary btn-sm inline-flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl"
             >
-
-              <ArrowRightLeft className="w-4 h-4" /> Transfer Stock
-
+              <ArrowRightLeft className="w-4 h-4 text-indigo-500" /> 
+              <span>Transfer</span>
             </button>
-
-            <button onClick={handleNew} className="btn btn-primary btn-sm inline-flex items-center gap-2">
-
-              <Plus className="w-4 h-4" /> New Product
-
+            <button onClick={handleNew} className="btn btn-primary btn-sm inline-flex items-center justify-center gap-1.5 rounded-xl shadow-sm">
+              <Plus className="w-4 h-4" /> 
+              <span>New Product</span>
             </button>
-
           </div>
-
         </div>
 
 
 
-        <div className="glass-panel overflow-hidden">
-
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 border-b border-[color:var(--border-glass)]">
-
-            <div className="flex items-center gap-2 flex-1 max-w-xl">
-
-              <div className="search-box flex-1" style={{ minWidth: 0 }}>
-
-                <Search />
-
+        <div className="glass-panel overflow-hidden border border-slate-200 dark:border-white/10 rounded-2xl bg-white dark:bg-slate-900/60 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3 sm:p-4 border-b border-slate-200 dark:border-white/10">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-2xl">
+              <div className="search-box flex-1 min-w-0 flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80">
+                <Search className="w-4 h-4 text-slate-400 shrink-0" />
                 <input 
-
                   placeholder="Search SKU, barcode or name..." 
-
                   value={searchQuery}
-
                   onChange={e => setSearchQuery(e.target.value)}
-
+                  className="w-full bg-transparent text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
                 />
-
               </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-
-                  <select
-
-                    value={selectedOutletId}
-
-                    onChange={(e) => setSelectedOutletId(e.target.value)}
-
-                    className="input py-1.5 px-3 text-xs font-semibold rounded-xl bg-white border border-gray-200"
-
-                    title="Filter inventory for Central Warehouse or specific outlet registers"
-
-                  >
-
-                    <option value="ALL">All Stock (Consolidated)</option>
-
-                    <option value="CENTRAL">Central Warehouse / Store (Main Supply)</option>
-
-                    {outlets.map(o => (
-
-                      <option key={o.id} value={o.id}>Outlet: {o.name}</option>
-
-                    ))}
-
-                  </select>
-
-                </div>
-
-            </div>
-
-            <div className="flex items-center gap-1 flex-wrap">
-
-              {['All Categories', ...Array.from(new Set(products.map(p => p.category || 'Uncategorized')))].map((c: string) => (
-
-                <button 
-
-                  key={c} 
-
-                  onClick={() => setSelectedCategory(c)}
-
-                  className={`chip ${selectedCategory === c ? 'active bg-blue-600 text-white' : 'bg-gray-100'}`}
-
+              <div className="shrink-0 w-full sm:w-auto">
+                <select
+                  value={selectedOutletId}
+                  onChange={(e) => setSelectedOutletId(e.target.value)}
+                  className="w-full sm:w-auto py-2 px-3 text-xs font-semibold rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  title="Filter inventory for Central Warehouse or specific outlet registers"
                 >
-
-                  {c}
-
-                </button>
-
-              ))}
-
+                  <option value="ALL">All Stock (Consolidated)</option>
+                  <option value="CENTRAL">Central Warehouse / Store</option>
+                  {outlets.map(o => (
+                    <option key={o.id} value={o.id}>Outlet: {o.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 no-scrollbar sm:flex-wrap">
+              {['All Categories', ...Array.from(new Set(products.map(p => p.category || 'Uncategorized')))].map((c: string) => (
+                <button 
+                  key={c} 
+                  onClick={() => setSelectedCategory(c)}
+                  className={`chip px-3 py-1.5 text-xs font-medium rounded-xl whitespace-nowrap transition-colors cursor-pointer ${
+                    selectedCategory === c 
+                      ? 'bg-blue-600 text-white shadow-sm font-semibold' 
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent dark:border-white/5'
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="hidden md:block table-scroll">
@@ -954,7 +895,7 @@ export default function Inventory() {
 
                       <td className="py-3 px-4 text-right">
 
-                        <span className={`font-semibold ${p.inStoreStock <= p.reorderLevel ? 'text-red-600' : 'text-gray-900'}`}>
+                        <span className={`font-semibold ${p.inStoreStock <= p.reorderLevel ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'}`}>
 
                           {p.inStoreStock}
 
@@ -966,7 +907,7 @@ export default function Inventory() {
 
                         <div className="flex items-center justify-end gap-2">
 
-                          <span className={`font-semibold ${p.totalStock <= p.reorderLevel ? 'text-red-600' : 'text-blue-600'}`}>
+                          <span className={`font-semibold ${p.totalStock <= p.reorderLevel ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-cyan-400'}`}>
 
                             {p.totalStock}
 
@@ -1036,130 +977,120 @@ export default function Inventory() {
 
           
 
-          <div className="md:hidden divide-y divide-[color:var(--border-glass)]">
-
+          <div className="md:hidden p-3 space-y-3">
             {products.length > 0 ? (
-
               products
-
                 .filter(p => selectedCategory === 'All Categories' || (p.category || 'Uncategorized') === selectedCategory)
-
                 .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase()))
-
                 .map(p => (
-
-                  <div key={p.id} className="p-4 flex flex-col gap-2">
-
-                    <div className="flex justify-between items-start">
-
-                      <div className="flex items-center gap-2.5">
-
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[color:var(--accent-primary-soft)] text-[color:var(--accent-primary)]">
-
+                  <div 
+                    key={p.id} 
+                    className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 shadow-xs flex flex-col gap-3 transition-all hover:border-slate-300 dark:hover:border-white/20"
+                  >
+                    {/* Top Row: Name, SKU, Category, and Price */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-blue-500/10 text-blue-600 dark:text-cyan-400 mt-0.5">
                           <Package className="w-4 h-4" />
-
                         </div>
-
-                        <div>
-
-                          <div className="font-semibold">{p.name}</div>
-
-                          <div className="font-mono text-xs text-[color:var(--text-muted)]">{p.sku}</div>
-
+                        <div className="min-w-0">
+                          <div className="font-bold text-sm text-slate-900 dark:text-white leading-tight truncate">
+                            {p.name}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                              {p.sku}
+                            </span>
+                            {p.category && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/5">
+                                {p.category}
+                              </span>
+                            )}
+                          </div>
                         </div>
-
                       </div>
 
-                      <div className="font-tabular font-semibold text-right">{p.price.toLocaleString()} KES</div>
-
+                      <div className="text-right shrink-0">
+                        <div className="font-tabular font-bold text-base text-emerald-600 dark:text-emerald-400">
+                          {Number(p.price || 0).toLocaleString()} <span className="text-[11px] font-normal text-slate-500">KES</span>
+                        </div>
+                        {p.costPrice > 0 && (
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500">
+                            Cost: {Number(p.costPrice).toLocaleString()} KES
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    
-
-                    <div className="flex justify-between items-center mt-2">
-
-                      <div className="text-sm text-[color:var(--text-secondary)]">{p.category || 'Uncategorized'}</div>
-
-                      <div className="flex items-center gap-4 text-sm">
-
-                        <div className="flex flex-col items-end">
-
-                          <span className="text-[10px] uppercase tracking-wider text-gray-500">In-Store</span>
-
-                          <span className={`font-semibold ${p.inStoreStock <= p.reorderLevel ? 'text-red-600' : 'text-gray-900'}`}>
-
-                            {p.inStoreStock}
-
-                          </span>
-
-                        </div>
-
-                        <div className="flex flex-col items-end">
-
-                          <span className="text-[10px] uppercase tracking-wider text-gray-500">Total</span>
-
-                          <span className={`font-semibold ${p.totalStock <= p.reorderLevel ? 'text-red-600' : 'text-blue-600'}`}>
-
-                            {p.totalStock}
-
-                          </span>
-
-                        </div>
-
+                    {/* Stock Metrics Row */}
+                    <div className="grid grid-cols-3 gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-white/5 text-center">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          In-Store
+                        </span>
+                        <span className={`text-xs font-bold mt-0.5 ${p.inStoreStock <= p.reorderLevel ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                          {p.inStoreStock ?? 0}
+                        </span>
                       </div>
 
+                      <div className="flex flex-col border-x border-slate-200/60 dark:border-white/10">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Central
+                        </span>
+                        <span className="text-xs font-bold mt-0.5 text-blue-600 dark:text-cyan-400">
+                          {p.storeStock ?? (Math.max(0, (p.totalStock ?? 0) - (p.inStoreStock ?? 0)))}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Total Stock
+                        </span>
+                        <span className={`text-xs font-bold mt-0.5 ${p.totalStock <= p.reorderLevel ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+                          {p.totalStock ?? 0}
+                        </span>
+                      </div>
                     </div>
 
-
-
-                    <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-[color:var(--border-glass)]">
-
-                      <button 
-
+                    {/* Action Bar */}
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-white/5 gap-2">
+                      <button
                         onClick={() => handleQuickAdd(p.id)}
-
-                        className="btn btn-icon btn-ghost btn-sm text-blue-600"
-
+                        className="flex-1 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold text-xs inline-flex items-center justify-center gap-1.5 border border-blue-200 dark:border-blue-800/60 transition-colors"
                         title="Quick Add Stock"
-
                       >
-
-                        <Plus className="w-4 h-4" />
-
+                        <Plus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        <span>Add Stock</span>
                       </button>
 
-                      <button onClick={() => handleEdit(p)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleEdit(p)}
+                          className="h-9 px-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-xs inline-flex items-center gap-1 transition-colors"
+                          title="Edit Product"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                          <span>Edit</span>
+                        </button>
 
-                        <Edit2 className="w-4 h-4" />
-
-                      </button>
-
-                      <button onClick={() => handleDelete(p.id)} className="btn btn-icon btn-ghost btn-sm text-[color:var(--text-muted)] hover:text-red-500">
-
-                        <Trash2 className="w-4 h-4" />
-
-                      </button>
-
+                        <button
+                          onClick={() => handleDelete(p.id)}
+                          className="h-9 w-9 rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 inline-flex items-center justify-center transition-colors"
+                          title="Delete Product"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-
                   </div>
-
                 ))
-
             ) : (
-
-              <div className="text-center py-8 text-[color:var(--text-muted)]">
-
-                No products found. Add your first product!
-
+              <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-slate-300 dark:border-white/10 text-slate-500 dark:text-slate-400 text-xs">
+                No products found matching your filter.
               </div>
-
             )}
-
           </div>
-
         </div>
-
       </section>
 
 
@@ -1198,15 +1129,11 @@ export default function Inventory() {
 
           <div>
 
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to add</label>
-
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Quantity to add</label>
             <input 
-
               type="number" 
-
               required
-
-              className="w-full p-2 border rounded-lg" 
+              className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-white/15 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-tabular font-bold text-base focus:outline-none focus:ring-2 focus:ring-blue-500" 
 
               value={quickAddQty} 
 
@@ -1222,9 +1149,9 @@ export default function Inventory() {
 
           <div className="flex justify-end gap-2 pt-2">
 
-            <button type="button" onClick={() => setQuickAddProduct(null)} className="btn btn-ghost">Cancel</button>
+            <button type="button" onClick={() => setQuickAddProduct(null)} className="btn btn-ghost text-slate-600 dark:text-slate-300">Cancel</button>
 
-            <button type="submit" className="btn btn-primary">Add Stock</button>
+            <button type="submit" className="btn btn-primary rounded-xl shadow-md">Add Stock</button>
 
           </div>
 
@@ -1252,9 +1179,8 @@ export default function Inventory() {
 
           {bizSettings.hasCentralStore ? (
 
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-white/10 rounded-2xl space-y-2.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
 
                 Goods Receiving Destination
 
@@ -1270,7 +1196,7 @@ export default function Inventory() {
 
                   className={`p-2.5 rounded-lg border text-left flex items-center gap-2 transition-all ${
 
-                    receiveDestination === 'STORE' ? 'border-blue-600 bg-blue-50 text-blue-900 font-semibold' : 'border-slate-200 bg-white text-slate-700'
+                    receiveDestination === 'STORE' ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-300 font-semibold shadow-sm' : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
 
                   }`}
 
@@ -1290,7 +1216,7 @@ export default function Inventory() {
 
                   className={`p-2.5 rounded-lg border text-left flex items-center gap-2 transition-all ${
 
-                    receiveDestination === 'SHARED' ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-semibold' : 'border-slate-200 bg-white text-slate-700'
+                    receiveDestination === 'SHARED' ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 font-semibold shadow-sm' : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
 
                   }`}
 
@@ -1308,7 +1234,7 @@ export default function Inventory() {
 
           ) : (
 
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
+            <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl text-xs text-emerald-900 dark:text-emerald-200 flex items-start gap-2.5">
 
               <Boxes className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
 
@@ -1328,11 +1254,7 @@ export default function Inventory() {
 
           <div>
 
-            <label className="block text-sm font-semibold text-gray-800 mb-1.5">
-
-              Select Product to Receive *
-
-            </label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Select Product to Receive *</label>
 
 
 
@@ -1340,7 +1262,7 @@ export default function Inventory() {
 
               /* Selected Product Card */
 
-              <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+              <div className="bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-300 dark:border-emerald-700/60 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
 
                 <div className="flex items-center gap-3 min-w-0">
 
@@ -1352,7 +1274,7 @@ export default function Inventory() {
 
                   <div className="min-w-0">
 
-                    <div className="font-bold text-gray-900 text-base truncate">
+                    <div className="font-bold text-slate-900 dark:text-white text-base truncate">
 
                       {selectedReceiveProduct.name}
 
@@ -1360,7 +1282,7 @@ export default function Inventory() {
 
                     <div className="flex items-center gap-2 flex-wrap text-xs text-gray-600 mt-0.5">
 
-                      <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                      <span className="font-mono bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-1.5 py-0.5 rounded border border-slate-200 dark:border-white/10">
 
                         SKU: {selectedReceiveProduct.sku}
 
@@ -1368,7 +1290,7 @@ export default function Inventory() {
 
                       {selectedReceiveProduct.barcode && (
 
-                        <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200 flex items-center gap-1">
+                        <span className="font-mono bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-1.5 py-0.5 rounded border border-slate-200 dark:border-white/10 flex items-center gap-1">
 
                           <Barcode className="w-3 h-3 text-gray-500" />
 
@@ -1378,7 +1300,7 @@ export default function Inventory() {
 
                       )}
 
-                      <span className="font-semibold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
+                      <span className="font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-900/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-700/50">
 
                         Current In-Store: {selectedReceiveProduct.inStoreStock ?? selectedReceiveProduct.stock ?? 0} units
 
@@ -1404,7 +1326,7 @@ export default function Inventory() {
 
                   }}
 
-                  className="btn btn-sm btn-secondary bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 shrink-0 inline-flex items-center gap-1"
+                  className="btn btn-sm btn-secondary bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10 rounded-xl shrink-0 inline-flex items-center gap-1"
 
                 >
 
@@ -1440,7 +1362,7 @@ export default function Inventory() {
 
                     placeholder="Search by product name, SKU, or scan barcode with scanner..."
 
-                    className="w-full pl-9 pr-8 py-2.5 border-2 border-blue-300 rounded-xl bg-white text-sm focus:outline-none focus:border-blue-600 transition-colors shadow-sm"
+                    className="w-full pl-9 pr-8 py-2.5 border-2 border-blue-300 dark:border-blue-700/60 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 transition-colors shadow-sm"
 
                   />
 
@@ -1474,7 +1396,7 @@ export default function Inventory() {
 
                 {/* Filtered Search Results Dropdown List */}
 
-                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-inner max-h-56 overflow-y-auto divide-y divide-gray-100">
+                <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-slate-800 shadow-inner max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-white/5">
 
                   {receiveMatchingProducts.length > 0 ? (
 
@@ -1486,13 +1408,13 @@ export default function Inventory() {
 
                         onClick={() => handleSelectReceiveProduct(p)}
 
-                        className="p-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between gap-3 transition-colors"
+                        className="p-2.5 hover:bg-blue-50 dark:hover:bg-slate-700 cursor-pointer flex items-center justify-between gap-3 transition-colors"
 
                       >
 
                         <div className="min-w-0">
 
-                          <div className="font-semibold text-sm text-gray-900 truncate">
+                          <div className="font-semibold text-sm text-slate-900 dark:text-white truncate">
 
                             {p.name}
 
@@ -1516,7 +1438,7 @@ export default function Inventory() {
 
                             <div className="text-xs text-gray-500">In-Store</div>
 
-                            <div className="font-bold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            <div className="font-bold text-xs text-blue-700 dark:text-cyan-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800/60">
 
                               {p.inStoreStock ?? p.stock ?? 0} units
 
@@ -1572,58 +1494,31 @@ export default function Inventory() {
 
             <div>
 
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-
-                Quantity Received (Units) *
-
-              </label>
-
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Quantity Received (Units) *</label>
               <input
-
                 ref={receiveQtyInputRef}
-
                 type="number"
-
                 required
-
                 min="1"
-
                 placeholder="e.g. 100"
-
                 value={receiveForm.quantity}
-
                 onChange={e => setReceiveForm({ ...receiveForm, quantity: e.target.value })}
-
-                className="w-full p-2.5 border rounded-lg text-base font-semibold"
-
+                className="w-full p-2.5 border border-slate-300 dark:border-white/15 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-base font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
 
             </div>
 
             <div>
 
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-
-                New Cost Price (Optional, KES)
-
-              </label>
-
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">New Cost Price (Optional, KES)</label>
               <input
-
                 type="number"
-
                 step="0.01"
-
                 min="0"
-
                 placeholder="e.g. 450.00"
-
                 value={receiveForm.costPrice}
-
                 onChange={e => setReceiveForm({ ...receiveForm, costPrice: e.target.value })}
-
-                className="w-full p-2.5 border rounded-lg"
-
+                className="w-full p-2.5 border border-slate-300 dark:border-white/15 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
 
             </div>
@@ -1634,24 +1529,13 @@ export default function Inventory() {
 
           <div>
 
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-
-              Supplier Delivery Note / Invoice Ref
-
-            </label>
-
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Supplier Delivery Note / Invoice Ref</label>
             <input
-
               type="text"
-
               placeholder="e.g. Invoice #9823 / Brookside Dairy"
-
               value={receiveForm.referenceNote}
-
               onChange={e => setReceiveForm({ ...receiveForm, referenceNote: e.target.value })}
-
-              className="w-full p-2.5 border rounded-lg"
-
+              className="w-full p-2.5 border border-slate-300 dark:border-white/15 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
 
           </div>
@@ -1661,12 +1545,9 @@ export default function Inventory() {
           <div className="flex justify-end gap-2 pt-3 border-t">
 
             <button 
-
               type="button" 
-
               onClick={() => setIsReceiveModalOpen(false)} 
-
-              className="btn btn-ghost"
+              className="btn btn-ghost text-slate-600 dark:text-slate-300 rounded-xl"
 
               disabled={isReceiving}
 
@@ -1680,7 +1561,7 @@ export default function Inventory() {
 
               type="submit" 
 
-              className="btn btn-primary inline-flex items-center gap-1.5"
+              className="btn btn-primary inline-flex items-center gap-1.5 rounded-xl shadow-md"
 
               disabled={isReceiving || !receiveForm.productId || !receiveForm.quantity}
 

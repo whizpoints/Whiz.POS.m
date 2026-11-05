@@ -3,54 +3,56 @@ import { Link } from 'react-router-dom';
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#060b14] py-12 px-4 sm:px-6 lg:px-8 font-sans transition-colors duration-200">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900/90 rounded-2xl shadow-sm border border-slate-200 dark:border-white/10 overflow-hidden">
         <div className="p-8 sm:p-12">
-          <Link to="/auth" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-8">
+          <Link to="/auth" className="inline-flex items-center text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors mb-8">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Login
           </Link>
           
           <div className="flex items-center gap-4 mb-4">
-            <Scale className="w-10 h-10 text-emerald-600" />
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">Terms of Service & EULA</h1>
+            <Scale className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">Terms of Service & EULA</h1>
           </div>
-          <p className="text-slate-500 mb-8 font-medium border-b pb-8">Last Updated and Effective: September 2026</p>
+          <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium border-b border-slate-200 dark:border-white/10 pb-8">
+            Last Updated and Effective: September 2026
+          </p>
           
-          <div className="prose prose-slate prose-a:text-emerald-600 max-w-none space-y-8 text-slate-700 text-sm leading-relaxed">
+          <div className="max-w-none space-y-8 text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
             
             <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">1. Binding Agreement</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">1. Binding Agreement</h2>
               <p>
                 By accessing, registering, or utilizing the Whiz POS platform and its associated services (collectively, the "Services"), you are entering into a legally binding agreement with Whiz POS. If you are accepting these terms on behalf of a company, business, or other legal entity, you represent that you have the authority to bind such entity to these Terms.
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">2. Financial Compliance and Anti-Money Laundering (AML)</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">2. Financial Compliance and Anti-Money Laundering (AML)</h2>
               <p>
-                Whiz POS provides software solutions for business management and is strictly <strong>not a bank, payment gateway, money transmitter, or financial institution</strong>. You bear the sole and absolute responsibility for all financial transactions, records, and activities conducted through your tenant account.
+                Whiz POS provides software solutions for business management and is strictly <strong className="text-slate-900 dark:text-white">not a bank, payment gateway, money transmitter, or financial institution</strong>. You bear the sole and absolute responsibility for all financial transactions, records, and activities conducted through your tenant account.
               </p>
               <ul className="list-disc pl-5 mt-4 space-y-2">
-                <li><strong>Prohibited Activities:</strong> You expressly agree that you will not use the Services to facilitate, conduct, or conceal any illegal activities, including but not limited to money laundering, terrorist financing, tax evasion, fraud, or the sale of illicit goods and services.</li>
-                <li><strong>Regulatory Compliance:</strong> You are solely responsible for ensuring that your business complies with all applicable local, national, and international laws, tax regulations, and accounting standards.</li>
-                <li><strong>Right to Suspend:</strong> We reserve the absolute right to immediately suspend, restrict, or permanently terminate your access to the Services, without prior notice, if we detect, suspect, or are notified by law enforcement of any fraudulent, suspicious, or illegal activity occurring within your workspace.</li>
+                <li><strong className="text-slate-900 dark:text-white">Prohibited Activities:</strong> You expressly agree that you will not use the Services to facilitate, conduct, or conceal any illegal activities, including but not limited to money laundering, terrorist financing, tax evasion, fraud, or the sale of illicit goods and services.</li>
+                <li><strong className="text-slate-900 dark:text-white">Regulatory Compliance:</strong> You are solely responsible for ensuring that your business complies with all applicable local, national, and international laws, tax regulations, and accounting standards.</li>
+                <li><strong className="text-slate-900 dark:text-white">Right to Suspend:</strong> We reserve the absolute right to immediately suspend, restrict, or permanently terminate your access to the Services, without prior notice, if we detect, suspect, or are notified by law enforcement of any fraudulent, suspicious, or illegal activity occurring within your workspace.</li>
               </ul>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">3. Limitation of Liability and Indemnification</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">3. Limitation of Liability and Indemnification</h2>
               <p>
                 To the maximum extent permitted by applicable law, in no event shall Whiz POS, its creators, affiliates, directors, or employees be liable for any indirect, punitive, incidental, special, consequential, or exemplary damages.
               </p>
               <ul className="list-disc pl-5 mt-4 space-y-2">
-                <li><strong>Data & Financial Accuracy:</strong> We provide no warranty regarding the accuracy of financial calculations, tax outputs, or inventory valuations generated by the Services. You are entirely responsible for verifying all financial data before filing taxes or making financial decisions.</li>
-                <li><strong>Indemnification:</strong> You agree to defend, indemnify, and hold harmless Whiz POS from any claims, damages, obligations, losses, liabilities, costs, or debt arising from your violation of these Terms, your violation of any third-party right, or any claim that your use of the Services caused damage to a third party or violated financial laws.</li>
+                <li><strong className="text-slate-900 dark:text-white">Data & Financial Accuracy:</strong> We provide no warranty regarding the accuracy of financial calculations, tax outputs, or inventory valuations generated by the Services. You are entirely responsible for verifying all financial data before filing taxes or making financial decisions.</li>
+                <li><strong className="text-slate-900 dark:text-white">Indemnification:</strong> You agree to defend, indemnify, and hold harmless Whiz POS from any claims, damages, obligations, losses, liabilities, costs, or debt arising from your violation of these Terms, your violation of any third-party right, or any claim that your use of the Services caused damage to a third party or violated financial laws.</li>
               </ul>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">4. Proprietary Rights & System Integrity</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">4. Proprietary Rights & System Integrity</h2>
               <p>
                 The Services—including all source code, architecture, design logic, user interfaces, and security mechanisms—are the exclusive intellectual property of Whiz POS.
               </p>
@@ -61,14 +63,14 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">5. Data Ownership and Processing</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">5. Data Ownership and Processing</h2>
               <p>
                 You retain all rights and ownership to the business data you input into the Services. By submitting data, you grant Whiz POS a limited, non-exclusive license to process, store, and transmit this data strictly for the purpose of providing the Services to you. Our data processing methodologies are strictly confidential to prevent cyber reconnaissance and protect the structural integrity of our cloud environment.
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-4 uppercase tracking-wider text-xs">6. Termination</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">6. Termination</h2>
               <p>
                 We may terminate or suspend your account immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms. Upon termination, your right to use the Services will immediately cease, and your data may be scheduled for permanent deletion in accordance with our security protocols.
               </p>

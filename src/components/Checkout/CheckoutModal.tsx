@@ -274,7 +274,7 @@ export default function CheckoutModal() {
           </div>
 
           {/* Column 2: Dynamic Payment Tender Area */}
-          <div className="flex-1 p-3 md:p-6 overflow-y-auto bg-white flex flex-col min-w-0">
+          <div className="flex-1 p-3 md:p-4 overflow-y-auto bg-white flex flex-col min-w-0">
             
             {/* Split Payment Progress Ledger (Appears when 1+ partial payment is recorded) */}
             {isSplitActive && (

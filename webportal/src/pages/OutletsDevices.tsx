@@ -160,30 +160,30 @@ export default function OutletsDevices() {
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
                         </div>
-                        <h3 className="font-bold text-slate-800 text-xl">Server Connected</h3>
+                        <h3 className="font-bold text-slate-900 dark:text-white text-xl">Server Connected</h3>
                       </div>
-                      <p className="text-sm text-slate-600 max-w-lg mb-4">
+                      <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mb-4">
                         A local server is currently paired to this branch. It is handling offline transactions and routing data to the cloud. You can link multiple server nodes using the same API key.
                       </p>
                       <div className="flex flex-wrap gap-4 text-sm">
-                        <div className="bg-white/60 px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
+                        <div className="bg-white/80 dark:bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100 shadow-sm flex items-center gap-2">
                            <Server className="w-4 h-4 text-emerald-500" />
-                           <span className="text-slate-500 font-semibold">Node ID:</span> 
-                           <span className="text-slate-800 font-mono font-bold tracking-wider">SVR-{activeLocation.apiKey.substring(0, 6).toUpperCase()}</span>
+                           <span className="text-slate-500 dark:text-slate-400 font-semibold">Node ID:</span> 
+                           <span className="text-slate-900 dark:text-white font-mono font-bold tracking-wider">SVR-{activeLocation.apiKey.substring(0, 6).toUpperCase()}</span>
                         </div>
-                        <div className="bg-white/60 px-3 py-1.5 rounded-lg border border-slate-200">
-                           <span className="text-slate-500 font-semibold mr-2">Last Sync:</span> 
-                           <span className="text-slate-800 font-mono">Just now</span>
+                        <div className="bg-white/80 dark:bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100">
+                           <span className="text-slate-500 dark:text-slate-400 font-semibold mr-2">Last Sync:</span> 
+                           <span className="text-slate-900 dark:text-white font-mono">Just now</span>
                         </div>
-                        <div className="bg-white/60 px-3 py-1.5 rounded-lg border border-slate-200">
-                           <span className="text-slate-500 font-semibold mr-2">API Key:</span> 
-                           <span className="text-slate-800 font-mono">****************{activeLocation.apiKey.slice(-4)}</span>
+                        <div className="bg-white/80 dark:bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100">
+                           <span className="text-slate-500 dark:text-slate-400 font-semibold mr-2">API Key:</span> 
+                           <span className="text-slate-900 dark:text-white font-mono">****************{activeLocation.apiKey.slice(-4)}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex flex-col gap-3 min-w-[200px]">
                       <button 
-                        className="bg-white text-slate-700 hover:text-sky-600 font-bold py-2.5 px-6 rounded-xl border border-slate-200 shadow-sm transition-all flex items-center justify-center gap-2" 
+                        className="bg-white text-slate-800 dark:text-slate-200 hover:text-sky-600 font-bold py-2.5 px-6 rounded-xl border border-slate-200 shadow-sm transition-all flex items-center justify-center gap-2" 
                         onClick={generatePairingCode}
                         disabled={isGenerating}
                       >
@@ -191,7 +191,7 @@ export default function OutletsDevices() {
                          Link Another Server
                       </button>
                         <button 
-                          className="bg-white text-red-500 hover:bg-red-50 font-bold py-2.5 px-6 rounded-xl border border-red-100 shadow-sm transition-all flex items-center justify-center gap-2"
+                          className="bg-white dark:bg-slate-800 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 font-bold py-2.5 px-6 rounded-xl border border-red-200 dark:border-red-500/20 shadow-sm transition-all flex items-center justify-center gap-2"
                           onClick={unlinkServers}
                           disabled={isUnlinking}
                         >
@@ -202,10 +202,10 @@ export default function OutletsDevices() {
                  </div>
               ) : (
                  <div>
-                    <h3 className="font-bold text-slate-800 mb-2">
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-2">
                       {activeLocation?.apiKey ? 'Link Additional Server Node' : 'Master API Node Pairing'}
                     </h3>
-                    <p className="text-sm text-slate-600 mb-6 max-w-2xl">
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 max-w-2xl">
                       To link a Whiz Local Server appliance to this specific branch, generate a secure handshake code. 
                       You will need to enter both the API Key and Pairing Code in the local server's setup wizard. 
                       <span className="font-semibold text-amber-600 ml-1">The pairing code expires in 15 minutes.</span>
@@ -225,12 +225,12 @@ export default function OutletsDevices() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl animate-in slide-in-from-top-4">
                           <div className="bg-white/80 p-4 rounded-2xl border border-slate-200 shadow-sm backdrop-blur-sm">
                             <div className="flex justify-between items-center mb-1">
-                              <div className="text-xs font-bold text-slate-500 uppercase">Permanent API Key</div>
+                              <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Permanent API Key</div>
                               <button onClick={() => handleCopy(pairingData.apiKey, 'API Key')} className="text-sky-500 hover:text-sky-600 bg-sky-50 hover:bg-sky-100 p-1.5 rounded-lg transition-colors">
                                 <Copy className="w-4 h-4" />
                               </button>
                             </div>
-                            <div className="font-mono text-sm text-slate-800 break-all bg-slate-50/50 p-2.5 rounded-xl border border-slate-100 mt-2">
+                            <div className="font-mono text-sm text-slate-900 dark:text-white break-all bg-slate-50/50 p-2.5 rounded-xl border border-slate-100 mt-2">
                               {pairingData.apiKey}
                             </div>
                           </div>
@@ -250,7 +250,7 @@ export default function OutletsDevices() {
                         {activeLocation?.apiKey && (
                            <button 
                              onClick={() => setPairingData(null)}
-                             className="text-sm text-slate-500 hover:text-sky-600 font-semibold"
+                             className="text-sm text-slate-500 dark:text-slate-400 hover:text-sky-600 font-semibold"
                            >
                              &larr; Back to Connected Server Dashboard
                            </button>

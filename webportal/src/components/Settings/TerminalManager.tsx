@@ -106,11 +106,11 @@ export default function TerminalManager() {
   return (
     <div className="space-y-4">
       {loading ? (
-        <p className="text-slate-500">Loading devices...</p>
+        <p className="text-slate-500 dark:text-slate-400">Loading devices...</p>
       ) : terminals.length === 0 ? (
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center text-slate-500">
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center text-slate-500 dark:text-slate-400">
           <Monitor className="w-10 h-10 mx-auto mb-3 opacity-40 text-slate-400" />
-          <p className="font-semibold text-slate-700">No POS Terminals or Server Nodes found.</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-200">No POS Terminals or Server Nodes found.</p>
           <p className="text-xs text-slate-400 mt-1">Pair a local server or connect a POS client device to see it appear here.</p>
         </div>
       ) : (
@@ -118,7 +118,7 @@ export default function TerminalManager() {
           {terminals.map(term => {
             const isServer = term.deviceType === 'EDGE_SERVER' || (term.name && term.name.toLowerCase().includes('server'));
             return (
-              <div key={term.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all">
+              <div key={term.id} className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-white/10 p-5 shadow-sm hover:shadow-md transition-all text-slate-900 dark:text-white">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className={`p-2.5 rounded-xl ${term.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
@@ -126,7 +126,7 @@ export default function TerminalManager() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-800 text-sm">{term.name}</h4>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm">{term.name}</h4>
                         {isServer && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-600 uppercase tracking-wide border border-sky-100">
                             Edge Node
@@ -153,7 +153,7 @@ export default function TerminalManager() {
                     </button>
                     <button 
                       onClick={() => handleDelete(term.id)}
-                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-xl transition-colors"
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 dark:text-slate-300 text-xs font-semibold py-2 rounded-xl transition-colors"
                     >
                       Reject
                     </button>

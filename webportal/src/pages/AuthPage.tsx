@@ -265,7 +265,7 @@ export default function AuthPage() {
       {/* ========================================================================= */}
       {/* RIGHT PANEL: MOBILE-FRIENDLY AUTH FORM CARD */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex flex-col justify-center items-center p-4 sm:p-6 lg:p-12 relative z-10 w-full min-h-[100dvh]">
+      <div className="flex-1 flex flex-col justify-center items-center py-8 px-4 sm:p-6 lg:p-12 relative z-10 w-full min-h-[100dvh] overflow-y-auto">
         
         {/* Mobile Header Bar */}
         <div className="w-full max-w-md flex items-center justify-between mb-6">
@@ -294,7 +294,7 @@ export default function AuthPage() {
         </div>
 
         {/* Central Auth Monolith Container */}
-        <div className={`w-full max-w-md rounded-3xl p-6 sm:p-8 border shadow-xl backdrop-blur-2xl transition-all ${
+        <div className={`w-full max-w-md rounded-3xl p-5 sm:p-8 border shadow-xl backdrop-blur-2xl transition-all ${
           isDark 
             ? 'bg-slate-900/90 border-white/10 shadow-2xl text-white' 
             : 'bg-white/95 border-slate-200 shadow-slate-200/50 text-slate-900'
@@ -414,7 +414,7 @@ export default function AuthPage() {
                 {/* Business Name Field (Signup Only) */}
                 {!isLogin && (
                   <div className="space-y-1.5 animate-in fade-in duration-200">
-                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 ml-0.5">Business Name</label>
+                    <label className="text-xs font-bold text-slate-900 dark:text-slate-100 ml-0.5">Business Name</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <Building2 className="w-4 h-4" />
@@ -437,7 +437,7 @@ export default function AuthPage() {
 
                 {/* Email Field */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 ml-0.5">Email Address</label>
+                  <label className="text-xs font-bold text-slate-900 dark:text-slate-100 ml-0.5">Email Address</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Mail className="w-4 h-4" />
@@ -460,9 +460,9 @@ export default function AuthPage() {
                 {/* Password Field */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between ml-0.5">
-                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200">Password</label>
+                    <label className="text-xs font-bold text-slate-900 dark:text-slate-100">Password</label>
                     {isLogin && (
-                      <span className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer">
+                      <span className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer">
                         Forgot password?
                       </span>
                     )}
@@ -518,7 +518,7 @@ export default function AuthPage() {
                   <div className="pt-2">
                     <div className="relative flex py-2 items-center">
                       <div className="flex-grow border-t border-slate-200 dark:border-white/10" />
-                      <span className="flex-shrink mx-3 text-[11px] font-mono uppercase tracking-wider text-slate-400">
+                      <span className="flex-shrink mx-3 text-[11px] font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 font-bold">
                         Or continue with
                       </span>
                       <div className="flex-grow border-t border-slate-200 dark:border-white/10" />
@@ -528,9 +528,7 @@ export default function AuthPage() {
                       type="button"
                       onClick={handleGoogleLogin}
                       className={`w-full h-12 rounded-xl border font-bold text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
-                        isDark 
-                          ? 'bg-slate-950/60 hover:bg-slate-800 border-white/10 text-white shadow-xs' 
-                          : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-xs'
+                        isDark ? 'bg-slate-950/60 hover:bg-slate-800 border-white/10 text-white shadow-xs' : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-900 font-bold shadow-xs'
                       }`}
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -554,7 +552,7 @@ export default function AuthPage() {
                     <button
                       type="button"
                       onClick={() => setIsLogin(false)}
-                      className="font-bold text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer ml-1"
+                      className="font-bold text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer ml-1"
                     >
                       Start 14-day free trial &rarr;
                     </button>
@@ -565,7 +563,7 @@ export default function AuthPage() {
                     <button
                       type="button"
                       onClick={() => setIsLogin(true)}
-                      className="font-bold text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer ml-1"
+                      className="font-bold text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer ml-1"
                     >
                       Sign in here &rarr;
                     </button>
@@ -577,10 +575,10 @@ export default function AuthPage() {
           )}
 
           {/* Legal micro-copy */}
-          <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/10 text-center text-[11px] text-slate-700 dark:text-slate-300">
+          <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/10 text-center text-[11px] text-slate-600 dark:text-slate-400">
             By signing in, you agree to our{' '}
-            <Link to="/terms" className="underline hover:text-cyan-500">Terms of Service</Link> and{' '}
-            <Link to="/privacy" className="underline hover:text-cyan-500">Privacy Policy</Link>.
+            <Link to="/terms" className="underline font-semibold text-slate-900 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400">Terms of Service</Link> and{' '}
+            <Link to="/privacy" className="underline font-semibold text-slate-900 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400">Privacy Policy</Link>.
           </div>
 
         </div>

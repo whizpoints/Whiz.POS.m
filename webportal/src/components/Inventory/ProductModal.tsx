@@ -76,54 +76,118 @@ export default function ProductModal({ isOpen, onClose, product, onComplete }: P
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">{product ? 'Edit Product' : 'New Product'}</h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-slate-900 dark:text-white max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-200 dark:border-white/10 shrink-0">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{product ? 'Edit Product' : 'New Product'}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Define catalog specifications and base pricing</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
-              <input type="text" required className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} />
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">SKU / Code *</label>
+              <input 
+                type="text" 
+                required 
+                className="w-full border border-slate-300 dark:border-white/15 rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                value={formData.sku} 
+                onChange={e => setFormData({ ...formData, sku: e.target.value })} 
+                placeholder="e.g. BEV-001"
+              />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input type="text" required className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <input type="text" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price (KES)</label>
-              <input type="number" required min="0" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.price} onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price (KES)</label>
-              <input type="number" required min="0" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.costPrice} onChange={e => setFormData({ ...formData, costPrice: Number(e.target.value) })} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">In-Store Stock (Central Warehouse)</label>
-              <input type="number" required min="0" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.stock} onChange={e => setFormData({ ...formData, stock: Number(e.target.value) })}  />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Reorder Level</label>
-              <input type="number" required min="0" className="w-full border border-gray-300 rounded-lg px-4 py-2" value={formData.reorderLevel} onChange={e => setFormData({ ...formData, reorderLevel: Number(e.target.value) })} />
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Product Name *</label>
+              <input 
+                type="text" 
+                required 
+                className="w-full border border-slate-300 dark:border-white/15 rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                value={formData.name} 
+                onChange={e => setFormData({ ...formData, name: e.target.value })} 
+                placeholder="e.g. Fresh Milk 500ml"
+              />
             </div>
           </div>
 
-          <div className="pt-4 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Category</label>
+            <input 
+              type="text" 
+              className="w-full border border-slate-300 dark:border-white/15 rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+              value={formData.category} 
+              onChange={e => setFormData({ ...formData, category: e.target.value })} 
+              placeholder="e.g. Dairy, Beverages, Snacks"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Selling Price (KES) *</label>
+              <input 
+                type="number" 
+                required 
+                min="0" 
+                className="w-full border border-slate-300 dark:border-white/15 rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white font-tabular font-bold text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+                value={formData.price} 
+                onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} 
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Cost Price (KES)</label>
+              <input 
+                type="number" 
+                required 
+                min="0" 
+                className="w-full border border-slate-300 dark:border-white/15 rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white font-tabular text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                value={formData.costPrice} 
+                onChange={e => setFormData({ ...formData, costPrice: Number(e.target.value) })} 
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Initial In-Store Stock</label>
+              <input 
+                type="number" 
+                required 
+                min="0" 
+                className="w-full border border-slate-300 dark:border-white/15 rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                value={formData.stock} 
+                onChange={e => setFormData({ ...formData, stock: Number(e.target.value) })} 
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1.5">Reorder Alert Level</label>
+              <input 
+                type="number" 
+                required 
+                min="0" 
+                className="w-full border border-slate-300 dark:border-white/15 rounded-xl px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                value={formData.reorderLevel} 
+                onChange={e => setFormData({ ...formData, reorderLevel: Number(e.target.value) })} 
+              />
+            </div>
+          </div>
+
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-white/5">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-5 py-2.5 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 rounded-xl font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={isSubmitting} 
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-sm shadow-md flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer"
+            >
               {isSubmitting ? 'Saving...' : <><Save className="w-4 h-4" /> Save Product</>}
             </button>
           </div>

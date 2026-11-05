@@ -97,6 +97,7 @@ function ThemeProvider({ children }: { children: ReactNode }) {
     const isDark = theme === 'dark' || (theme === 'system' && systemDark);
     setResolvedTheme(isDark ? 'dark' : 'light');
     root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    root.classList.toggle('dark', isDark);
   }, [theme]);
 
   useEffect(() => {
@@ -106,6 +107,7 @@ function ThemeProvider({ children }: { children: ReactNode }) {
       const isDark = mql.matches;
       setResolvedTheme(isDark ? 'dark' : 'light');
       document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', isDark);
     };
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
@@ -253,6 +255,8 @@ function App() {
    PUBLIC LAYOUT (Landing, Auth, Pricing, FAQ, Docs)
 ============================================================ */
 function PublicLayout({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const isLanding = location.pathname === '/';
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -295,27 +299,44 @@ function PublicLayout({ children }: { children: ReactNode }) {
         {children}
       </main>
 
-      <footer className="mt-12 border-t" style={{ borderColor: 'var(--border-glass)' }}>
-        <div className="glass-panel rounded-none border-x-0 border-b-0 py-8 px-4">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="sidebar-logo">
-                <img src="/logo.png" alt="Whiz POS" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <footer className={`mt-16 border-t transition-colors ${
+        isLanding 
+          ? 'bg-slate-950/80 border-white/10 text-slate-300' 
+          : 'bg-white/90 dark:bg-slate-950/80 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300'
+      }`}>
+        <div className="py-10 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+            
+            {/* Brand Logo & Slogan */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center p-1.5 shadow-md">
+                <img src="/logo.png" alt="Whiz POS" className="w-full h-full object-contain brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
               <div>
-                <div className="sidebar-brand text-sm">Whiz <span>POS</span></div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Modern Retail Operating System</div>
+                <div className="font-heading font-black text-base tracking-tight text-slate-900 dark:text-white">
+                  Whiz <span className="text-cyan-500">POS</span>
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  Modern Retail Operating System
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-5 flex-wrap justify-center" style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-              <Link to="/pricing" className="hover:text-[var(--accent-primary)] transition-colors">Pricing</Link>
-              <Link to="/faq" className="hover:text-[var(--accent-primary)] transition-colors">FAQ</Link>
-              <Link to="/docs" className="hover:text-[var(--accent-primary)] transition-colors">Docs</Link>
-              <Link to="/dashboard" className="hover:text-[var(--accent-primary)] transition-colors">Dashboard</Link>
+
+            {/* Navigation & Legal Links */}
+            <div className="flex items-center gap-6 flex-wrap justify-center text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <Link to="/pricing" className="hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors">Pricing</Link>
+              <Link to="/faq" className="hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors">FAQ</Link>
+              <Link to="/docs" className="hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors">Documentation</Link>
+              <Link to="/terms" className="hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors">Terms of Service</Link>
+              <Link to="/privacy" className="hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors">Privacy Policy</Link>
+              <Link to="/dashboard" className="hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors">Dashboard</Link>
             </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-              Â© 2026 Whiz POS. All rights reserved.
+
+            {/* Copyright */}
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              &copy; {new Date().getFullYear()} Whiz POS. All rights reserved.
             </div>
+
           </div>
         </div>
       </footer>

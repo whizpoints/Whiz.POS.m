@@ -232,7 +232,7 @@ export default function OutletDetails() {
     return (
       <div className="p-8 text-center space-y-4">
         <AlertCircle className="w-12 h-12 text-rose-500 mx-auto" />
-        <h2 className="text-xl font-bold text-gray-800">Outlet Not Found</h2>
+        <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100">Outlet Not Found</h2>
         <Link to="/dashboard/outlets" className="btn btn-secondary inline-flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" /> Back to Outlets
         </Link>
@@ -257,9 +257,9 @@ export default function OutletDetails() {
     <div className="space-y-6 p-4 md:p-6 animate-in fade-in duration-300">
       
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900/90 rounded-2xl p-6 border border-gray-100 dark:border-white/10 dark:border-white/10 shadow-sm text-gray-900 dark:text-white dark:text-white">
         <div className="flex items-center gap-4">
-          <Link to="/dashboard/outlets" className="p-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 transition-colors">
+          <Link to="/dashboard/outlets" className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:bg-slate-800/50 text-gray-600 dark:text-slate-300 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
@@ -267,9 +267,9 @@ export default function OutletDetails() {
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md">
                 Outlet Register
               </span>
-              <span className="text-xs text-gray-400 font-mono">ID: {outlet.id}</span>
+              <span className="text-xs text-gray-400 dark:text-slate-400 font-mono">ID: {outlet.id}</span>
             </div>
-            <h1 className="text-2xl font-black text-gray-900 mt-1 flex items-center gap-2">
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white mt-1 flex items-center gap-2">
               <Server className="w-6 h-6 text-blue-600" />
               {outlet.name}
             </h1>
@@ -291,19 +291,19 @@ export default function OutletDetails() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-gray-100 dark:border-white/10 dark:border-white/10 shadow-sm flex items-center justify-between text-gray-900 dark:text-white dark:text-white">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Assigned Products</p>
-            <p className="text-2xl font-black text-gray-900 mt-1">{outlet.inventory?.length || 0}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400">Assigned Products</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{outlet.inventory?.length || 0}</p>
           </div>
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
             <Package className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-gray-100 dark:border-white/10 dark:border-white/10 shadow-sm flex items-center justify-between text-gray-900 dark:text-white dark:text-white">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Total Stock On Hand</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400">Total Stock On Hand</p>
             <p className="text-2xl font-black text-emerald-600 mt-1">{totalStockUnits.toLocaleString()}</p>
           </div>
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -311,22 +311,22 @@ export default function OutletDetails() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-gray-100 dark:border-white/10 dark:border-white/10 shadow-sm flex items-center justify-between text-gray-900 dark:text-white dark:text-white">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Low Stock SKUs</p>
-            <p className={`text-2xl font-black mt-1 ${lowStockCount > 0 ? 'text-rose-600' : 'text-gray-900'}`}>
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400">Low Stock SKUs</p>
+            <p className={`text-2xl font-black mt-1 ${lowStockCount > 0 ? 'text-rose-600' : 'text-gray-900 dark:text-white'}`}>
               {lowStockCount}
             </p>
           </div>
-          <div className={`p-3 rounded-xl ${lowStockCount > 0 ? 'bg-rose-50 text-rose-600' : 'bg-gray-50 text-gray-400'}`}>
+          <div className={`p-3 rounded-xl ${lowStockCount > 0 ? 'bg-rose-50 text-rose-600' : 'bg-gray-50 dark:bg-slate-800/50 text-gray-400 dark:text-slate-400'}`}>
             <AlertCircle className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-gray-100 dark:border-white/10 dark:border-white/10 shadow-sm flex items-center justify-between text-gray-900 dark:text-white dark:text-white">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Assigned Cashiers</p>
-            <p className="text-2xl font-black text-gray-900 mt-1">{outlet.users?.length || 0}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400">Assigned Cashiers</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{outlet.users?.length || 0}</p>
           </div>
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
             <Users className="w-6 h-6" />
@@ -335,11 +335,11 @@ export default function OutletDetails() {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 dark:border-white/10">
         <button
           onClick={() => setActiveTab('inventory')}
           className={`px-5 py-3 font-semibold text-sm border-b-2 flex items-center gap-2 transition-colors ${
-            activeTab === 'inventory' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+            activeTab === 'inventory' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-100'
           }`}
         >
           <Package className="w-4 h-4" /> Outlet Inventory ({outlet.inventory?.length || 0})
@@ -348,7 +348,7 @@ export default function OutletDetails() {
         <button
           onClick={() => setActiveTab('staff')}
           className={`px-5 py-3 font-semibold text-sm border-b-2 flex items-center gap-2 transition-colors ${
-            activeTab === 'staff' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+            activeTab === 'staff' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-100'
           }`}
         >
           <Users className="w-4 h-4" /> Assigned Staff ({outlet.users?.length || 0})
@@ -357,7 +357,7 @@ export default function OutletDetails() {
         <button
           onClick={() => setActiveTab('overview')}
           className={`px-5 py-3 font-semibold text-sm border-b-2 flex items-center gap-2 transition-colors ${
-            activeTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+            activeTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-100'
           }`}
         >
           <Server className="w-4 h-4" /> Overview & Diagnostics
@@ -375,9 +375,9 @@ export default function OutletDetails() {
             const isOverStock = Boolean(selectedProductId) && Number(initialStock) > availableInCentralStore;
 
             return (
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+              <div className="bg-white dark:bg-slate-900/90 p-6 rounded-2xl border border-gray-200 dark:border-white/10 dark:border-white/10 shadow-sm space-y-4 text-gray-900 dark:text-white dark:text-white">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-gray-900">Assign Product from Central Store</h3>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Assign Product from Central Store</h3>
                   {selectedProductId && (
                     <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                       Central Store Available: {availableInCentralStore} units
@@ -389,7 +389,7 @@ export default function OutletDetails() {
                   <select
                     value={selectedProductId}
                     onChange={(e) => setSelectedProductId(e.target.value)}
-                    className="input flex-1 bg-white text-sm"
+                    className="input flex-1 bg-white dark:bg-slate-950/80 border dark:border-white/15 text-gray-900 dark:text-white text-sm"
                   >
                     <option value="">Select a product from Central Store...</option>
                     {unassignedProducts.map(p => {
@@ -442,8 +442,8 @@ export default function OutletDetails() {
           })()}
 
           {/* Inventory Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-gray-200 dark:border-white/10 dark:border-white/10 shadow-sm overflow-hidden text-gray-900 dark:text-white dark:text-white">
+            <div className="p-4 border-b border-gray-100 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="relative max-w-sm flex-1">
                 <input
                   type="text"
@@ -452,17 +452,17 @@ export default function OutletDetails() {
                   onChange={(e) => setInventorySearch(e.target.value)}
                   className="input !pl-9 text-sm w-full"
                 />
-                <Package className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Package className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400" />
               </div>
 
-              <div className="text-xs text-gray-500 font-medium">
+              <div className="text-xs text-gray-500 dark:text-slate-400 font-medium">
                 Showing {filteredInventory.length} of {outlet.inventory?.length || 0} products
               </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50/80 text-gray-600 uppercase text-xs border-b border-gray-100">
+                <thead className="bg-gray-50 dark:bg-slate-800/50/80 text-gray-600 dark:text-slate-300 uppercase text-xs border-b border-gray-100 dark:border-white/10">
                   <tr>
                     <th className="px-6 py-3.5">SKU</th>
                     <th className="px-6 py-3.5">Product Name</th>
@@ -475,7 +475,7 @@ export default function OutletDetails() {
                 <tbody className="divide-y divide-gray-100">
                   {filteredInventory.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-400 dark:text-slate-400">
                         {inventorySearch ? 'No products matching search in this outlet' : 'No products assigned to this outlet yet. Use the bar above to assign inventory.'}
                       </td>
                     </tr>
@@ -483,14 +483,14 @@ export default function OutletDetails() {
                     filteredInventory.map((item: any) => {
                       const isLowStock = (item.stock || 0) <= (item.reorderLevel || 5);
                       return (
-                        <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
-                          <td className="px-6 py-4 font-mono text-xs text-gray-500">{item.product?.sku || 'N/A'}</td>
-                          <td className="px-6 py-4 font-semibold text-gray-900">{item.product?.name || 'Unnamed Product'}</td>
-                          <td className="px-6 py-4 font-bold text-gray-900 text-right">
+                        <tr key={item.id} className="hover:bg-gray-50 dark:bg-slate-800/50/60 transition-colors">
+                          <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-slate-400">{item.product?.sku || 'N/A'}</td>
+                          <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">{item.product?.name || 'Unnamed Product'}</td>
+                          <td className="px-6 py-4 font-bold text-gray-900 dark:text-white text-right">
                             KES {Number(item.product?.price || 0).toLocaleString()}
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <span className={`text-base font-black ${isLowStock ? 'text-rose-600' : 'text-gray-900'}`}>
+                            <span className={`text-base font-black ${isLowStock ? 'text-rose-600' : 'text-gray-900 dark:text-white'}`}>
                               {item.stock}
                             </span>
                           </td>
@@ -537,13 +537,13 @@ export default function OutletDetails() {
       {/* TAB: STAFF */}
       {activeTab === 'staff' && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-            <h3 className="text-base font-bold text-gray-900">Assign Staff Member to this Outlet</h3>
+          <div className="bg-white dark:bg-slate-900/90 p-6 rounded-2xl border border-gray-200 dark:border-white/10 dark:border-white/10 shadow-sm space-y-4 text-gray-900 dark:text-white dark:text-white">
+            <h3 className="text-base font-bold text-gray-900 dark:text-white">Assign Staff Member to this Outlet</h3>
             <div className="flex flex-col sm:flex-row gap-3">
               <select
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                className="input flex-1 bg-white text-sm"
+                className="input flex-1 bg-white dark:bg-slate-950/80 border dark:border-white/15 text-gray-900 dark:text-white text-sm"
               >
                 <option value="">Select staff member...</option>
                 {allUsers
@@ -564,34 +564,34 @@ export default function OutletDetails() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-100 font-bold text-sm text-gray-900">
+          <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-gray-200 dark:border-white/10 dark:border-white/10 shadow-sm overflow-hidden text-gray-900 dark:text-white dark:text-white">
+            <div className="p-4 border-b border-gray-100 dark:border-white/10 font-bold text-sm text-gray-900 dark:text-white">
               Assigned Staff Members ({outlet.users?.length || 0})
             </div>
             <div className="divide-y divide-gray-100">
               {(outlet.users || []).length === 0 ? (
-                <div className="p-8 text-center text-gray-400 text-sm">
+                <div className="p-8 text-center text-gray-400 dark:text-slate-400 text-sm">
                   No staff members currently assigned to this outlet.
                 </div>
               ) : (
                 (outlet.users || []).map((user: any) => (
-                  <div key={user.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                  <div key={user.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:bg-slate-800/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm">
                         {user.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="font-semibold text-sm text-gray-900">{user.name}</div>
-                        <div className="text-xs text-gray-500">{user.email || 'No email registered'}</div>
+                        <div className="font-semibold text-sm text-gray-900 dark:text-white">{user.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-slate-400">{user.email || 'No email registered'}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-gray-100 text-gray-700">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 dark:text-slate-200">
                         {user.role || 'CASHIER'}
                       </span>
                       <button
                         onClick={() => removeUser(user.id)}
-                        className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                        className="p-1.5 text-gray-400 dark:text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
                         title="Remove staff from outlet"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -607,24 +607,24 @@ export default function OutletDetails() {
 
       {/* TAB: OVERVIEW */}
       {activeTab === 'overview' && (
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-          <h3 className="text-base font-bold text-gray-900">Outlet Details & Cloud Sync Status</h3>
+        <div className="bg-white dark:bg-slate-900/90 p-6 rounded-2xl border border-gray-200 dark:border-white/10 dark:border-white/10 shadow-sm space-y-4 text-gray-900 dark:text-white dark:text-white">
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">Outlet Details & Cloud Sync Status</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-xs text-gray-400 uppercase font-bold">Outlet Name</span>
-              <p className="text-base font-bold text-gray-900 mt-1">{outlet.name}</p>
+            <div className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-white/10">
+              <span className="text-xs text-gray-400 dark:text-slate-400 uppercase font-bold">Outlet Name</span>
+              <p className="text-base font-bold text-gray-900 dark:text-white mt-1">{outlet.name}</p>
             </div>
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-xs text-gray-400 uppercase font-bold">Outlet ID</span>
-              <p className="font-mono text-gray-900 mt-1">{outlet.id}</p>
+            <div className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-white/10">
+              <span className="text-xs text-gray-400 dark:text-slate-400 uppercase font-bold">Outlet ID</span>
+              <p className="font-mono text-gray-900 dark:text-white mt-1">{outlet.id}</p>
             </div>
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-xs text-gray-400 uppercase font-bold">Created At</span>
-              <p className="text-gray-900 mt-1">{new Date(outlet.createdAt).toLocaleString()}</p>
+            <div className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-white/10">
+              <span className="text-xs text-gray-400 dark:text-slate-400 uppercase font-bold">Created At</span>
+              <p className="text-gray-900 dark:text-white mt-1">{new Date(outlet.createdAt).toLocaleString()}</p>
             </div>
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-xs text-gray-400 uppercase font-bold">Last Synchronized</span>
-              <p className="text-gray-900 mt-1">{new Date(outlet.updatedAt).toLocaleString()}</p>
+            <div className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-white/10">
+              <span className="text-xs text-gray-400 dark:text-slate-400 uppercase font-bold">Last Synchronized</span>
+              <p className="text-gray-900 dark:text-white mt-1">{new Date(outlet.updatedAt).toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -633,12 +633,12 @@ export default function OutletDetails() {
       {/* Adjust Stock Modal */}
       {adjustStockModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-200 dark:border-white/10 dark:border-white/10 w-full max-w-md p-6 space-y-4 text-gray-900 dark:text-white dark:text-white">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 {adjustStockModal.type === 'ADD' ? 'Add Stock to Outlet' : 'Deduct Stock from Outlet'}
               </h3>
-              <button onClick={() => setAdjustStockModal(null)} className="p-1 rounded-full text-gray-400 hover:bg-gray-100">
+              <button onClick={() => setAdjustStockModal(null)} className="p-1 rounded-full text-gray-400 dark:text-slate-400 hover:bg-gray-100">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -650,8 +650,8 @@ export default function OutletDetails() {
 
               return (
                 <>
-                  <div className="flex items-center justify-between text-sm text-gray-600">
-                    <p>Product: <span className="font-bold text-gray-900">{adjustStockModal.productName}</span></p>
+                  <div className="flex items-center justify-between text-sm text-gray-600 dark:text-slate-300">
+                    <p>Product: <span className="font-bold text-gray-900 dark:text-white">{adjustStockModal.productName}</span></p>
                     {adjustStockModal.type === 'ADD' && (
                       <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
                         In Central Store: {adjustCentralStock}
@@ -660,7 +660,7 @@ export default function OutletDetails() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-gray-500 mb-1">
+                    <label className="block text-xs font-bold uppercase text-gray-500 dark:text-slate-400 mb-1">
                       Quantity to {adjustStockModal.type === 'ADD' ? 'Add (+)' : 'Deduct (-)'}
                     </label>
                     <input
@@ -677,7 +677,7 @@ export default function OutletDetails() {
                         Cannot add {adjustStockModal.amount} units: Central Store only has {adjustCentralStock} units available.
                       </p>
                     ) : (
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">
                         {adjustStockModal.type === 'ADD'
                           ? 'Deducts stock from Central Store and transfers it to this outlet.'
                           : 'Deducts stock from this outlet and returns it to Central Store.'}
